@@ -34,7 +34,7 @@ type Props = {
   palette: PaletteEntry[];
   colorMap: Record<string, YarnOption | null>;
   selectedHex: string | null;
-  onColorPick: (hex: string) => void;
+  onColorPick: (hex: string, clientX: number, clientY: number) => void;
 };
 
 const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCanvas(
@@ -130,7 +130,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     const hex = rgbToHex(r, g, b);
     // Only pick colors that are in the design palette — ignore click misses
     if (paletteHexSet.current.has(hex)) {
-      onColorPick(hex);
+      onColorPick(hex, clientX, clientY);
     }
   }
 

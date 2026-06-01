@@ -1,9 +1,11 @@
 /**
  * prisma/seed.ts
  *
- * Seeds the database with:
- *   1. Yarns from data/yarn-library-carpets-bazaar.csv
- *   2. Designs (run process-designs.ts first to upload images and get URLs)
+ * Seeds the database with designs from data/designs/manifest.json.
+ * Run process-designs.ts first to generate the manifest.
+ *
+ * Yarns are managed separately via `npm run import-yarns`
+ * (scripts/import-yarn-libraries.ts) and are never touched here.
  *
  * Usage:
  *   npx prisma db seed
@@ -12,64 +14,11 @@
 import "dotenv/config";
 import fs from "fs";
 import path from "path";
-import { parse } from "csv-parse/sync";
 import { PrismaClient } from "@/app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const db = new PrismaClient({ adapter });
-
-// ─── Yarn seeding ──────────────────────────────────────────────────────────────
-
-type YarnCsvRow = {
-  code: string;
-  name: string;
-  hex: string;
-  material: string;
-  pile_type: string;
-  sort_order: string;
-};
-
-async function seedYarns(): Promise<void> {
-  const csvPath = path.join(process.cwd(), "data", "yarn-library-carpets-bazaar.csv");
-
-  if (!fs.existsSync(csvPath)) {
-    console.warn("Yarn CSV not found at data/yarn-library-carpets-bazaar.csv — skipping.");
-    return;
-  }
-
-  const raw = fs.readFileSync(csvPath, "utf-8");
-  const rows: YarnCsvRow[] = parse(raw, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-  });
-
-  console.log(`Seeding ${rows.length} yarns...`);
-
-  for (const row of rows) {
-    await db.yarn.upsert({
-      where: { code: row.code },
-      update: {
-        name: row.name,
-        hex: row.hex.startsWith("#") ? row.hex : `#${row.hex}`,
-        material: row.material || null,
-        pileType: row.pile_type || null,
-        sortOrder: row.sort_order ? parseInt(row.sort_order, 10) : 0,
-      },
-      create: {
-        code: row.code,
-        name: row.name,
-        hex: row.hex.startsWith("#") ? row.hex : `#${row.hex}`,
-        material: row.material || null,
-        pileType: row.pile_type || null,
-        sortOrder: row.sort_order ? parseInt(row.sort_order, 10) : 0,
-      },
-    });
-  }
-
-  console.log(`✓ Yarns seeded.`);
-}
 
 // ─── Design seeding ────────────────────────────────────────────────────────────
 //
@@ -88,6 +37,7 @@ type DesignManifestEntry = {
     hex: string;
     pixelCount: number;
     percentage: number;
+    matchedYarnCode?: string;
   }>;
 };
 
@@ -143,7 +93,6 @@ async function seedDesigns(): Promise<void> {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  await seedYarns();
   await seedDesigns();
 }
 

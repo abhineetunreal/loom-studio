@@ -1,5 +1,196 @@
 [
   {
+    "slug": "3635-1",
+    "name": "3635 1",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3635-1/3635-1.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3635-1/3635%20(1).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#b4a5ab",
+        "pixelCount": 459032,
+        "percentage": 39.8,
+        "matchedYarnCode": "4_D BM 1360"
+      },
+      {
+        "index": 1,
+        "hex": "#b9b2b0",
+        "pixelCount": 220648,
+        "percentage": 19.2,
+        "matchedYarnCode": "29_H BM 971"
+      },
+      {
+        "index": 2,
+        "hex": "#aba79a",
+        "pixelCount": 148378,
+        "percentage": 12.9,
+        "matchedYarnCode": "7_G BM 983(SPC)"
+      },
+      {
+        "index": 3,
+        "hex": "#c8bca2",
+        "pixelCount": 143167,
+        "percentage": 12.4,
+        "matchedYarnCode": "28_E SPC 07"
+      },
+      {
+        "index": 4,
+        "hex": "#c39698",
+        "pixelCount": 96832,
+        "percentage": 8.4,
+        "matchedYarnCode": "2_C AN-09"
+      },
+      {
+        "index": 5,
+        "hex": "#ac9db1",
+        "pixelCount": 43427,
+        "percentage": 3.8,
+        "matchedYarnCode": "32_E BM 1381"
+      },
+      {
+        "index": 6,
+        "hex": "#ada781",
+        "pixelCount": 40516,
+        "percentage": 3.5,
+        "matchedYarnCode": "6_F OU 81"
+      }
+    ]
+  },
+  {
+    "slug": "3665",
+    "name": "3665",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3665/3665.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3665/3665.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#95abbb",
+        "pixelCount": 553694,
+        "percentage": 48.1,
+        "matchedYarnCode": "13_B BL 10B"
+      },
+      {
+        "index": 1,
+        "hex": "#2a497b",
+        "pixelCount": 295474,
+        "percentage": 25.6,
+        "matchedYarnCode": "11_A BM 804"
+      },
+      {
+        "index": 2,
+        "hex": "#93989d",
+        "pixelCount": 96963,
+        "percentage": 8.4,
+        "matchedYarnCode": "14_G SPC 06"
+      },
+      {
+        "index": 3,
+        "hex": "#657f91",
+        "pixelCount": 76604,
+        "percentage": 6.6,
+        "matchedYarnCode": "16_G BI-08"
+      },
+      {
+        "index": 4,
+        "hex": "#cfcbc5",
+        "pixelCount": 50123,
+        "percentage": 4.4,
+        "matchedYarnCode": "29_A OU-10II"
+      },
+      {
+        "index": 5,
+        "hex": "#bfcac9",
+        "pixelCount": 38712,
+        "percentage": 3.4,
+        "matchedYarnCode": "13_H BI-11(NZ)"
+      },
+      {
+        "index": 6,
+        "hex": "#a55568",
+        "pixelCount": 30059,
+        "percentage": 2.6,
+        "matchedYarnCode": "1_D BM-1328"
+      },
+      {
+        "index": 7,
+        "hex": "#d1c3c0",
+        "pixelCount": 10371,
+        "percentage": 0.9,
+        "matchedYarnCode": "4_E BM 1261"
+      }
+    ]
+  },
+  {
+    "slug": "3683",
+    "name": "3683",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3683/3683.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3683/3683.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#b6c3c2",
+        "pixelCount": 341302,
+        "percentage": 29.6,
+        "matchedYarnCode": "13_G BM-813"
+      },
+      {
+        "index": 1,
+        "hex": "#b8bfbe",
+        "pixelCount": 227287,
+        "percentage": 19.7,
+        "matchedYarnCode": "34_E SJ ICE Green"
+      },
+      {
+        "index": 2,
+        "hex": "#d1c3c0",
+        "pixelCount": 161913,
+        "percentage": 14.1,
+        "matchedYarnCode": "4_E BM 1261"
+      },
+      {
+        "index": 3,
+        "hex": "#b6b1ad",
+        "pixelCount": 132774,
+        "percentage": 11.5,
+        "matchedYarnCode": "29_G BM 995"
+      },
+      {
+        "index": 4,
+        "hex": "#b5ada4",
+        "pixelCount": 117082,
+        "percentage": 10.2,
+        "matchedYarnCode": "29_E CH 511"
+      },
+      {
+        "index": 5,
+        "hex": "#a3b6ae",
+        "pixelCount": 85892,
+        "percentage": 7.5,
+        "matchedYarnCode": "12_E BM-2035-50"
+      },
+      {
+        "index": 6,
+        "hex": "#c3c7b8",
+        "pixelCount": 53680,
+        "percentage": 4.7,
+        "matchedYarnCode": "25_H SJ MALKA GREEN"
+      },
+      {
+        "index": 7,
+        "hex": "#cfcbc5",
+        "pixelCount": 32070,
+        "percentage": 2.8,
+        "matchedYarnCode": "29_A OU-10II"
+      }
+    ]
+  },
+  {
     "slug": "sabrina-rois-01",
     "name": "Sabrina Rois 01",
     "width": 1501,

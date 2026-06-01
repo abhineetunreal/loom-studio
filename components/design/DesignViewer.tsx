@@ -3,6 +3,7 @@
 import { useReducer, useState, useRef, useCallback, useEffect } from "react";
 import RecolorCanvas, { type RecolorCanvasHandle } from "./RecolorCanvas";
 import PalettePanel from "./PalettePanel";
+import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
 import type { DesignDetail, PaletteEntry, YarnOption } from "@/types";
@@ -19,6 +20,7 @@ type RecolorState = {
 
 type RecolorAction =
   | { type: "ASSIGN"; hex: string; yarn: YarnOption }
+  | { type: "REVERT"; hex: string; yarn: YarnOption | null } // yarn=null → remove assignment
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET" };
@@ -45,6 +47,19 @@ function recolorReducer(state: RecolorState, action: RecolorAction): RecolorStat
         past: [...state.past, state.current],
         future: state.future.slice(1),
       };
+    case "REVERT": {
+      const next = { ...state.current };
+      if (action.yarn !== null) {
+        next[action.hex] = action.yarn;
+      } else {
+        delete next[action.hex];
+      }
+      return {
+        current: next,
+        past: [...state.past.slice(-49), state.current],
+        future: [],
+      };
+    }
     case "RESET":
       if (!Object.keys(state.current).length) return state;
       return {
@@ -62,12 +77,27 @@ const initialRecolorState: RecolorState = { current: {}, past: [], future: [] };
 type Props = {
   design: DesignDetail;
   yarns: YarnOption[];
+  /** Pre-matched yarns from the rendered-color lookup; pre-populates the color map on load. */
+  initialColorMap?: Record<string, YarnOption>;
 };
 
-export default function DesignViewer({ design, yarns }: Props) {
-  const [recolor, dispatch] = useReducer(recolorReducer, initialRecolorState);
-  // Which palette hex is currently selected (opens YarnPicker when set)
+// State for the floating popover shown on canvas click (before the full picker opens)
+type CanvasPickState = {
+  hex: string;
+  clientX: number;
+  clientY: number;
+} | null;
+
+export default function DesignViewer({ design, yarns, initialColorMap }: Props) {
+  const [recolor, dispatch] = useReducer(
+    recolorReducer,
+    initialColorMap ?? {},
+    (initial): RecolorState => ({ current: initial as ColorMap, past: [], future: [] })
+  );
+  // Set when YarnPicker should be open (from palette row click OR popover "choose yarn")
   const [selectedHex, setSelectedHex] = useState<string | null>(null);
+  // Set when the floating popover should be shown (canvas click, before picker opens)
+  const [canvasPick, setCanvasPick] = useState<CanvasPickState>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
   const canvasRef = useRef<RecolorCanvasHandle>(null);
 
@@ -75,6 +105,10 @@ export default function DesignViewer({ design, yarns }: Props) {
     design.palette.map((e) => [e.hex, e])
   );
   const selectedEntry = selectedHex ? paletteByHex.get(selectedHex) ?? null : null;
+
+  // Palette sorted by coverage — used to derive 1-based rank for the popover
+  const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);
+  const paletteRankByHex = new Map(sortedPalette.map((e, i) => [e.hex, i + 1]));
 
   // ── Keyboard shortcuts ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -95,18 +129,43 @@ export default function DesignViewer({ design, yarns }: Props) {
   }, []);
 
   // ── Color pick handlers ──────────────────────────────────────────────────────
-  const handleColorPick = useCallback((hex: string) => {
+
+  // Canvas click → show the floating popover (does NOT open YarnPicker directly)
+  const handleCanvasColorPick = useCallback(
+    (hex: string, clientX: number, clientY: number) => {
+      setCanvasPick({ hex, clientX, clientY });
+    },
+    []
+  );
+
+  // Palette row click → open YarnPicker directly; dismiss any canvas popover
+  const handlePaletteColorPick = useCallback((hex: string) => {
     setSelectedHex(hex);
+    setCanvasPick(null);
   }, []);
+
+  // Popover "choose yarn / change yarn" → open picker; keep popover visible
+  function handlePopoverOpenPicker() {
+    if (!canvasPick) return;
+    setSelectedHex(canvasPick.hex);
+    // intentionally NOT clearing canvasPick — popover stays visible
+  }
 
   function handleYarnPick(yarn: YarnOption) {
     if (!selectedHex) return;
     dispatch({ type: "ASSIGN", hex: selectedHex, yarn });
     setSelectedHex(null);
+    // canvasPick stays set — popover remains and will re-render with the new yarn
   }
 
   function handlePickerClose() {
     setSelectedHex(null);
+    setCanvasPick(null); // picker closed → dismiss the popover too
+  }
+
+  // Revert a single color back to its initial (pre-matched) state, or unassigned
+  function handleRevert(hex: string) {
+    dispatch({ type: "REVERT", hex, yarn: initialColorMap?.[hex] ?? null });
   }
 
   // ── Snapshot for submission ──────────────────────────────────────────────────
@@ -127,8 +186,8 @@ export default function DesignViewer({ design, yarns }: Props) {
           height={design.height}
           palette={design.palette}
           colorMap={recolor.current}
-          selectedHex={selectedHex}
-          onColorPick={handleColorPick}
+          selectedHex={canvasPick?.hex ?? selectedHex}
+          onColorPick={handleCanvasColorPick}
         />
 
         {/* Undo / Redo / Reset — sits below the canvas */}
@@ -177,8 +236,10 @@ export default function DesignViewer({ design, yarns }: Props) {
           <PalettePanel
             palette={design.palette}
             colorMap={recolor.current}
-            selectedHex={selectedHex}
-            onSelectColor={handleColorPick}
+            initialColorMap={initialColorMap ?? {}}
+            selectedHex={canvasPick?.hex ?? selectedHex}
+            onSelectColor={handlePaletteColorPick}
+            onRevert={handleRevert}
           />
 
           <button
@@ -189,6 +250,24 @@ export default function DesignViewer({ design, yarns }: Props) {
           </button>
         </div>
       </aside>
+
+      {/* ── Canvas click popover ────────────────────────────────────────── */}
+      {canvasPick && (() => {
+        const popoverEntry = paletteByHex.get(canvasPick.hex);
+        if (!popoverEntry) return null;
+        return (
+          <ColorPopover
+            entry={popoverEntry}
+            paletteRank={paletteRankByHex.get(canvasPick.hex) ?? 1}
+            assignedYarn={recolor.current[canvasPick.hex] ?? null}
+            initialYarn={initialColorMap?.[canvasPick.hex] ?? null}
+            clientX={canvasPick.clientX}
+            clientY={canvasPick.clientY}
+            onOpenPicker={handlePopoverOpenPicker}
+            onDismiss={() => setCanvasPick(null)}
+          />
+        );
+      })()}
 
       {/* ── YarnPicker modal ─────────────────────────────────────────────── */}
       {selectedHex && selectedEntry && (

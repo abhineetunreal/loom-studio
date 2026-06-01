@@ -27,6 +27,7 @@ import { createClient } from "@supabase/supabase-js";
 const ws = require("ws");
 
 const DESIGNS_BUCKET = process.env.SUPABASE_DESIGNS_BUCKET ?? "designs";
+const LOOKUP_PATH = path.join(process.cwd(), "data", "oneloom-rendered-lookup.json");
 
 function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,25 +40,23 @@ function createAdminClient() {
 const DESIGNS_DIR = path.join(process.cwd(), "data", "designs");
 const OUTPUT_DIR = path.join(DESIGNS_DIR, "converted");
 
-// ─── BMP color table parser ───────────────────────────────────────────────────
-// Reads the palette directly from the BMP file header — this is the authoritative
-// source of palette colors, independent of any image library's decoding.
+// ─── BMP header helpers ───────────────────────────────────────────────────────
 
 type RgbColor = { r: number; g: number; b: number };
 
-function parseBmpColorTable(buf: Buffer): RgbColor[] {
-  // BMP file header: 14 bytes
-  // DIB header (BITMAPINFOHEADER): 40 bytes
-  // Bit depth is at offset 28 (2 bytes, little-endian)
-  const bitDepth = buf.readUInt16LE(28);
-  if (bitDepth !== 8) {
-    throw new Error(`Expected 8bpp indexed BMP, got ${bitDepth}bpp`);
-  }
+function readBmpBitDepth(buf: Buffer): number {
+  // BMP file header: 14 bytes; DIB header starts at 14.
+  // Bit depth is at DIB offset 14 (abs 28), 2 bytes LE.
+  return buf.readUInt16LE(28);
+}
 
-  // Color table size: stored at offset 46 (0 means use max for bit depth)
+// Reads the indexed color table from an 8bpp BMP header.
+// Only valid for indexed (≤8bpp) BMPs — 24/32bpp have no color table.
+function parseBmpColorTable(buf: Buffer): RgbColor[] {
+  // Color table size: stored at DIB offset 32 (abs 46); 0 means use 2^bitDepth
   const colorTableSize = buf.readUInt32LE(46) || 256;
 
-  // Color table starts at byte 54 (14 + 40)
+  // Color table starts at byte 54 (14-byte file header + 40-byte DIB header)
   // Each entry is 4 bytes: Blue, Green, Red, Reserved
   const colorTable: RgbColor[] = [];
   for (let i = 0; i < colorTableSize; i++) {
@@ -170,6 +169,22 @@ async function uploadFile(
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+// Load the rendered-color → OneLoom code lookup table.
+// Only keys starting with "#" are treated as color entries; others are metadata.
+function loadRenderedLookup(): Map<string, string> {
+  if (!fs.existsSync(LOOKUP_PATH)) return new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(LOOKUP_PATH, "utf-8")) as Record<string, string>;
+    const entries = Object.entries(raw)
+      .filter(([k]) => /^#[0-9a-f]{6}$/i.test(k))
+      .map(([k, v]): [string, string] => [k.toLowerCase(), v]);
+    return new Map(entries);
+  } catch {
+    console.warn(`  ⚠ Could not parse ${LOOKUP_PATH} — skipping lookup.`);
+    return new Map();
+  }
+}
+
 async function processDesigns(): Promise<void> {
   if (!fs.existsSync(DESIGNS_DIR)) {
     console.error(`data/designs/ not found at ${DESIGNS_DIR}`);
@@ -192,6 +207,9 @@ async function processDesigns(): Promise<void> {
 
   console.log(`Found ${bmpFiles.length} BMP file(s). Processing...\n`);
 
+  const renderedLookup = loadRenderedLookup();
+  console.log(`Rendered-color lookup: ${renderedLookup.size} entr${renderedLookup.size === 1 ? "y" : "ies"} loaded.\n`);
+
   const results = [];
 
   for (const bmpFile of bmpFiles) {
@@ -206,10 +224,19 @@ async function processDesigns(): Promise<void> {
 
     console.log(`Processing: ${bmpFile}`);
 
-    // 1. Parse color table from BMP header
+    // 1. Read bit depth; parse indexed color table only for 8bpp BMPs
     const bmpBuffer = fs.readFileSync(bmpPath);
-    const colorTable = parseBmpColorTable(bmpBuffer);
-    console.log(`  BMP color table: ${colorTable.length} entries (includes unused slots)`);
+    const bitDepth = readBmpBitDepth(bmpBuffer);
+    console.log(`  Bit depth: ${bitDepth}bpp`);
+
+    if (bitDepth === 8) {
+      const colorTable = parseBmpColorTable(bmpBuffer);
+      console.log(`  BMP color table: ${colorTable.length} entries (includes unused slots)`);
+    } else if (bitDepth === 24 || bitDepth === 32) {
+      console.log(`  Direct-color BMP — palette derived from pixel scan`);
+    } else {
+      throw new Error(`Unsupported bit depth ${bitDepth}bpp in ${bmpFile}`);
+    }
 
     // 2. Convert BMP → PNG
     const { width, height } = await convertBmpToPng(bmpPath, pngPath);
@@ -244,17 +271,28 @@ async function processDesigns(): Promise<void> {
 
     const palette = Array.from(pixelCounts.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([hex, pixelCount], index) => ({
-        index,
-        hex,
-        pixelCount,
-        percentage: Math.round((pixelCount / totalPixels) * 1000) / 10,
-      }));
+      .map(([hex, pixelCount], index) => {
+        const matchedYarnCode = renderedLookup.get(hex);
+        return {
+          index,
+          hex,
+          pixelCount,
+          percentage: Math.round((pixelCount / totalPixels) * 1000) / 10,
+          ...(matchedYarnCode ? { matchedYarnCode } : {}),
+        };
+      });
 
+    const matchCount = palette.filter((e) => e.matchedYarnCode).length;
     console.log(`  Palette (top 5 by coverage):`);
     palette.slice(0, 5).forEach((e) =>
-      console.log(`    ${e.percentage.toFixed(1).padStart(5)}%  ${e.hex}`)
+      console.log(
+        `    ${e.percentage.toFixed(1).padStart(5)}%  ${e.hex}` +
+        (e.matchedYarnCode ? `  → ${e.matchedYarnCode}` : "")
+      )
     );
+    if (matchCount > 0) {
+      console.log(`  Lookup: ${matchCount} of ${palette.length} palette color${palette.length !== 1 ? "s" : ""} matched`);
+    }
 
     // 6. Upload to Supabase Storage
     console.log(`  Uploading to Supabase...`);

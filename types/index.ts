@@ -3,10 +3,11 @@
 // One entry in a design's indexed palette.
 // Stored as JSON on the Design model.
 export type PaletteEntry = {
-  index: number;      // palette index (0–255) in the source BMP
-  hex: string;        // "#rrggbb" — source of truth from the BMP
-  pixelCount: number; // how many pixels in the image use this color
-  percentage: number; // pixelCount / totalPixels * 100, rounded to 1 decimal
+  index: number;           // palette index (0–255) in the source BMP
+  hex: string;             // "#rrggbb" — source of truth from the BMP
+  pixelCount: number;      // how many pixels in the image use this color
+  percentage: number;      // pixelCount / totalPixels * 100, rounded to 1 decimal
+  matchedYarnCode?: string; // OneLoom yarn name from oneloom-rendered-lookup.json, if matched at process time
 };
 
 // ─── Recolor state ────────────────────────────────────────────────────────────
@@ -22,7 +23,8 @@ export type YarnOption = {
   code: string;
   name: string;
   hex: string;
-  library: string | null; // "OneLoom" | "ARS 1400" | "ARS 1200" — mapped from DB `material`
+  library: string | null;  // "OneLoom" | "ARS 1400" | "ARS 1200" — mapped from DB `material`
+  pileType: string | null; // e.g. "Standard", "Loop" — null for most XML-imported yarns
   swatchImageUrl: string | null;
 };
 
