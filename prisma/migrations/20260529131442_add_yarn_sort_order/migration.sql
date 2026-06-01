@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Yarn" ADD COLUMN     "sortOrder" INTEGER NOT NULL DEFAULT 0;

@@ -1,0 +1,90 @@
+[
+  {
+    "slug": "sabrina-rois-01",
+    "name": "Sabrina Rois 01",
+    "width": 1501,
+    "height": 1857,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/sabrina-rois-01/sabrina-rois-01.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/sabrina-rois-01/sabrina%20rois-01.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#a0a8b0",
+        "pixelCount": 668171,
+        "percentage": 24
+      },
+      {
+        "index": 1,
+        "hex": "#e0e0d8",
+        "pixelCount": 637120,
+        "percentage": 22.9
+      },
+      {
+        "index": 2,
+        "hex": "#90a088",
+        "pixelCount": 508694,
+        "percentage": 18.3
+      },
+      {
+        "index": 3,
+        "hex": "#6888a0",
+        "pixelCount": 329945,
+        "percentage": 11.8
+      },
+      {
+        "index": 4,
+        "hex": "#f0d0d0",
+        "pixelCount": 213584,
+        "percentage": 7.7
+      },
+      {
+        "index": 5,
+        "hex": "#bd9f64",
+        "pixelCount": 84043,
+        "percentage": 3
+      },
+      {
+        "index": 6,
+        "hex": "#b8c8a0",
+        "pixelCount": 79203,
+        "percentage": 2.8
+      },
+      {
+        "index": 7,
+        "hex": "#c8d2e3",
+        "pixelCount": 65593,
+        "percentage": 2.4
+      },
+      {
+        "index": 8,
+        "hex": "#c6baba",
+        "pixelCount": 51867,
+        "percentage": 1.9
+      },
+      {
+        "index": 9,
+        "hex": "#98c0c8",
+        "pixelCount": 47369,
+        "percentage": 1.7
+      },
+      {
+        "index": 10,
+        "hex": "#bc8788",
+        "pixelCount": 40293,
+        "percentage": 1.4
+      },
+      {
+        "index": 11,
+        "hex": "#7a8904",
+        "pixelCount": 33703,
+        "percentage": 1.2
+      },
+      {
+        "index": 12,
+        "hex": "#949178",
+        "pixelCount": 27772,
+        "percentage": 1
+      }
+    ]
+  }
+]
