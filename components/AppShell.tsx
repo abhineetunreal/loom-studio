@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import LeftPanel from "@/components/catalog/LeftPanel";
+import { signOutAction } from "@/app/actions/auth";
 import type { DesignSummary, TierInfo } from "@/types";
+
+type UserInfo = {
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+};
 
 type Props = {
   designs: DesignSummary[];
   tierInfo: TierInfo;
+  user: UserInfo | null;
   children: React.ReactNode;
 };
 
-export default function AppShell({ designs, tierInfo, children }: Props) {
+export default function AppShell({ designs, tierInfo, user, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -52,7 +61,21 @@ export default function AppShell({ designs, tierInfo, children }: Props) {
         >
           <MenuIcon />
         </button>
-        <span className="font-semibold tracking-tight text-lg">Loom Studio</span>
+        <span className="font-semibold tracking-tight text-lg flex-1">
+          Loom Studio
+        </span>
+
+        {/* User menu / sign-in link */}
+        {user ? (
+          <UserMenu user={user} />
+        ) : (
+          <Link
+            href="/auth/signin"
+            className="text-xs text-stone-500 hover:text-stone-900 transition-colors"
+          >
+            Sign in
+          </Link>
+        )}
       </header>
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -69,20 +92,123 @@ export default function AppShell({ designs, tierInfo, children }: Props) {
   );
 }
 
+// ─── UserMenu ─────────────────────────────────────────────────────────────────
+
+function UserMenu({ user }: { user: UserInfo }) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const initials = (user.name ?? user.email)
+    .split(/[\s@]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0].toUpperCase())
+    .join("");
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-stone-100 transition-colors"
+        aria-label="User menu"
+        aria-expanded={open}
+      >
+        {/* Avatar */}
+        <span className="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center overflow-hidden shrink-0">
+          {user.avatarUrl ? (
+            <Image
+              src={user.avatarUrl}
+              alt={user.name ?? user.email}
+              width={28}
+              height={28}
+              className="object-cover w-full h-full"
+            />
+          ) : (
+            <span className="text-[10px] font-semibold text-stone-600 select-none">
+              {initials}
+            </span>
+          )}
+        </span>
+        {/* Email — hidden on small screens */}
+        <span className="hidden sm:block text-xs text-stone-600 max-w-[160px] truncate">
+          {user.email}
+        </span>
+        <ChevronDownIcon />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-stone-200 bg-white shadow-lg z-50 overflow-hidden">
+          {/* Email header */}
+          <div className="px-3 py-2 border-b border-stone-100">
+            <p className="text-xs text-stone-500 truncate">{user.email}</p>
+          </div>
+
+          <Link
+            href="/auth/set-password"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+          >
+            <KeyIcon />
+            Set password
+          </Link>
+
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+            >
+              <SignOutIcon />
+              Sign out
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
 function MenuIcon() {
   return (
-    <svg
-      className="w-5 h-5"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4 6h16M4 12h16M4 18h16"
-      />
+    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg className="w-3 h-3 text-stone-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg className="w-4 h-4 text-stone-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg className="w-4 h-4 text-stone-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
     </svg>
   );
 }

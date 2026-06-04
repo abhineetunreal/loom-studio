@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getGoogleSignInUrl, signInWithMagicLink } from "@/lib/auth";
+import { PasswordSignInForm } from "./PasswordSignInForm";
 import { MagicLinkForm } from "./MagicLinkForm";
 
 // ─── Server actions ───────────────────────────────────────────────────────────
@@ -47,8 +48,8 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
-          {/* Google */}
+        <div className="rounded-xl border border-stone-200 bg-white p-6 shadow-sm space-y-5">
+          {/* 1. Google */}
           <form action={googleSignIn}>
             <button
               type="submit"
@@ -59,24 +60,37 @@ export default function SignInPage() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="my-5 flex items-center gap-3">
-            <hr className="flex-1 border-stone-200" />
-            <span className="text-xs text-stone-400">or</span>
-            <hr className="flex-1 border-stone-200" />
-          </div>
+          <Divider />
 
-          {/* Magic link */}
+          {/* 2. Email + password */}
+          <PasswordSignInForm />
+
+          <Divider label="or use a magic link" />
+
+          {/* 3. Magic link */}
           <MagicLinkForm action={magicLinkAction} />
         </div>
 
         <p className="mt-6 text-center text-xs text-stone-400">
           No account needed for demo access.{" "}
-          <a href="/" className="underline underline-offset-2 hover:text-stone-600">
+          <a
+            href="/"
+            className="underline underline-offset-2 hover:text-stone-600"
+          >
             Browse demos →
           </a>
         </p>
       </div>
+    </div>
+  );
+}
+
+function Divider({ label = "or" }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <hr className="flex-1 border-stone-200" />
+      <span className="text-xs text-stone-400">{label}</span>
+      <hr className="flex-1 border-stone-200" />
     </div>
   );
 }
