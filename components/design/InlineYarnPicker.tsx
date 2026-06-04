@@ -92,7 +92,7 @@ export default function InlineYarnPicker({
                   <button
                     key={yarn.id}
                     onClick={() => onPick(yarn)}
-                    title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                    title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
                     className={`w-6 h-6 rounded-sm border-2 transition-colors ${
@@ -152,7 +152,7 @@ export default function InlineYarnPicker({
                   onClick={() => onPick(yarn)}
                   onMouseEnter={() => setHoveredYarn(yarn)}
                   onMouseLeave={() => setHoveredYarn(null)}
-                  title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                  title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                   aria-label={yarn.name}
                   aria-pressed={isCurrent}
                   className={`aspect-square rounded-[2px] border-2 transition-colors ${

@@ -156,7 +156,7 @@ export default function YarnPicker({
                   onClick={() => onPick(yarn)}
                   onMouseEnter={() => setHoveredYarn(yarn)}
                   onMouseLeave={() => setHoveredYarn(null)}
-                  title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                  title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                   aria-label={`${yarn.name}${yarn.library ? " (" + yarn.library + ")" : ""}`}
                   aria-pressed={isCurrent}
                   className={`w-9 h-9 rounded-md border-2 transition-all hover:scale-110 hover:shadow-md ${
@@ -234,7 +234,7 @@ export default function YarnPicker({
                     onClick={() => onPick(yarn)}
                     onMouseEnter={() => setHoveredYarn(yarn)}
                     onMouseLeave={() => setHoveredYarn(null)}
-                    title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                    title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
                     className={`aspect-square rounded-sm border-2 transition-colors ${
