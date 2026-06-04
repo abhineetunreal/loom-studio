@@ -77,7 +77,7 @@ export async function submitColorway(
     try {
       const [design, yarns] = await Promise.all([
         db.design.findUnique({ where: { id: designId }, select: { name: true } }),
-        db.yarn.findMany({
+        db.yarnColor.findMany({
           where: { id: { in: colorMappings.map((m) => m.yarnId) } },
           select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
         }),

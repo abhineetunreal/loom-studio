@@ -121,7 +121,7 @@ async function main(): Promise<void> {
   // --- Clear existing yarn data ---
   console.log("Clearing existing yarn data...");
   const deletedMappings = await db.submissionColorMapping.deleteMany({});
-  const deletedYarns = await db.yarn.deleteMany({});
+  const deletedYarns = await db.yarnColor.deleteMany({});
   console.log(
     `  Removed ${deletedYarns.count} yarn(s) and ${deletedMappings.count} submission mapping(s).`
   );
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
     // Batch insert in chunks of 500 to stay within pg parameter limits
     const CHUNK = 500;
     for (let i = 0; i < yarns.length; i += CHUNK) {
-      await db.yarn.createMany({
+      await db.yarnColor.createMany({
         data: yarns.slice(i, i + CHUNK).map((yarn) => ({
           code: yarn.code,
           name: yarn.name,

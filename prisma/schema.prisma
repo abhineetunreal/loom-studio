@@ -13,50 +13,98 @@ datasource db {
   // - Runtime queries use a driver adapter in lib/db.ts (DATABASE_URL — pooler)
 }
 
+model Tenant {
+  id           String   @id @default(cuid())
+  slug         String   @unique // used in subdomain: slug.loomstudio.com
+  name         String // "Carpets Bazaar", "Kashmir Rugs Co"
+  logoUrl      String?
+  primaryColor String   @default("#1a1612")
+  domain       String?  @unique // custom domain if any
+  adminEmail   String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  designs     Design[]
+  yarns       YarnColor[]
+  users       TenantUser[]
+  submissions ColorwaySubmission[]
+}
+
+model TenantUser {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  email      String
+  name       String?
+  role       UserRole @default(PENDING)
+  authUserId String? // Supabase Auth user ID
+  createdAt  DateTime @default(now())
+
+  @@unique([tenantId, email])
+}
+
+enum UserRole {
+  PENDING // just signed up, waiting for approval
+  APPROVED // can access full catalog
+  ADMIN // can manage designs, approve users
+  DEMO // limited access, sample designs only
+}
+
 // A rug design in the catalog
 model Design {
   id           String   @id @default(cuid())
+  tenantId     String? // nullable — existing rows don't break
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
   name         String
   slug         String   @unique
-  imageUrl     String   // web-ready PNG (converted from BMP at seed time)
-  sourceBmpUrl String   // original BMP — canonical production file
+  imageUrl     String // web-ready PNG (converted from BMP at seed time)
+  sourceBmpUrl String // original BMP — canonical production file
   width        Int
   height       Int
   // JSON array of PaletteEntry: { index, hex, pixelCount, percentage }
   // Stored as-is from the BMP; never snapped to the yarn library
   palette      Json
-  collection   String?  // optional grouping label shown in the left-panel design browser
+  collection   String? // optional grouping label shown in the left-panel design browser
   isActive     Boolean  @default(true)
+  isDemo       Boolean  @default(false) // DEMO tier users only see isDemo designs
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   submissions ColorwaySubmission[]
 }
 
-// A yarn from the physical yarn library
-model Yarn {
-  id             String  @id @default(cuid())
-  code           String  @unique
+// A yarn from the physical yarn library (scoped per tenant)
+// @@map keeps the underlying DB table named "Yarn" so no data is lost on migration
+model YarnColor {
+  id             String   @id @default(cuid())
+  tenantId       String? // nullable — existing rows don't break
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
+  code           String
   name           String
-  hex            String  // authoritative display color
+  hex            String // authoritative display color
   material       String?
   pileType       String?
   swatchImageUrl String? // reserved for v1.5 — falls back to hex swatch when null
-  sortOrder      Int     @default(0)
-  isActive       Boolean @default(true)
+  sortOrder      Int      @default(0)
+  isActive       Boolean  @default(true)
 
   submissionMappings SubmissionColorMapping[]
+
+  @@unique([tenantId, code])
+  @@map("Yarn")
 }
 
 // A customer's colorway request
 model ColorwaySubmission {
   id            String   @id @default(cuid())
+  tenantId      String? // nullable — existing rows don't break
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id])
   designId      String
   design        Design   @relation(fields: [designId], references: [id])
   customerName  String
   customerEmail String
   notes         String?
-  snapshotUrl   String?  // flattened PNG in Supabase Storage — convenience preview
+  snapshotUrl   String? // flattened PNG in Supabase Storage — convenience preview
   createdAt     DateTime @default(now())
 
   colorMappings SubmissionColorMapping[]
@@ -67,8 +115,8 @@ model SubmissionColorMapping {
   id           String             @id @default(cuid())
   submissionId String
   submission   ColorwaySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  originalHex  String             // the design's original palette color
-  percentage   Float              // what % of the design this color covers
+  originalHex  String // the design's original palette color
+  percentage   Float // what % of the design this color covers
   yarnId       String
-  yarn         Yarn               @relation(fields: [yarnId], references: [id])
+  yarn         YarnColor          @relation(fields: [yarnId], references: [id])
 }

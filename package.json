@@ -20,6 +20,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.2",
     "@vingle/bmp-js": "^0.2.5",
     "jimp": "^1.6.1",

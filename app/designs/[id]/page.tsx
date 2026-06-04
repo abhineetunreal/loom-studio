@@ -44,7 +44,7 @@ export default async function DesignPage({ params }: Props) {
         palette: true,
       },
     }),
-    db.yarn.findMany({
+    db.yarnColor.findMany({
       where: { isActive: true },
       select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
