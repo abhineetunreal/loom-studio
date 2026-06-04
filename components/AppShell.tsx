@@ -20,6 +20,7 @@ type Props = {
   children: React.ReactNode;
 };
 
+
 export default function AppShell({ designs, tierInfo, user, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -67,7 +68,7 @@ export default function AppShell({ designs, tierInfo, user, children }: Props) {
 
         {/* User menu / sign-in link */}
         {user ? (
-          <UserMenu user={user} />
+          <UserMenu user={user} isAdmin={tierInfo.tier === "admin"} />
         ) : (
           <Link
             href="/auth/signin"
@@ -94,7 +95,7 @@ export default function AppShell({ designs, tierInfo, user, children }: Props) {
 
 // ─── UserMenu ─────────────────────────────────────────────────────────────────
 
-function UserMenu({ user }: { user: UserInfo }) {
+function UserMenu({ user, isAdmin }: { user: UserInfo; isAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -155,6 +156,17 @@ function UserMenu({ user }: { user: UserInfo }) {
             <p className="text-xs text-stone-500 truncate">{user.email}</p>
           </div>
 
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 transition-colors"
+            >
+              <AdminIcon />
+              Admin panel
+            </Link>
+          )}
+
           <Link
             href="/auth/set-password"
             onClick={() => setOpen(false)}
@@ -193,6 +205,14 @@ function ChevronDownIcon() {
   return (
     <svg className="w-3 h-3 text-stone-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg className="w-4 h-4 text-stone-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
     </svg>
   );
 }

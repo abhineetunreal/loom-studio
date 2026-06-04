@@ -38,6 +38,7 @@ model TenantUser {
   name       String?
   role       UserRole @default(PENDING)
   authUserId String? // Supabase Auth user ID
+  provider   String? // "google" | "magic_link" | "password"
   createdAt  DateTime @default(now())
 
   @@unique([tenantId, email])

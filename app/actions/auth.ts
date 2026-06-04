@@ -76,7 +76,7 @@ export async function signUpAction(
 
   // Provision TenantUser for the default tenant
   if (userId) {
-    await provisionTenantUser(email.trim(), userId, name.trim());
+    await provisionTenantUser(email.trim(), userId, name.trim(), "password");
   }
 
   return { success: true };
@@ -115,7 +115,8 @@ export async function setPasswordAction(
 async function provisionTenantUser(
   email: string,
   authUserId: string,
-  name?: string
+  name?: string,
+  provider?: string
 ): Promise<void> {
   try {
     const tenant = await db.tenant.findUnique({
@@ -128,12 +129,13 @@ async function provisionTenantUser(
 
     await db.tenantUser.upsert({
       where: { tenantId_email: { tenantId: tenant.id, email } },
-      update: { authUserId, name: name ?? undefined },
+      update: { authUserId, name: name ?? undefined, provider: provider ?? undefined },
       create: {
         tenantId: tenant.id,
         email,
         name: name ?? null,
         authUserId,
+        provider: provider ?? null,
         role: isAdmin ? "ADMIN" : "PENDING",
       },
     });

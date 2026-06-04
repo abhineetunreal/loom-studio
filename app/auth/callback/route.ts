@@ -14,10 +14,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error && data.session?.user.email) {
+      const rawProvider = data.session.user.app_metadata?.provider as string | undefined;
+      const provider = rawProvider === "google" ? "google" : "magic_link";
       await upsertTenantUser(
         data.session.user.email,
         data.session.user.id,
-        data.session.user.user_metadata?.full_name as string | undefined
+        data.session.user.user_metadata?.full_name as string | undefined,
+        provider
       );
     }
   }
@@ -36,7 +39,8 @@ export async function GET(request: NextRequest) {
 async function upsertTenantUser(
   email: string,
   authUserId: string,
-  name?: string
+  name?: string,
+  provider?: string
 ): Promise<void> {
   try {
     const tenant = await db.tenant.findUnique({
@@ -50,12 +54,13 @@ async function upsertTenantUser(
 
     await db.tenantUser.upsert({
       where: { tenantId_email: { tenantId: tenant.id, email } },
-      update: { authUserId, name: name ?? undefined },
+      update: { authUserId, name: name ?? undefined, provider: provider ?? undefined },
       create: {
         tenantId: tenant.id,
         email,
         name: name ?? null,
         authUserId,
+        provider: provider ?? null,
         role: isAdmin ? "ADMIN" : "PENDING",
       },
     });
