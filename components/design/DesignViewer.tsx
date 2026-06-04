@@ -8,7 +8,7 @@ import InlineYarnPicker from "./InlineYarnPicker";
 import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
-import type { DesignDetail, PaletteEntry, YarnOption } from "@/types";
+import type { DesignDetail, PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 // ─── Recolor state + reducer ──────────────────────────────────────────────────
 
@@ -81,6 +81,7 @@ type Props = {
   yarns: YarnOption[];
   /** Pre-matched yarns from the rendered-color lookup; pre-populates the color map on load. */
   initialColorMap?: Record<string, YarnOption>;
+  tierInfo: TierInfo;
 };
 
 // State for the floating popover shown on canvas click (before the full picker opens)
@@ -90,7 +91,7 @@ type CanvasPickState = {
   clientY: number;
 } | null;
 
-export default function DesignViewer({ design, yarns, initialColorMap }: Props) {
+export default function DesignViewer({ design, yarns, initialColorMap, tierInfo }: Props) {
   const [recolor, dispatch] = useReducer(
     recolorReducer,
     initialColorMap ?? {},
@@ -199,6 +200,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
           onSelectColor={handlePaletteColorPick}
           onRevert={handleRevert}
           onRequestColorway={() => setShowSubmissionForm(true)}
+          tierInfo={tierInfo}
         />
       </div>
 
@@ -209,6 +211,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
           targetEntry={selectedHex ? (design.palette.find((e) => e.hex === selectedHex) ?? null) : null}
           currentYarn={selectedHex ? (recolor.current[selectedHex] ?? null) : null}
           onPick={handleYarnPick}
+          tierInfo={tierInfo}
         />
       </div>
 
@@ -223,6 +226,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
               currentYarn={recolor.current[selectedHex] ?? null}
               onPick={handleYarnPick}
               onClose={handlePickerClose}
+              tierInfo={tierInfo}
             />
           </div>
         ) : null;
@@ -244,6 +248,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
             clientY={canvasPick.clientY}
             onOpenPicker={handlePopoverOpenPicker}
             onDismiss={() => setCanvasPick(null)}
+            tierInfo={tierInfo}
           />
         );
       })()}

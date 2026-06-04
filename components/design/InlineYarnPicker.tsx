@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { hexToRgb } from "@/lib/recolor";
-import type { PaletteEntry, YarnOption } from "@/types";
+import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 const LIBRARIES = ["OneLoom", "ARS 1400", "ARS 1200"] as const;
 type Library = (typeof LIBRARIES)[number];
@@ -18,6 +18,7 @@ type Props = {
   targetEntry: PaletteEntry | null;
   currentYarn: YarnOption | null;
   onPick: (yarn: YarnOption) => void;
+  tierInfo: TierInfo;
 };
 
 export default function InlineYarnPicker({
@@ -25,9 +26,11 @@ export default function InlineYarnPicker({
   targetEntry,
   currentYarn,
   onPick,
+  tierInfo,
 }: Props) {
   const [library, setLibrary] = useState<Library>("OneLoom");
   const [search, setSearch] = useState("");
+  const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
 
   // Top 6 closest RGB matches
@@ -103,30 +106,34 @@ export default function InlineYarnPicker({
           </div>
         )}
 
-        {/* Library selector */}
-        <select
-          value={library}
-          onChange={(e) => {
-            setLibrary(e.target.value as Library);
-            setSearch("");
-          }}
-          className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
-        >
-          {LIBRARIES.map((lib) => (
-            <option key={lib} value={lib}>
-              {lib}
-            </option>
-          ))}
-        </select>
+        {/* Library selector — hidden in demo tier */}
+        {!isDemo && (
+          <select
+            value={library}
+            onChange={(e) => {
+              setLibrary(e.target.value as Library);
+              setSearch("");
+            }}
+            className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
+          >
+            {LIBRARIES.map((lib) => (
+              <option key={lib} value={lib}>
+                {lib}
+              </option>
+            ))}
+          </select>
+        )}
 
-        {/* Search */}
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search…"
-          className="text-[9px] px-2 py-1 border-b border-stone-200 w-full placeholder:text-stone-400 focus:outline-none bg-white"
-        />
+        {/* Search — hidden in demo tier */}
+        {!isDemo && (
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search…"
+            className="text-[9px] px-2 py-1 border-b border-stone-200 w-full placeholder:text-stone-400 focus:outline-none bg-white"
+          />
+        )}
       </div>
 
       {/* Scrollable swatch grid */}

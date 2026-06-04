@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getDefaultTierInfo } from "@/lib/tier";
 import DesignViewer from "@/components/design/DesignViewer";
 import type { PaletteEntry, YarnOption } from "@/types";
 
@@ -29,7 +30,7 @@ type Props = { params: Promise<{ id: string }> };
 export default async function DesignPage({ params }: Props) {
   const { id } = await params;
 
-  const [design, rawYarns] = await Promise.all([
+  const [design, rawYarns, tierInfo] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -49,6 +50,7 @@ export default async function DesignPage({ params }: Props) {
       select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
+    getDefaultTierInfo(),
   ]);
 
   if (!design) notFound();
@@ -80,6 +82,7 @@ export default async function DesignPage({ params }: Props) {
         design={{ ...design, palette }}
         yarns={yarns}
         initialColorMap={initialColorMap}
+        tierInfo={tierInfo}
       />
     </div>
   );

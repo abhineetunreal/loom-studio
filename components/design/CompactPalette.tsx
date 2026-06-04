@@ -1,6 +1,7 @@
 "use client";
 
-import type { PaletteEntry, YarnOption } from "@/types";
+import Link from "next/link";
+import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 type Props = {
   designName: string;
@@ -11,6 +12,7 @@ type Props = {
   onSelectColor: (hex: string) => void;
   onRevert: (hex: string) => void;
   onRequestColorway: () => void;
+  tierInfo: TierInfo;
 };
 
 export default function CompactPalette({
@@ -22,8 +24,10 @@ export default function CompactPalette({
   onSelectColor,
   onRevert,
   onRequestColorway,
+  tierInfo,
 }: Props) {
   const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
+  const isDemo = tierInfo.tier === "demo";
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -35,13 +39,17 @@ export default function CompactPalette({
 
       {/* Scrollable rows */}
       <ul className="flex-1 overflow-y-auto">
-        {sorted.map((entry) => {
+        {sorted.map((entry, i) => {
           const assignedYarn = colorMap[entry.hex] ?? null;
           const initialYarn = initialColorMap[entry.hex] ?? null;
           const isSelected = selectedHex === entry.hex;
           const isChanged = (assignedYarn?.id ?? null) !== (initialYarn?.id ?? null);
           const swatchHex = assignedYarn?.hex ?? entry.hex;
-          const displayCode = assignedYarn?.code ?? entry.hex.toUpperCase();
+
+          // Demo tier: "Color 1", "Color 2", … — no codes revealed
+          const displayCode = isDemo
+            ? `Color ${i + 1}`
+            : (assignedYarn?.code ?? entry.hex.toUpperCase());
 
           return (
             <li key={entry.hex} className="relative">
@@ -61,7 +69,7 @@ export default function CompactPalette({
                   style={{ backgroundColor: swatchHex }}
                   aria-hidden
                 />
-                {/* Code */}
+                {/* Code / label */}
                 <span
                   className={`text-[9px] flex-1 min-w-0 truncate ${
                     isSelected ? "text-white" : "text-stone-700"
@@ -95,14 +103,29 @@ export default function CompactPalette({
         })}
       </ul>
 
-      {/* Footer */}
+      {/* Footer — changes based on tier */}
       <div className="shrink-0 p-2">
-        <button
-          onClick={onRequestColorway}
-          className="w-full bg-stone-900 text-white text-[10px] py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
-        >
-          Request colorway
-        </button>
+        {isDemo ? (
+          tierInfo.pendingApproval ? (
+            <p className="w-full text-center text-[10px] py-1.5 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+              Account pending approval
+            </p>
+          ) : (
+            <Link
+              href="/auth/signin"
+              className="block w-full text-center bg-stone-800 text-white text-[10px] py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
+            >
+              Sign in to request
+            </Link>
+          )
+        ) : (
+          <button
+            onClick={onRequestColorway}
+            className="w-full bg-stone-900 text-white text-[10px] py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
+          >
+            Request colorway
+          </button>
+        )}
       </div>
     </div>
   );

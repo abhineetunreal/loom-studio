@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { db } from "@/lib/db";
+import { getDefaultTierInfo } from "@/lib/tier";
 import AppShell from "@/components/AppShell";
 import type { DesignSummary } from "@/types";
 
@@ -18,8 +19,15 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const tierInfo = await getDefaultTierInfo();
+  const isDemo = tierInfo.tier === "demo";
+
   const designs = await db.design.findMany({
-    where: { isActive: true },
+    where: {
+      isActive: true,
+      // Demo tier only sees designs flagged as demo
+      ...(isDemo ? { isDemo: true } : {}),
+    },
     select: {
       id: true,
       name: true,
@@ -35,7 +43,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
       <body className="h-full flex flex-col bg-stone-50 text-stone-900">
-        <AppShell designs={designs as DesignSummary[]}>
+        <AppShell designs={designs as DesignSummary[]} tierInfo={tierInfo}>
           {children}
         </AppShell>
       </body>

@@ -1,3 +1,12 @@
+// ─── Tier ─────────────────────────────────────────────────────────────────────
+
+export type Tier = "demo" | "full" | "admin";
+
+export type TierInfo = {
+  tier: Tier;
+  pendingApproval: boolean;
+};
+
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
 // One entry in a design's indexed palette.

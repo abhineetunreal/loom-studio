@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { hexToRgb } from "@/lib/recolor";
-import type { PaletteEntry, YarnOption } from "@/types";
+import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -27,6 +27,7 @@ type Props = {
   currentYarn: YarnOption | null;
   onPick: (yarn: YarnOption) => void;
   onClose: () => void;
+  tierInfo: TierInfo;
 };
 
 export default function YarnPicker({
@@ -35,9 +36,11 @@ export default function YarnPicker({
   currentYarn,
   onPick,
   onClose,
+  tierInfo,
 }: Props) {
   const [library, setLibrary] = useState<Library>("OneLoom");
   const [query, setQuery] = useState("");
+  const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -166,45 +169,49 @@ export default function YarnPicker({
           </div>
         </div>
 
-        {/* ── Library selector + search ────────────────────────────────────── */}
-        <div className="px-4 pt-3 pb-2 shrink-0 flex gap-2 items-center">
-          <select
-            value={library}
-            onChange={(e) => handleLibraryChange(e.target.value as Library)}
-            className="text-sm px-2.5 py-2 rounded-lg border border-stone-200 bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0 cursor-pointer"
-          >
-            {LIBRARIES.map((lib) => (
-              <option key={lib} value={lib}>
-                {lib}
-              </option>
-            ))}
-          </select>
-          <input
-            ref={searchRef}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search code or name…"
-            className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400"
-          />
-        </div>
+        {/* ── Library selector + search — hidden in demo tier ─────────────── */}
+        {!isDemo && (
+          <div className="px-4 pt-3 pb-2 shrink-0 flex gap-2 items-center">
+            <select
+              value={library}
+              onChange={(e) => handleLibraryChange(e.target.value as Library)}
+              className="text-sm px-2.5 py-2 rounded-lg border border-stone-200 bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0 cursor-pointer"
+            >
+              {LIBRARIES.map((lib) => (
+                <option key={lib} value={lib}>
+                  {lib}
+                </option>
+              ))}
+            </select>
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search code or name…"
+              className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400"
+            />
+          </div>
+        )}
 
-        {/* ── Hover info / count bar ───────────────────────────────────────── */}
-        <div className="px-4 pb-1.5 shrink-0 h-5">
-          {hoveredYarn ? (
-            <p className="text-xs text-stone-600 truncate">
-              <span className="font-mono">{hoveredYarn.name}</span>
-              {hoveredYarn.library && (
-                <span className="text-stone-400"> · {hoveredYarn.library}</span>
-              )}
-            </p>
-          ) : (
-            <p className="text-xs text-stone-300">
-              {libraryYarns.length} color{libraryYarns.length !== 1 ? "s" : ""}
-              {query && " matched"}
-            </p>
-          )}
-        </div>
+        {/* ── Hover info / count bar — hidden in demo tier ─────────────────── */}
+        {!isDemo && (
+          <div className="px-4 pb-1.5 shrink-0 h-5">
+            {hoveredYarn ? (
+              <p className="text-xs text-stone-600 truncate">
+                <span className="font-mono">{hoveredYarn.name}</span>
+                {hoveredYarn.library && (
+                  <span className="text-stone-400"> · {hoveredYarn.library}</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-stone-300">
+                {libraryYarns.length} color{libraryYarns.length !== 1 ? "s" : ""}
+                {query && " matched"}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── Swatch grid ─────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-3 pb-4">

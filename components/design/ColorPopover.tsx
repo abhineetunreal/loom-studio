@@ -22,7 +22,7 @@
  */
 
 import { useRef } from "react";
-import type { PaletteEntry, YarnOption } from "@/types";
+import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 const CARD_W = 224; // estimated width (matches w-56 = 224px)
 const CARD_H = 220; // estimated height for smart-flip (taller when changed state shown)
@@ -39,6 +39,7 @@ type Props = {
   clientY: number;
   onOpenPicker: () => void;
   onDismiss: () => void;
+  tierInfo: TierInfo;
 };
 
 export default function ColorPopover({
@@ -50,7 +51,9 @@ export default function ColorPopover({
   clientY,
   onOpenPicker,
   onDismiss,
+  tierInfo,
 }: Props) {
+  const isDemo = tierInfo.tier === "demo";
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Show the original reference line only when the color has been changed away from its initial match
@@ -137,25 +140,28 @@ export default function ColorPopover({
                 style={{ backgroundColor: assignedYarn.hex }}
                 aria-hidden
               />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-stone-800 truncate leading-snug">
-                  {assignedYarn.name}
-                </p>
-                {(assignedYarn.library || assignedYarn.pileType) && (
-                  <div className="flex gap-1 mt-0.5 flex-wrap">
-                    {assignedYarn.library && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 leading-none">
-                        {assignedYarn.library}
-                      </span>
-                    )}
-                    {assignedYarn.pileType && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 leading-none">
-                        {assignedYarn.pileType}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+              {/* Hide name/library in demo tier */}
+              {!isDemo && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-stone-800 truncate leading-snug">
+                    {assignedYarn.name}
+                  </p>
+                  {(assignedYarn.library || assignedYarn.pileType) && (
+                    <div className="flex gap-1 mt-0.5 flex-wrap">
+                      {assignedYarn.library && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 leading-none">
+                          {assignedYarn.library}
+                        </span>
+                      )}
+                      {assignedYarn.pileType && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 leading-none">
+                          {assignedYarn.pileType}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <>
