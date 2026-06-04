@@ -41,7 +41,7 @@ export default async function DesignPage({ params }: Props) {
         sourceBmpUrl: true,
         width: true,
         height: true,
-        collection: true,
+        collection: { select: { id: true, name: true, slug: true } },
         palette: true,
       },
     }),

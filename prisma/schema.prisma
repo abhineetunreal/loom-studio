@@ -28,6 +28,7 @@ model Tenant {
   yarns       YarnColor[]
   users       TenantUser[]
   submissions ColorwaySubmission[]
+  collections Collection[]
 }
 
 model TenantUser {
@@ -40,6 +41,8 @@ model TenantUser {
   authUserId String? // Supabase Auth user ID
   provider   String? // "google" | "magic_link" | "password"
   createdAt  DateTime @default(now())
+
+  collectionAccess CollectionAccess[]
 
   @@unique([tenantId, email])
 }
@@ -65,13 +68,41 @@ model Design {
   // JSON array of PaletteEntry: { index, hex, pixelCount, percentage }
   // Stored as-is from the BMP; never snapped to the yarn library
   palette      Json
-  collection   String? // optional grouping label shown in the left-panel design browser
-  isActive     Boolean  @default(true)
-  isDemo       Boolean  @default(false) // DEMO tier users only see isDemo designs
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  collectionId String? // FK to Collection — replaces the old collection TEXT column
+  collection   Collection? @relation(fields: [collectionId], references: [id])
+  isHidden     Boolean     @default(false) // hide from users within an accessible collection
+  isActive     Boolean     @default(true)
+  isDemo       Boolean     @default(false) // DEMO tier users only see isDemo designs
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   submissions ColorwaySubmission[]
+}
+
+model Collection {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  slug      String
+  parentId  String? // for nested folders later
+  parent    Collection?  @relation("CollectionTree", fields: [parentId], references: [id])
+  children  Collection[] @relation("CollectionTree")
+  designs   Design[]
+  access    CollectionAccess[]
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, slug])
+}
+
+model CollectionAccess {
+  id           String     @id @default(cuid())
+  tenantUserId String
+  tenantUser   TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantUserId, collectionId])
 }
 
 // A yarn from the physical yarn library (scoped per tenant)

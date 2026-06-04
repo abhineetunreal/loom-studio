@@ -33,7 +33,7 @@ export default function LeftPanel({
   const [search, setSearch] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
     const all = new Set<string>();
-    for (const d of designs) all.add(d.collection ?? "Uncategorized");
+    for (const d of designs) all.add(d.collection?.name ?? "Uncategorized");
     return all;
   });
   // Favorites loaded from localStorage after mount to avoid SSR mismatch
@@ -87,7 +87,7 @@ export default function LeftPanel({
       : designs;
     const map = new Map<string, DesignSummary[]>();
     for (const d of filtered) {
-      const key = d.collection ?? "Uncategorized";
+      const key = d.collection?.name ?? "Uncategorized";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     }

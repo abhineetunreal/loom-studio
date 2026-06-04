@@ -7,6 +7,11 @@ import {
   bulkApproveAction,
   changeRoleAction,
 } from "@/app/actions/admin";
+import { setUserCollectionAccessAction } from "@/app/actions/collections";
+import { CollectionsTab } from "./CollectionsTab";
+import type { CollectionSummary, DesignBrief } from "./CollectionsTab";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type User = {
   id: string;
@@ -28,18 +33,38 @@ type Props = {
   tenantName: string;
   users: User[];
   stats: Stats;
+  collections: CollectionSummary[];
+  designs: DesignBrief[];
+  userAccess: Array<{ tenantUserId: string; collectionId: string }>;
 };
 
-type Tab = "pending" | "all";
+type Tab = "pending" | "all" | "collections";
 
-export function AdminPanel({ tenantName, users, stats }: Props) {
+// ─── AdminPanel ───────────────────────────────────────────────────────────────
+
+export function AdminPanel({
+  tenantName,
+  users,
+  stats,
+  collections,
+  designs,
+  userAccess,
+}: Props) {
   const [tab, setTab] = useState<Tab>("pending");
+  const [accessModalUser, setAccessModalUser] = useState<User | null>(null);
 
   const pendingUsers = users.filter((u) => u.role === "PENDING");
 
+  // Pre-compute per-user access map
+  const accessByUser = new Map<string, string[]>();
+  for (const a of userAccess) {
+    if (!accessByUser.has(a.tenantUserId)) accessByUser.set(a.tenantUserId, []);
+    accessByUser.get(a.tenantUserId)!.push(a.collectionId);
+  }
+
   return (
     <div className="min-h-screen bg-stone-50">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-xl font-semibold text-stone-900">Admin Panel</h1>
@@ -49,9 +74,16 @@ export function AdminPanel({ tenantName, users, stats }: Props) {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <StatCard label="Total users" value={stats.totalUsers} />
-          <StatCard label="Pending approval" value={stats.pendingCount} accent={stats.pendingCount > 0} />
+          <StatCard
+            label="Pending approval"
+            value={stats.pendingCount}
+            accent={stats.pendingCount > 0}
+          />
           <StatCard label="Approved" value={stats.approvedCount} />
-          <StatCard label="Submissions this month" value={stats.submissionsThisMonth} />
+          <StatCard
+            label="Submissions this month"
+            value={stats.submissionsThisMonth}
+          />
         </div>
 
         {/* Tabs */}
@@ -67,30 +99,73 @@ export function AdminPanel({ tenantName, users, stats }: Props) {
           <TabButton active={tab === "all"} onClick={() => setTab("all")}>
             All users
           </TabButton>
+          <TabButton
+            active={tab === "collections"}
+            onClick={() => setTab("collections")}
+          >
+            Collections
+            {collections.length > 0 && (
+              <span className="ml-1.5 bg-stone-100 text-stone-600 text-xs font-medium px-1.5 py-0.5 rounded-full">
+                {collections.length}
+              </span>
+            )}
+          </TabButton>
         </div>
 
-        {tab === "pending" ? (
-          <PendingTab users={pendingUsers} />
-        ) : (
-          <AllUsersTab users={users} />
+        {tab === "pending" && (
+          <PendingTab
+            users={pendingUsers}
+            collections={collections}
+            accessByUser={accessByUser}
+            onOpenAccess={setAccessModalUser}
+          />
+        )}
+        {tab === "all" && (
+          <AllUsersTab
+            users={users}
+            collections={collections}
+            accessByUser={accessByUser}
+            onOpenAccess={setAccessModalUser}
+          />
+        )}
+        {tab === "collections" && (
+          <CollectionsTab collections={collections} designs={designs} />
         )}
       </div>
+
+      {/* User access modal */}
+      {accessModalUser && (
+        <UserAccessModal
+          user={accessModalUser}
+          collections={collections}
+          currentAccess={accessByUser.get(accessModalUser.id) ?? []}
+          onClose={() => setAccessModalUser(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ─── Pending tab ──────────────────────────────────────────────────────────────
+// ─── PendingTab ───────────────────────────────────────────────────────────────
 
-function PendingTab({ users }: { users: User[] }) {
+function PendingTab({
+  users,
+  collections,
+  accessByUser,
+  onOpenAccess,
+}: {
+  users: User[];
+  collections: CollectionSummary[];
+  accessByUser: Map<string, string[]>;
+  onOpenAccess: (u: User) => void;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   const toggleAll = () => {
-    if (selected.size === users.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(users.map((u) => u.id)));
-    }
+    setSelected(
+      selected.size === users.length ? new Set() : new Set(users.map((u) => u.id))
+    );
   };
 
   const toggle = (id: string) => {
@@ -109,9 +184,8 @@ function PendingTab({ users }: { users: User[] }) {
     });
   };
 
-  const handleApprove = (id: string) => {
+  const handleApprove = (id: string) =>
     startTransition(() => approveUserAction(id));
-  };
 
   const handleReject = (id: string) => {
     if (!confirm("Remove this user? They will need to sign up again.")) return;
@@ -128,7 +202,6 @@ function PendingTab({ users }: { users: User[] }) {
 
   return (
     <div>
-      {/* Bulk actions bar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
           <span className="text-sm text-amber-800 flex-1">
@@ -156,15 +229,26 @@ function PendingTab({ users }: { users: User[] }) {
                   className="rounded border-stone-300"
                 />
               </th>
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600">User</th>
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">Provider</th>
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">Signed up</th>
-              <th className="px-3 py-2.5 text-right font-medium text-stone-600">Actions</th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600">
+                User
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">
+                Provider
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">
+                Signed up
+              </th>
+              <th className="px-3 py-2.5 text-right font-medium text-stone-600">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50">
+              <tr
+                key={user.id}
+                className="border-b border-stone-100 last:border-0 hover:bg-stone-50"
+              >
                 <td className="px-3 py-2.5">
                   <input
                     type="checkbox"
@@ -174,10 +258,7 @@ function PendingTab({ users }: { users: User[] }) {
                   />
                 </td>
                 <td className="px-3 py-2.5">
-                  <div className="font-medium text-stone-800 truncate max-w-[200px]">
-                    {user.name ?? <span className="text-stone-400 font-normal">—</span>}
-                  </div>
-                  <div className="text-xs text-stone-400 truncate max-w-[200px]">{user.email}</div>
+                  <UserCell user={user} />
                 </td>
                 <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
                   {user.provider ?? "—"}
@@ -187,6 +268,13 @@ function PendingTab({ users }: { users: User[] }) {
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-2">
+                    {collections.length > 0 && (
+                      <AccessBadge
+                        count={accessByUser.get(user.id)?.length ?? 0}
+                        total={collections.length}
+                        onClick={() => onOpenAccess(user)}
+                      />
+                    )}
                     <button
                       onClick={() => handleApprove(user.id)}
                       disabled={isPending}
@@ -212,11 +300,21 @@ function PendingTab({ users }: { users: User[] }) {
   );
 }
 
-// ─── All users tab ────────────────────────────────────────────────────────────
+// ─── AllUsersTab ──────────────────────────────────────────────────────────────
 
 const ROLES = ["PENDING", "APPROVED", "DEMO", "ADMIN"] as const;
 
-function AllUsersTab({ users }: { users: User[] }) {
+function AllUsersTab({
+  users,
+  collections,
+  accessByUser,
+  onOpenAccess,
+}: {
+  users: User[];
+  collections: CollectionSummary[];
+  accessByUser: Map<string, string[]>;
+  onOpenAccess: (u: User) => void;
+}) {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -228,9 +326,8 @@ function AllUsersTab({ users }: { users: User[] }) {
       )
     : users;
 
-  const handleRoleChange = (id: string, role: string) => {
+  const handleRoleChange = (id: string, role: string) =>
     startTransition(() => changeRoleAction(id, role));
-  };
 
   return (
     <div>
@@ -246,27 +343,38 @@ function AllUsersTab({ users }: { users: User[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-100 bg-stone-50">
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600">User</th>
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">Provider</th>
-              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">Signed up</th>
-              <th className="px-3 py-2.5 text-right font-medium text-stone-600">Role</th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600">
+                User
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">
+                Provider
+              </th>
+              <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">
+                Signed up
+              </th>
+              <th className="px-3 py-2.5 text-right font-medium text-stone-600">
+                Role
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-stone-400">
+                <td
+                  colSpan={4}
+                  className="px-3 py-8 text-center text-stone-400"
+                >
                   No users found.
                 </td>
               </tr>
             ) : (
               filtered.map((user) => (
-                <tr key={user.id} className="border-b border-stone-100 last:border-0 hover:bg-stone-50">
+                <tr
+                  key={user.id}
+                  className="border-b border-stone-100 last:border-0 hover:bg-stone-50"
+                >
                   <td className="px-3 py-2.5">
-                    <div className="font-medium text-stone-800 truncate max-w-[200px]">
-                      {user.name ?? <span className="text-stone-400 font-normal">—</span>}
-                    </div>
-                    <div className="text-xs text-stone-400 truncate max-w-[200px]">{user.email}</div>
+                    <UserCell user={user} />
                   </td>
                   <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
                     {user.provider ?? "—"}
@@ -275,16 +383,27 @@ function AllUsersTab({ users }: { users: User[] }) {
                     {formatDate(user.createdAt)}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <select
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                      disabled={isPending}
-                      className="text-xs border border-stone-200 rounded-md px-2 py-1 bg-white text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-900/10 disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-end gap-2">
+                      {collections.length > 0 && (
+                        <AccessBadge
+                          count={accessByUser.get(user.id)?.length ?? 0}
+                          total={collections.length}
+                          onClick={() => onOpenAccess(user)}
+                        />
+                      )}
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                        disabled={isPending}
+                        className="text-xs border border-stone-200 rounded-md px-2 py-1 bg-white text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-900/10 disabled:opacity-50"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -296,7 +415,156 @@ function AllUsersTab({ users }: { users: User[] }) {
   );
 }
 
+// ─── UserAccessModal ──────────────────────────────────────────────────────────
+
+function UserAccessModal({
+  user,
+  collections,
+  currentAccess,
+  onClose,
+}: {
+  user: User;
+  collections: CollectionSummary[];
+  currentAccess: string[];
+  onClose: () => void;
+}) {
+  const [checked, setChecked] = useState<Set<string>>(new Set(currentAccess));
+  const [isPending, startTransition] = useTransition();
+
+  const toggle = (id: string) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const save = () => {
+    startTransition(async () => {
+      await setUserCollectionAccessAction(user.id, [...checked]);
+      onClose();
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-stone-100">
+          <p className="text-xs text-stone-400 mb-0.5">Collection access for</p>
+          <p className="font-medium text-stone-900 truncate">{user.email}</p>
+        </div>
+
+        {/* Helper text */}
+        <div className="px-5 pt-3 pb-1">
+          <p className="text-xs text-stone-500 leading-relaxed">
+            Select which collections this user can see. If none are selected, they
+            see <strong>all collections</strong>.
+          </p>
+        </div>
+
+        {/* Grant/Revoke all */}
+        <div className="px-5 py-2 flex gap-2">
+          <button
+            onClick={() => setChecked(new Set(collections.map((c) => c.id)))}
+            className="text-xs text-stone-600 hover:text-stone-900 underline underline-offset-2"
+          >
+            Grant all
+          </button>
+          <span className="text-stone-300">·</span>
+          <button
+            onClick={() => setChecked(new Set())}
+            className="text-xs text-stone-600 hover:text-stone-900 underline underline-offset-2"
+          >
+            Revoke all
+          </button>
+        </div>
+
+        {/* Collection checkboxes */}
+        <div className="px-5 pb-3 max-h-60 overflow-y-auto space-y-1.5">
+          {collections.length === 0 ? (
+            <p className="text-xs text-stone-400 py-4 text-center">
+              No collections exist yet.
+            </p>
+          ) : (
+            collections.map((col) => (
+              <label
+                key={col.id}
+                className="flex items-center gap-3 cursor-pointer py-1 group"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked.has(col.id)}
+                  onChange={() => toggle(col.id)}
+                  className="rounded border-stone-300 shrink-0"
+                />
+                <span className="text-sm text-stone-700 flex-1">{col.name}</span>
+                <span className="text-xs text-stone-400">
+                  {col.designCount}
+                </span>
+              </label>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-stone-100 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={isPending}
+            className="px-4 py-1.5 text-sm font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shared components ────────────────────────────────────────────────────────
+
+function UserCell({ user }: { user: User }) {
+  return (
+    <>
+      <div className="font-medium text-stone-800 truncate max-w-[200px]">
+        {user.name ?? (
+          <span className="text-stone-400 font-normal">—</span>
+        )}
+      </div>
+      <div className="text-xs text-stone-400 truncate max-w-[200px]">
+        {user.email}
+      </div>
+    </>
+  );
+}
+
+function AccessBadge({
+  count,
+  total,
+  onClick,
+}: {
+  count: number;
+  total: number;
+  onClick: () => void;
+}) {
+  const label = count === 0 ? "All" : `${count}/${total}`;
+  return (
+    <button
+      onClick={onClick}
+      title="Manage collection access"
+      className="text-xs px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-colors"
+    >
+      {label} collections
+    </button>
+  );
+}
 
 function StatCard({
   label,
@@ -310,12 +578,14 @@ function StatCard({
   return (
     <div
       className={`rounded-lg border px-4 py-3 ${
-        accent
-          ? "border-amber-200 bg-amber-50"
-          : "border-stone-200 bg-white"
+        accent ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-white"
       }`}
     >
-      <div className={`text-2xl font-semibold ${accent ? "text-amber-700" : "text-stone-900"}`}>
+      <div
+        className={`text-2xl font-semibold ${
+          accent ? "text-amber-700" : "text-stone-900"
+        }`}
+      >
         {value}
       </div>
       <div className={`text-xs mt-0.5 ${accent ? "text-amber-600" : "text-stone-500"}`}>

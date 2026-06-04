@@ -47,7 +47,7 @@ export type DesignSummary = {
   imageUrl: string;
   width: number;
   height: number;
-  collection: string | null;
+  collection: { id: string; name: string; slug: string } | null;
 };
 
 // Full design including palette, used on the design viewer page
