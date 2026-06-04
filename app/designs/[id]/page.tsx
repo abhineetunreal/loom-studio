@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/lib/db";
 import DesignViewer from "@/components/design/DesignViewer";
 import type { PaletteEntry, YarnOption } from "@/types";
@@ -41,6 +40,7 @@ export default async function DesignPage({ params }: Props) {
         sourceBmpUrl: true,
         width: true,
         height: true,
+        collection: true,
         palette: true,
       },
     }),
@@ -60,10 +60,7 @@ export default async function DesignPage({ params }: Props) {
   }));
 
   // ── Build initial color map from the rendered-color lookup ─────────────────
-  // Check the lookup file first, then fall back to matchedYarnCode baked into
-  // the palette at process-designs time (handles both fresh and pre-seeded designs).
   const renderedLookup = loadRenderedLookup();
-  // Index OneLoom yarns by their name for O(1) resolution
   const oneloomByName = new Map<string, YarnOption>(
     yarns.filter((y) => y.library === "OneLoom").map((y) => [y.name, y])
   );
@@ -78,16 +75,7 @@ export default async function DesignPage({ params }: Props) {
   }
 
   return (
-    <div className="px-6 py-6 max-w-6xl mx-auto">
-      {/* Breadcrumb */}
-      <nav className="text-sm text-stone-400 mb-6">
-        <Link href="/" className="hover:text-stone-700 transition-colors">
-          Designs
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-stone-700">{design.name}</span>
-      </nav>
-
+    <div className="h-full overflow-hidden">
       <DesignViewer
         design={{ ...design, palette }}
         yarns={yarns}

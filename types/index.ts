@@ -30,7 +30,7 @@ export type YarnOption = {
 
 // ─── Design ───────────────────────────────────────────────────────────────────
 
-// Shape used on the catalog page
+// Shape used on the catalog page and in the left-panel design browser
 export type DesignSummary = {
   id: string;
   name: string;
@@ -38,6 +38,7 @@ export type DesignSummary = {
   imageUrl: string;
   width: number;
   height: number;
+  collection: string | null;
 };
 
 // Full design including palette, used on the design viewer page

@@ -1,8 +1,10 @@
 "use client";
 
 import { useReducer, useState, useRef, useCallback, useEffect } from "react";
-import RecolorCanvas, { type RecolorCanvasHandle } from "./RecolorCanvas";
-import PalettePanel from "./PalettePanel";
+import type { RecolorCanvasHandle } from "./RecolorCanvas";
+import CanvasZone from "./CanvasZone";
+import CompactPalette from "./CompactPalette";
+import InlineYarnPicker from "./InlineYarnPicker";
 import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
@@ -99,16 +101,10 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
   // Set when the floating popover should be shown (canvas click, before picker opens)
   const [canvasPick, setCanvasPick] = useState<CanvasPickState>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
-  const canvasRef = useRef<RecolorCanvasHandle>(null);
-
-  const paletteByHex = new Map<string, PaletteEntry>(
-    design.palette.map((e) => [e.hex, e])
-  );
-  const selectedEntry = selectedHex ? paletteByHex.get(selectedHex) ?? null : null;
+  const canvasRef = useRef<RecolorCanvasHandle | null>(null);
 
   // Palette sorted by coverage — used to derive 1-based rank for the popover
   const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);
-  const paletteRankByHex = new Map(sortedPalette.map((e, i) => [e.hex, i + 1]));
 
   // ── Keyboard shortcuts ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -130,10 +126,11 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
 
   // ── Color pick handlers ──────────────────────────────────────────────────────
 
-  // Canvas click → show the floating popover (does NOT open YarnPicker directly)
+  // Canvas click → show the floating popover; deselects any active picker selection
   const handleCanvasColorPick = useCallback(
     (hex: string, clientX: number, clientY: number) => {
       setCanvasPick({ hex, clientX, clientY });
+      setSelectedHex(null);
     },
     []
   );
@@ -154,8 +151,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
   function handleYarnPick(yarn: YarnOption) {
     if (!selectedHex) return;
     dispatch({ type: "ASSIGN", hex: selectedHex, yarn });
-    setSelectedHex(null);
-    // canvasPick stays set — popover remains and will re-render with the new yarn
+    // Keep selectedHex — picker stays "hot" so user can swap yarns without re-selecting
   }
 
   function handlePickerClose() {
@@ -176,89 +172,72 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
   const hasChanges = Object.keys(recolor.current).length > 0;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 lg:items-start">
-      {/* ── Left: canvas + toolbar ───────────────────────────────────────── */}
-      <div className="flex-1 min-w-0">
-        <RecolorCanvas
-          ref={canvasRef}
-          imageUrl={design.imageUrl}
-          width={design.width}
-          height={design.height}
+    <div className="flex h-full overflow-hidden">
+      {/* Zone B — canvas */}
+      <CanvasZone
+        design={design}
+        colorMap={recolor.current}
+        selectedHex={canvasPick?.hex ?? selectedHex}
+        onColorPick={handleCanvasColorPick}
+        canvasRef={canvasRef}
+        onUndo={() => dispatch({ type: "UNDO" })}
+        onRedo={() => dispatch({ type: "REDO" })}
+        onReset={() => dispatch({ type: "RESET" })}
+        canUndo={!!recolor.past.length}
+        canRedo={!!recolor.future.length}
+        hasChanges={hasChanges}
+      />
+
+      {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
+      <div className="shrink-0 w-[13%] min-w-[160px] flex flex-col border-l border-stone-200 bg-white overflow-hidden">
+        <CompactPalette
+          designName={design.name}
           palette={design.palette}
           colorMap={recolor.current}
+          initialColorMap={initialColorMap ?? {}}
           selectedHex={canvasPick?.hex ?? selectedHex}
-          onColorPick={handleCanvasColorPick}
+          onSelectColor={handlePaletteColorPick}
+          onRevert={handleRevert}
+          onRequestColorway={() => setShowSubmissionForm(true)}
         />
-
-        {/* Undo / Redo / Reset — sits below the canvas */}
-        <div className="flex items-center gap-2 mt-3">
-          <button
-            onClick={() => dispatch({ type: "UNDO" })}
-            disabled={!recolor.past.length}
-            title="Undo (Ctrl+Z)"
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <UndoIcon /> Undo
-          </button>
-          <button
-            onClick={() => dispatch({ type: "REDO" })}
-            disabled={!recolor.future.length}
-            title="Redo (Ctrl+Y)"
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <RedoIcon /> Redo
-          </button>
-          <button
-            onClick={() => dispatch({ type: "RESET" })}
-            disabled={!hasChanges}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            Reset
-          </button>
-          <p className="text-xs text-stone-400 ml-1 hidden sm:block">
-            {hasChanges
-              ? `${Object.keys(recolor.current).length} color${Object.keys(recolor.current).length !== 1 ? "s" : ""} changed`
-              : "Click a color region to start"}
-          </p>
-        </div>
       </div>
 
-      {/* ── Right: palette + request button (sticky on desktop) ─────────── */}
-      <aside className="w-full lg:w-72 xl:w-80 shrink-0">
-        <div className="lg:sticky lg:top-6 flex flex-col gap-4">
-          <div>
-            <h1 className="text-xl font-semibold leading-tight">{design.name}</h1>
-            <p className="text-sm text-stone-400 mt-0.5">
-              {design.width} × {design.height} px
-            </p>
+      {/* Zone D — inline yarn picker, desktop only */}
+      <div className="flex flex-col shrink-0 w-[16%] min-w-[200px] border-l border-stone-200 bg-white overflow-hidden">
+        <InlineYarnPicker
+          yarns={yarns}
+          targetEntry={selectedHex ? (design.palette.find((e) => e.hex === selectedHex) ?? null) : null}
+          currentYarn={selectedHex ? (recolor.current[selectedHex] ?? null) : null}
+          onPick={handleYarnPick}
+        />
+      </div>
+
+      {/* Mobile: YarnPicker bottom sheet */}
+      {selectedHex && (() => {
+        const entry = design.palette.find((e) => e.hex === selectedHex);
+        return entry ? (
+          <div className="md:hidden">
+            <YarnPicker
+              yarns={yarns}
+              targetEntry={entry}
+              currentYarn={recolor.current[selectedHex] ?? null}
+              onPick={handleYarnPick}
+              onClose={handlePickerClose}
+            />
           </div>
+        ) : null;
+      })()}
 
-          <PalettePanel
-            palette={design.palette}
-            colorMap={recolor.current}
-            initialColorMap={initialColorMap ?? {}}
-            selectedHex={canvasPick?.hex ?? selectedHex}
-            onSelectColor={handlePaletteColorPick}
-            onRevert={handleRevert}
-          />
-
-          <button
-            onClick={() => setShowSubmissionForm(true)}
-            className="w-full bg-stone-900 text-white text-sm font-medium py-3 rounded-xl hover:bg-stone-700 transition-colors"
-          >
-            Request this colorway
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Canvas click popover ────────────────────────────────────────── */}
+      {/* ColorPopover */}
       {canvasPick && (() => {
-        const popoverEntry = paletteByHex.get(canvasPick.hex);
-        if (!popoverEntry) return null;
+        const entry = design.palette.find((e) => e.hex === canvasPick.hex);
+        if (!entry) return null;
         return (
           <ColorPopover
-            entry={popoverEntry}
-            paletteRank={paletteRankByHex.get(canvasPick.hex) ?? 1}
+            entry={entry}
+            paletteRank={
+              sortedPalette.findIndex((e) => e.hex === canvasPick.hex) + 1
+            }
             assignedYarn={recolor.current[canvasPick.hex] ?? null}
             initialYarn={initialColorMap?.[canvasPick.hex] ?? null}
             clientX={canvasPick.clientX}
@@ -269,18 +248,7 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
         );
       })()}
 
-      {/* ── YarnPicker modal ─────────────────────────────────────────────── */}
-      {selectedHex && selectedEntry && (
-        <YarnPicker
-          yarns={yarns}
-          targetEntry={selectedEntry}
-          currentYarn={recolor.current[selectedHex] ?? null}
-          onPick={handleYarnPick}
-          onClose={handlePickerClose}
-        />
-      )}
-
-      {/* ── Submission form modal ────────────────────────────────────────── */}
+      {/* Submission form */}
       {showSubmissionForm && (
         <SubmissionForm
           designId={design.id}
@@ -292,23 +260,5 @@ export default function DesignViewer({ design, yarns, initialColorMap }: Props) 
         />
       )}
     </div>
-  );
-}
-
-// ─── Micro icons ─────────────────────────────────────────────────────────────
-
-function UndoIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-    </svg>
-  );
-}
-
-function RedoIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
-    </svg>
   );
 }

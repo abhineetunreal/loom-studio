@@ -25,6 +25,8 @@ import type { PaletteEntry, YarnOption } from "@/types";
 export type RecolorCanvasHandle = {
   /** Returns a data URL of the current recolored image, scaled to maxWidth. */
   getSnapshot: (maxWidth?: number) => string | null;
+  /** Pick the palette color at the given viewport coordinates (forwarded from CanvasZone). */
+  pickColorAt: (clientX: number, clientY: number) => void;
 };
 
 type Props = {
@@ -47,7 +49,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // Set of valid palette hex values for fast lookup on click
   const paletteHexSet = useRef<Set<string>>(new Set(palette.map((e) => e.hex)));
 
-  // ── Expose getSnapshot() to parent ──────────────────────────────────────────
+  // ── Expose getSnapshot() and pickColorAt() to parent ────────────────────────
   useImperativeHandle(ref, () => ({
     getSnapshot(maxWidth = 800) {
       const canvas = canvasRef.current;
@@ -60,6 +62,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       offscreen.height = h;
       offscreen.getContext("2d")!.drawImage(canvas, 0, 0, w, h);
       return offscreen.toDataURL("image/png");
+    },
+    pickColorAt(clientX: number, clientY: number) {
+      pickColorAt(clientX, clientY);
     },
   }));
 
@@ -151,7 +156,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         height={height}
         onClick={handleClick}
         onTouchEnd={handleTouchEnd}
-        className="w-full h-auto rounded-xl border border-stone-200 cursor-crosshair touch-none"
+        className="w-full h-full rounded-xl border border-stone-200 cursor-crosshair touch-none"
         aria-label="Rug design — click a color region to select it"
       />
       {/* Highlight ring on the selected color region is handled in PalettePanel,

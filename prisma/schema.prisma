@@ -25,6 +25,7 @@ model Design {
   // JSON array of PaletteEntry: { index, hex, pixelCount, percentage }
   // Stored as-is from the BMP; never snapped to the yarn library
   palette      Json
+  collection   String?  // optional grouping label shown in the left-panel design browser
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
