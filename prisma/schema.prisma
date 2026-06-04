@@ -40,6 +40,7 @@ model TenantUser {
   role       UserRole @default(PENDING)
   authUserId String? // Supabase Auth user ID
   provider   String? // "google" | "magic_link" | "password"
+  canUpload  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   collectionAccess CollectionAccess[]
