@@ -69,9 +69,11 @@ export default function InlineYarnPicker({
                 style={{ backgroundColor: targetEntry.hex }}
                 aria-hidden
               />
-              <span className="text-[9px] font-mono text-stone-500">
-                {targetEntry.hex.toUpperCase()}
-              </span>
+              {!isDemo && (
+                <span className="text-[9px] font-mono text-stone-500">
+                  {targetEntry.hex.toUpperCase()}
+                </span>
+              )}
               <span className="text-[9px] text-stone-400">
                 {targetEntry.percentage.toFixed(1)}%
               </span>

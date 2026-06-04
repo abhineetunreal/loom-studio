@@ -114,9 +114,11 @@ export default function YarnPicker({
             />
             <div>
               <p className="text-sm font-medium leading-tight">Choose yarn</p>
-              <p className="text-xs text-stone-400 font-mono leading-tight">
-                {targetEntry.hex.toUpperCase()} · {targetEntry.percentage.toFixed(1)}%
-              </p>
+              {!isDemo && (
+                <p className="text-xs text-stone-400 font-mono leading-tight">
+                  {targetEntry.hex.toUpperCase()} · {targetEntry.percentage.toFixed(1)}%
+                </p>
+              )}
             </div>
           </div>
           <button
