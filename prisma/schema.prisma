@@ -24,11 +24,12 @@ model Tenant {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  designs     Design[]
-  yarns       YarnColor[]
-  users       TenantUser[]
-  submissions ColorwaySubmission[]
-  collections Collection[]
+  designs        Design[]
+  yarns          YarnColor[]
+  users          TenantUser[]
+  submissions    ColorwaySubmission[]
+  collections    Collection[]
+  savedColorways SavedColorway[]
 }
 
 model TenantUser {
@@ -45,6 +46,7 @@ model TenantUser {
 
   collectionAccess CollectionAccess[]
   uploadedDesigns  Design[]
+  savedColorways   SavedColorway[]
 
   @@unique([tenantId, email])
 }
@@ -80,7 +82,8 @@ model Design {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  submissions ColorwaySubmission[]
+  submissions    ColorwaySubmission[]
+  savedColorways SavedColorway[]
 }
 
 model Collection {
@@ -155,4 +158,22 @@ model SubmissionColorMapping {
   percentage   Float // what % of the design this color covers
   yarnId       String
   yarn         YarnColor          @relation(fields: [yarnId], references: [id])
+}
+
+// A user's saved colorway for a design — one per user per design
+model SavedColorway {
+  id           String     @id @default(cuid())
+  designId     String
+  design       Design     @relation(fields: [designId], references: [id])
+  userId       String
+  user         TenantUser @relation(fields: [userId], references: [id])
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  // { [paletteIndex]: { yarnId, yarnCode, yarnHex, libraryName } }
+  colorMapping Json
+  snapshotUrl  String? // Supabase storage URL for canvas PNG export
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([designId, userId])
 }
