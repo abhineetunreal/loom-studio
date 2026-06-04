@@ -44,6 +44,7 @@ model TenantUser {
   createdAt  DateTime @default(now())
 
   collectionAccess CollectionAccess[]
+  uploadedDesigns  Design[]
 
   @@unique([tenantId, email])
 }
@@ -69,9 +70,11 @@ model Design {
   // JSON array of PaletteEntry: { index, hex, pixelCount, percentage }
   // Stored as-is from the BMP; never snapped to the yarn library
   palette      Json
-  collectionId String? // FK to Collection — replaces the old collection TEXT column
-  collection   Collection? @relation(fields: [collectionId], references: [id])
-  isHidden     Boolean     @default(false) // hide from users within an accessible collection
+  collectionId  String? // FK to Collection — replaces the old collection TEXT column
+  collection    Collection? @relation(fields: [collectionId], references: [id])
+  uploadedById  String?
+  uploadedBy    TenantUser? @relation(fields: [uploadedById], references: [id])
+  isHidden      Boolean     @default(false) // hide from users within an accessible collection
   isActive     Boolean     @default(true)
   isDemo       Boolean     @default(false) // DEMO tier users only see isDemo designs
   createdAt    DateTime    @default(now())
