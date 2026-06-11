@@ -31,11 +31,9 @@ export async function GET(request: NextRequest) {
 
 // ─── Tenant user provisioning ─────────────────────────────────────────────────
 //
-// On first sign-in, create a TenantUser row for the default tenant.
-// Admin email gets ADMIN role; everyone else starts as PENDING.
-//
-// TODO: When multi-tenant subdomain routing is added, resolve the tenant from
-// the request hostname instead of always using the default slug.
+// On every sign-in: ensure a TenantUser row exists for the current-domain tenant.
+// If the user's email matches any tenant's adminEmail, they get OWNER for that
+// tenant (cross-tenant — not limited to the current domain).
 
 async function upsertTenantUser(
   email: string,

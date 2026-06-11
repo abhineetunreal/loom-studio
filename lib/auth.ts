@@ -2,7 +2,23 @@
 // and Server Actions. Never import from Client Components.
 
 import type { Session, User } from "@supabase/supabase-js";
+import { headers } from "next/headers";
 import { createAuthClient } from "./supabase-server";
+
+/**
+ * Build the /auth/callback URL for the current request's host.
+ * Uses x-tenant-host (set by middleware) or the raw Host header.
+ * localhost → http; everything else → https.
+ */
+async function getCallbackUrl(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-tenant-host") ?? h.get("host") ?? "";
+  const proto =
+    host.startsWith("localhost") || host.startsWith("127.")
+      ? "http"
+      : "https";
+  return `${proto}://${host}/auth/callback`;
+}
 
 /**
  * Returns the current Supabase session, or null if unauthenticated.
@@ -35,7 +51,7 @@ export async function getGoogleSignInUrl(): Promise<string> {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      redirectTo: await getCallbackUrl(),
     },
   });
   if (error || !data.url) throw new Error(error?.message ?? "OAuth error");
@@ -51,7 +67,7 @@ export async function signInWithMagicLink(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: await getCallbackUrl(),
     },
   });
   if (error) throw new Error(error.message);
