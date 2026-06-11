@@ -1,13 +1,21 @@
 // proxy.ts — Next.js 16 request proxy (replaces middleware.ts).
-// Refreshes the Supabase session on every request so tokens stay valid.
+//
+// 1. Forwards the Host header as x-tenant-host so that server components,
+//    route handlers, and server actions can call getCurrentTenant() in
+//    lib/tenant.ts without re-extracting the host everywhere.
+//
+// 2. Refreshes the Supabase session on every request so auth tokens stay valid.
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  // Start with a pass-through response, but forward the incoming headers so
-  // Server Components can read them.
-  const response = NextResponse.next({ request });
+  // Forward Host as x-tenant-host for getCurrentTenant() (lib/tenant.ts).
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-tenant-host", request.headers.get("host") ?? "");
+
+  // Pass the modified headers to the response so downstream server code sees them.
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,6 +49,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // Skip Next.js internals and static assets
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
