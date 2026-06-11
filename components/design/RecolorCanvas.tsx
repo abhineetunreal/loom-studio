@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
-import { applyRecolor, buildColorLookup, rgbToHex } from "@/lib/recolor";
+import { applyRecolor, buildColorLookup, rgbToHex } from "@/lib/recolor"; // rgbToHex used by pickColorAt
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
 import type { PaletteEntry, YarnOption } from "@/types";
 
@@ -81,6 +81,8 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   const originalPixels = useRef<Uint8ClampedArray | null>(null);
   // Same image upscaled to SUPERSAMPLE_FACTOR × native size, for the render pass
   const supersampledPixels = useRef<Uint8ClampedArray | null>(null);
+  // Reused across renders — avoids GC pressure from allocating a new OffscreenCanvas each time
+  const offscreenRef = useRef<OffscreenCanvas | null>(null);
   // Bumped when the image finishes loading so the render effect re-fires with real pixels.
   // Refs don't trigger effects — without this counter the textured render would never happen
   // on initial load (the render effect fires on mount before pixels arrive, returns early,
@@ -191,6 +193,21 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   }, [imageUrl, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Re-render when colorMap or texture toggle changes ───────────────────────
+  //
+  // Two-phase render for instant perceived feedback:
+  //
+  //   Phase 1 — flat recolor at native resolution (~5–15 ms).
+  //             Paints to the canvas immediately so the user sees the new
+  //             colors without waiting for the texture pass.
+  //
+  //   Phase 2 — textured render at 2× supersampled resolution.
+  //             Queued via requestAnimationFrame so the browser first composites
+  //             phase 1, then runs the heavier pixel loop without blocking the UI.
+  //
+  // Performance notes:
+  //   • lookup uses integer keys (r<<16|g<<8|b) — no per-pixel string allocation
+  //   • OffscreenCanvas is reused across renders (offscreenRef)
+  //   • Row offsets pre-computed; bitwise ops replace Math.floor / %
   useEffect(() => {
     let cancelled = false;
 
@@ -204,53 +221,46 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
       const lookup = buildColorLookup(colorMap);
 
-      const ss = SUPERSAMPLE_FACTOR;
-      const ssW = width * ss;
-      const ssH = height * ss;
-      const renderW = ssPixels ? ssW : width;
-      const renderH = ssPixels ? ssH : height;
-      const srcPixels = ssPixels ?? pixels;
-
+      // ── Phase 1: flat recolor at native resolution — fast path ─────────────
       const t0 = performance.now();
-      let imageData: ImageData;
-
-      if (textureEnabled) {
-        // ── Combined single-pass: recolor + texture ──────────────────────────
-        // ~2× faster than sequential applyRecolor() → textureShader.apply().
-        await textureShader.load("422");
-        if (cancelled) return;
-
-        const { tileScaleX, tileScaleY } = computeTileScales(renderW, renderH, designName ?? "", tileMultiplier);
-        imageData = textureShader.applyRecolorAndTexture(
-          srcPixels, renderW, renderH, lookup, tileScaleX, tileScaleY, textureStrength
-        );
-      } else {
-        // ── Flat recolor only ────────────────────────────────────────────────
-        imageData = applyRecolor(srcPixels, renderW, renderH, lookup);
-      }
-
-      if (cancelled) return;
-
-      const passMs = (performance.now() - t0).toFixed(0);
-      console.log(`[Canvas] pixel pass (${textureEnabled ? "recolor+texture" : "recolor only"}, ${(renderW * renderH / 1e6).toFixed(1)}Mpx): ${passMs}ms`);
-
-      // ── Blit supersampled buffer → display canvas ─────────────────────────
-      // The bilinear downscale from 2× acts as a box-filter anti-alias.
-      const t1 = performance.now();
-      if (ssPixels) {
-        const offscreen = new OffscreenCanvas(ssW, ssH);
-        const offCtx = offscreen.getContext("2d")!;
-        offCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(offscreen, 0, 0, width, height);
-      } else {
-        ctx.putImageData(imageData, 0, 0);
-      }
-      console.log(`[Canvas] blit ${ssPixels ? `${ssW}×${ssH}→${width}×${height}` : `${width}×${height}`}: ${(performance.now() - t1).toFixed(0)}ms`);
+      const flatData = applyRecolor(pixels, width, height, lookup);
+      ctx.putImageData(flatData, 0, 0);
+      console.log(`[Canvas] phase 1 flat (${width}×${height}): ${(performance.now() - t0).toFixed(0)}ms`);
 
       if (!cancelled && !renderCompleteFired.current) {
         renderCompleteFired.current = true;
         onRenderComplete?.();
       }
+
+      if (!textureEnabled || !ssPixels || cancelled) return;
+
+      // ── Yield to browser so phase 1 is composited before phase 2 blocks ────
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (cancelled) return;
+
+      // ── Phase 2: textured render at supersampled resolution ─────────────────
+      const ss = SUPERSAMPLE_FACTOR;
+      const ssW = width * ss;
+      const ssH = height * ss;
+
+      await textureShader.load("422");
+      if (cancelled) return;
+
+      const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
+      const t1 = performance.now();
+      const texturedData = textureShader.applyRecolorAndTexture(
+        ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY, textureStrength
+      );
+      if (cancelled) return;
+      console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}): ${(performance.now() - t1).toFixed(0)}ms`);
+
+      // Reuse OffscreenCanvas — allocate only when size changes
+      if (!offscreenRef.current || offscreenRef.current.width !== ssW || offscreenRef.current.height !== ssH) {
+        offscreenRef.current = new OffscreenCanvas(ssW, ssH);
+      }
+      const offCtx = offscreenRef.current.getContext("2d")!;
+      offCtx.putImageData(texturedData, 0, 0);
+      ctx.drawImage(offscreenRef.current, 0, 0, width, height);
     }
 
     render();

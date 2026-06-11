@@ -11,7 +11,7 @@
 //   // or — single-pass recolor+texture (faster):
 //   textureShader.applyRecolorAndTexture(originalPixels, w, h, lookup, tileScaleX, tileScaleY, strength);
 
-import { rgbToHex } from "@/lib/recolor";
+import { rgbToInt } from "@/lib/recolor";
 
 // ─── Rug dimension parsing ────────────────────────────────────────────────────
 
@@ -193,13 +193,20 @@ class TextureShader {
    *
    * Falls back to recolor-only if the detail map hasn't been loaded yet.
    *
-   * @param lookup  Map from original hex → replacement {r,g,b}, from buildColorLookup()
+   * Optimisations vs the naïve version:
+   *   • Integer-keyed lookup (no per-pixel string allocation)
+   *   • Row offset pre-computed outside the inner loop
+   *   • Bitwise AND for power-of-2 texture modulo (2048 → & 2047)
+   *   • `| 0` for float→int truncation instead of Math.floor
+   *   • Uint8ClampedArray auto-clamps writes — no explicit Math.min/max
+   *
+   * @param lookup  Map from packed-int RGB → replacement {r,g,b}, from buildColorLookup()
    */
   applyRecolorAndTexture(
     originalPixels: Uint8ClampedArray,
     width: number,
     height: number,
-    lookup: Map<string, { r: number; g: number; b: number }>,
+    lookup: Map<number, { r: number; g: number; b: number }>,
     tileScaleX: number,
     tileScaleY: number,
     strength = 0.6
@@ -210,41 +217,49 @@ class TextureShader {
     if (!this.detailMap) {
       // Texture not loaded — recolor only (shouldn't happen if load() was awaited first)
       for (let i = 0; i < originalPixels.length; i += 4) {
-        const rep = lookup.get(rgbToHex(originalPixels[i], originalPixels[i + 1], originalPixels[i + 2]));
-        out[i]     = rep ? rep.r : originalPixels[i];
-        out[i + 1] = rep ? rep.g : originalPixels[i + 1];
-        out[i + 2] = rep ? rep.b : originalPixels[i + 2];
+        const r = originalPixels[i], g = originalPixels[i + 1], b = originalPixels[i + 2];
+        const rep = lookup.get(rgbToInt(r, g, b));
+        out[i]     = rep ? rep.r : r;
+        out[i + 1] = rep ? rep.g : g;
+        out[i + 2] = rep ? rep.b : b;
         out[i + 3] = originalPixels[i + 3];
       }
       return output;
     }
 
     const { data: dPx, width: tw, height: th } = this.detailMap;
+    // Bitwise AND modulo only works for power-of-2 dimensions (2048 is 2^11)
+    const twMask = tw - 1;
+    const thMask = th - 1;
 
     for (let y = 0; y < height; y++) {
-      const texY = Math.floor((y * tileScaleY) % th);
+      const texY = ((y * tileScaleY) | 0) & thMask;
+      const texRowOff = texY * tw;   // pre-computed row offset into detail map
+      const rowOff = y * width;
+
       for (let x = 0; x < width; x++) {
-        const pi = (y * width + x) * 4;
+        const pi = (rowOff + x) << 2; // * 4
         const a = originalPixels[pi + 3];
-        if (a === 0) {
-          out[pi + 3] = 0;
-          continue;
-        }
+        if (a === 0) continue; // out is already zero-initialised
 
-        // ── Color substitution ──
-        const rep = lookup.get(rgbToHex(originalPixels[pi], originalPixels[pi + 1], originalPixels[pi + 2]));
-        const r = rep ? rep.r : originalPixels[pi];
-        const g = rep ? rep.g : originalPixels[pi + 1];
-        const b = rep ? rep.b : originalPixels[pi + 2];
+        // ── Color substitution (integer key — no string allocation) ──────────
+        const r0 = originalPixels[pi];
+        const g0 = originalPixels[pi + 1];
+        const b0 = originalPixels[pi + 2];
+        const rep = lookup.get(rgbToInt(r0, g0, b0));
+        const r = rep ? rep.r : r0;
+        const g = rep ? rep.g : g0;
+        const b = rep ? rep.b : b0;
 
-        // ── Texture grain factor ──
-        const texX = Math.floor((x * tileScaleX) % tw);
-        const d = dPx[(texY * tw + texX) * 4]; // R channel of detail map
+        // ── Texture grain factor ─────────────────────────────────────────────
+        const texX = ((x * tileScaleX) | 0) & twMask;
+        const d = dPx[(texRowOff + texX) << 2]; // R channel of detail map
         const factor = 1 + strength * ((d - 128) / 128);
 
-        out[pi]     = Math.min(255, Math.max(0, r * factor));
-        out[pi + 1] = Math.min(255, Math.max(0, g * factor));
-        out[pi + 2] = Math.min(255, Math.max(0, b * factor));
+        // Uint8ClampedArray auto-clamps to 0–255 — no Math.min/max needed
+        out[pi]     = r * factor;
+        out[pi + 1] = g * factor;
+        out[pi + 2] = b * factor;
         out[pi + 3] = a;
       }
     }

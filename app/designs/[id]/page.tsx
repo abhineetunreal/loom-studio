@@ -39,7 +39,10 @@ type Props = { params: Promise<{ id: string }> };
 export default async function DesignPage({ params }: Props) {
   const { id } = await params;
 
-  const [design, rawYarns, tierInfo, authUser, tenant] = await Promise.all([
+  // Resolve tenant first (cached after first call) so the yarn query can be scoped.
+  const tenant = await getCurrentTenant();
+
+  const [design, rawYarns, tierInfo, authUser] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -56,13 +59,12 @@ export default async function DesignPage({ params }: Props) {
       },
     }),
     db.yarnColor.findMany({
-      where: { isActive: true },
+      where: { isActive: true, tenantId: tenant?.id },
       select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getDefaultTierInfo(),
     getUser(),
-    getCurrentTenant(),
   ]);
 
   if (!design) notFound();

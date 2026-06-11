@@ -178,7 +178,7 @@ export default function YarnPicker({
         {/* ── Library selector + search — hidden in demo tier ─────────────── */}
         {!isDemo && (
           <div className="px-4 pt-3 pb-2 shrink-0 flex gap-2 items-center">
-            {libraries.length > 1 && (
+            {libraries.length > 1 ? (
               <select
                 value={library}
                 onChange={(e) => handleLibraryChange(e.target.value)}
@@ -190,7 +190,11 @@ export default function YarnPicker({
                   </option>
                 ))}
               </select>
-            )}
+            ) : yarnLibraryName ? (
+              <span className="text-sm px-2.5 py-2 rounded-lg border border-stone-200 bg-stone-50 text-stone-600 shrink-0">
+                {yarnLibraryName}
+              </span>
+            ) : null}
             <input
               ref={searchRef}
               type="search"

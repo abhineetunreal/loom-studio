@@ -112,22 +112,28 @@ export default function InlineYarnPicker({
           </div>
         )}
 
-        {/* Library selector — hidden in demo tier and when there's only one library */}
-        {!isDemo && libraries.length > 1 && (
-          <select
-            value={library}
-            onChange={(e) => {
-              setLibrary(e.target.value);
-              setSearch("");
-            }}
-            className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
-          >
-            {libraries.map((lib) => (
-              <option key={lib} value={lib}>
-                {lib}
-              </option>
-            ))}
-          </select>
+        {/* Library selector — hidden in demo tier */}
+        {!isDemo && (
+          libraries.length > 1 ? (
+            <select
+              value={library}
+              onChange={(e) => {
+                setLibrary(e.target.value);
+                setSearch("");
+              }}
+              className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
+            >
+              {libraries.map((lib) => (
+                <option key={lib} value={lib}>
+                  {lib}
+                </option>
+              ))}
+            </select>
+          ) : yarnLibraryName ? (
+            <p className="text-[9px] px-2 py-0.5 text-stone-500 border-b border-stone-200 bg-stone-50">
+              {yarnLibraryName}
+            </p>
+          ) : null
         )}
 
         {/* Search — hidden in demo tier */}
