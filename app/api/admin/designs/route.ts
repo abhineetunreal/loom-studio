@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 import type { PaletteEntry } from "@/types";
 
 export type CatalogDesign = {
@@ -27,8 +28,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
+  }
+
   const rows = await db.design.findMany({
-    where: { uploadedById: null },
+    where: { tenantId: tenant.id, uploadedById: null },
     select: {
       id: true,
       name: true,
