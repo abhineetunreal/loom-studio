@@ -39,7 +39,7 @@ type Props = { params: Promise<{ id: string }> };
 export default async function DesignPage({ params }: Props) {
   const { id } = await params;
 
-  const [design, rawYarns, tierInfo, authUser] = await Promise.all([
+  const [design, rawYarns, tierInfo, authUser, tenant] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -62,6 +62,7 @@ export default async function DesignPage({ params }: Props) {
     }),
     getDefaultTierInfo(),
     getUser(),
+    getCurrentTenant(),
   ]);
 
   if (!design) notFound();
@@ -96,7 +97,6 @@ export default async function DesignPage({ params }: Props) {
   let savedColorMap: Record<string, YarnOption> | undefined;
 
   if (authUser) {
-    const tenant = await getCurrentTenant();
     if (tenant) {
       const tenantUser = await db.tenantUser.findFirst({
         where: { tenantId: tenant.id, authUserId: authUser.id },
@@ -135,6 +135,7 @@ export default async function DesignPage({ params }: Props) {
         savedColorMap={savedColorMap}
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
+        yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}
       />
     </div>
   );

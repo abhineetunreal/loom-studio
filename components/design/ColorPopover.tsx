@@ -40,6 +40,7 @@ type Props = {
   onOpenPicker: () => void;
   onDismiss: () => void;
   tierInfo: TierInfo;
+  yarnLibraryName: string;
 };
 
 export default function ColorPopover({
@@ -52,6 +53,7 @@ export default function ColorPopover({
   onOpenPicker,
   onDismiss,
   tierInfo,
+  yarnLibraryName,
 }: Props) {
   const isDemo = tierInfo.tier === "demo";
   const cardRef = useRef<HTMLDivElement>(null);
@@ -146,11 +148,11 @@ export default function ColorPopover({
                   <p className="text-xs font-medium text-stone-800 truncate leading-snug">
                     {assignedYarn.name}
                   </p>
-                  {(assignedYarn.library || assignedYarn.pileType) && (
+                  {(yarnLibraryName || assignedYarn.pileType) && (
                     <div className="flex gap-1 mt-0.5 flex-wrap">
-                      {assignedYarn.library && (
+                      {yarnLibraryName && (
                         <span className="text-xs px-1.5 py-0.5 rounded bg-stone-100 text-stone-500 leading-none">
-                          {assignedYarn.library}
+                          {yarnLibraryName}
                         </span>
                       )}
                       {assignedYarn.pileType && (

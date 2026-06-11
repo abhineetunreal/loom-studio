@@ -91,6 +91,8 @@ type Props = {
   /** True when this design was uploaded by a user (not seeded from catalog). */
   isUserUpload: boolean;
   tierInfo: TierInfo;
+  /** Display name for the yarn library — derived from the tenant's displayName/name. */
+  yarnLibraryName: string;
 };
 
 // State for the floating popover shown on canvas click (before the full picker opens)
@@ -107,6 +109,7 @@ export default function DesignViewer({
   savedColorMap,
   isUserUpload,
   tierInfo,
+  yarnLibraryName,
 }: Props) {
   // Saved colorway takes precedence over the lookup-matched initial map.
   // For user uploads, initialColorMap is typically empty anyway.
@@ -315,6 +318,7 @@ export default function DesignViewer({
           currentYarn={selectedHex ? (recolor.current[selectedHex] ?? null) : null}
           onPick={handleYarnPick}
           tierInfo={tierInfo}
+          yarnLibraryName={yarnLibraryName}
         />
       </div>
 
@@ -330,6 +334,7 @@ export default function DesignViewer({
               onPick={handleYarnPick}
               onClose={handlePickerClose}
               tierInfo={tierInfo}
+              yarnLibraryName={yarnLibraryName}
             />
           </div>
         ) : null;
@@ -352,6 +357,7 @@ export default function DesignViewer({
             onOpenPicker={handlePopoverOpenPicker}
             onDismiss={() => setCanvasPick(null)}
             tierInfo={tierInfo}
+            yarnLibraryName={yarnLibraryName}
           />
         );
       })()}

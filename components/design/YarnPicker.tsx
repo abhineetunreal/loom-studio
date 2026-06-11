@@ -6,9 +6,6 @@ import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LIBRARIES = ["OneLoom", "ARS 1400", "ARS 1200"] as const;
-type Library = (typeof LIBRARIES)[number];
-
 const SIMILAR_COUNT = 8;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -28,6 +25,7 @@ type Props = {
   onPick: (yarn: YarnOption) => void;
   onClose: () => void;
   tierInfo: TierInfo;
+  yarnLibraryName: string;
 };
 
 export default function YarnPicker({
@@ -37,8 +35,14 @@ export default function YarnPicker({
   onPick,
   onClose,
   tierInfo,
+  yarnLibraryName,
 }: Props) {
-  const [library, setLibrary] = useState<Library>("OneLoom");
+  // Unique library values present in the yarn list (preserving first-seen order)
+  const libraries = useMemo(
+    () => [...new Set(yarns.map((y) => y.library ?? "").filter(Boolean))],
+    [yarns]
+  );
+  const [library, setLibrary] = useState<string>(() => libraries[0] ?? "");
   const [query, setQuery] = useState("");
   const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
@@ -81,7 +85,7 @@ export default function YarnPicker({
     );
   }, [yarns, library, query]);
 
-  function handleLibraryChange(next: Library) {
+  function handleLibraryChange(next: string) {
     setLibrary(next);
     setQuery("");
     // Re-focus search so keyboard users can type immediately
@@ -156,8 +160,8 @@ export default function YarnPicker({
                   onClick={() => onPick(yarn)}
                   onMouseEnter={() => setHoveredYarn(yarn)}
                   onMouseLeave={() => setHoveredYarn(null)}
-                  title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
-                  aria-label={`${yarn.name}${yarn.library ? " (" + yarn.library + ")" : ""}`}
+                  title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
+                  aria-label={`${yarn.name}${yarnLibraryName ? " (" + yarnLibraryName + ")" : ""}`}
                   aria-pressed={isCurrent}
                   className={`w-9 h-9 rounded-md border-2 transition-all hover:scale-110 hover:shadow-md ${
                     isCurrent
@@ -174,17 +178,19 @@ export default function YarnPicker({
         {/* ── Library selector + search — hidden in demo tier ─────────────── */}
         {!isDemo && (
           <div className="px-4 pt-3 pb-2 shrink-0 flex gap-2 items-center">
-            <select
-              value={library}
-              onChange={(e) => handleLibraryChange(e.target.value as Library)}
-              className="text-sm px-2.5 py-2 rounded-lg border border-stone-200 bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0 cursor-pointer"
-            >
-              {LIBRARIES.map((lib) => (
-                <option key={lib} value={lib}>
-                  {lib}
-                </option>
-              ))}
-            </select>
+            {libraries.length > 1 && (
+              <select
+                value={library}
+                onChange={(e) => handleLibraryChange(e.target.value)}
+                className="text-sm px-2.5 py-2 rounded-lg border border-stone-200 bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-400 shrink-0 cursor-pointer"
+              >
+                {libraries.map((lib) => (
+                  <option key={lib} value={lib}>
+                    {lib}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               ref={searchRef}
               type="search"
@@ -202,8 +208,8 @@ export default function YarnPicker({
             {hoveredYarn ? (
               <p className="text-xs text-stone-600 truncate">
                 <span className="font-mono">{hoveredYarn.name}</span>
-                {hoveredYarn.library && (
-                  <span className="text-stone-400"> · {hoveredYarn.library}</span>
+                {yarnLibraryName && (
+                  <span className="text-stone-400"> · {yarnLibraryName}</span>
                 )}
               </p>
             ) : (
@@ -234,7 +240,7 @@ export default function YarnPicker({
                     onClick={() => onPick(yarn)}
                     onMouseEnter={() => setHoveredYarn(yarn)}
                     onMouseLeave={() => setHoveredYarn(null)}
-                    title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                    title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
                     className={`aspect-square rounded-sm border-2 transition-colors ${

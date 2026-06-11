@@ -4,9 +4,6 @@ import { useState, useMemo } from "react";
 import { hexToRgb } from "@/lib/recolor";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
-const LIBRARIES = ["OneLoom", "ARS 1400", "ARS 1200"] as const;
-type Library = (typeof LIBRARIES)[number];
-
 function rgbDistance(hexA: string, hexB: string): number {
   const a = hexToRgb(hexA);
   const b = hexToRgb(hexB);
@@ -19,6 +16,7 @@ type Props = {
   currentYarn: YarnOption | null;
   onPick: (yarn: YarnOption) => void;
   tierInfo: TierInfo;
+  yarnLibraryName: string;
 };
 
 export default function InlineYarnPicker({
@@ -27,8 +25,14 @@ export default function InlineYarnPicker({
   currentYarn,
   onPick,
   tierInfo,
+  yarnLibraryName,
 }: Props) {
-  const [library, setLibrary] = useState<Library>("OneLoom");
+  // Unique library values present in the yarn list (preserving first-seen order)
+  const libraries = useMemo(
+    () => [...new Set(yarns.map((y) => y.library ?? "").filter(Boolean))],
+    [yarns]
+  );
+  const [library, setLibrary] = useState<string>(() => libraries[0] ?? "");
   const [search, setSearch] = useState("");
   const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
@@ -92,7 +96,7 @@ export default function InlineYarnPicker({
                   <button
                     key={yarn.id}
                     onClick={() => onPick(yarn)}
-                    title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                    title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
                     className={`w-6 h-6 rounded-sm border-2 transition-colors ${
@@ -108,17 +112,17 @@ export default function InlineYarnPicker({
           </div>
         )}
 
-        {/* Library selector — hidden in demo tier */}
-        {!isDemo && (
+        {/* Library selector — hidden in demo tier and when there's only one library */}
+        {!isDemo && libraries.length > 1 && (
           <select
             value={library}
             onChange={(e) => {
-              setLibrary(e.target.value as Library);
+              setLibrary(e.target.value);
               setSearch("");
             }}
             className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
           >
-            {LIBRARIES.map((lib) => (
+            {libraries.map((lib) => (
               <option key={lib} value={lib}>
                 {lib}
               </option>
