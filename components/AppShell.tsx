@@ -13,16 +13,22 @@ type UserInfo = {
   avatarUrl?: string;
 };
 
+type TenantBranding = {
+  displayName: string;
+  logoUrl: string | null;
+};
+
 type Props = {
   designs: DesignSummary[];
   tierInfo: TierInfo;
   canUpload: boolean;
   user: UserInfo | null;
+  tenant: TenantBranding | null;
   children: React.ReactNode;
 };
 
 
-export default function AppShell({ designs, tierInfo, canUpload, user, children }: Props) {
+export default function AppShell({ designs, tierInfo, canUpload, user, tenant, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -63,8 +69,21 @@ export default function AppShell({ designs, tierInfo, canUpload, user, children 
         >
           <MenuIcon />
         </button>
-        <span className="font-semibold tracking-tight text-lg flex-1">
-          Loom Studio
+        <span className="flex-1 flex items-center min-w-0">
+          {tenant?.logoUrl ? (
+            <Image
+              src={tenant.logoUrl}
+              alt={tenant.displayName}
+              width={120}
+              height={32}
+              className="h-8 w-auto object-contain"
+              priority
+            />
+          ) : (
+            <span className="font-semibold tracking-tight text-lg truncate">
+              {tenant?.displayName ?? "Loom Studio"}
+            </span>
+          )}
         </span>
 
         {/* User menu / sign-in link */}

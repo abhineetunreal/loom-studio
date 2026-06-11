@@ -9,6 +9,7 @@
 
 import { db } from "./db";
 import { getSession } from "./auth";
+import { getCurrentTenant } from "./tenant";
 
 export type Tier = "demo" | "full" | "admin";
 
@@ -49,20 +50,17 @@ export async function getTierForUser(tenantId: string): Promise<TierInfo> {
 }
 
 /**
- * Resolves tier for the default tenant (carpetsbazaar).
- * Used in root layout and design pages until subdomain routing is added.
+ * Resolves tier for the tenant matching the current request's domain.
+ * Falls back to the default tenant when no custom domain matches.
  */
 export async function getDefaultTierInfo(): Promise<TierInfo> {
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return { tier: "demo", pendingApproval: false };
   return getTierForUser(tenant.id);
 }
 
 /**
- * Returns the current session user's raw role string for the default tenant,
+ * Returns the current session user's raw role string for the request's tenant,
  * or null if the user is not authenticated / not a tenant member.
  * Used by admin actions that need to distinguish OWNER from ADMIN.
  */
@@ -70,10 +68,7 @@ export async function getCurrentUserRole(): Promise<string | null> {
   const session = await getSession();
   if (!session?.user.email) return null;
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return null;
 
   const tenantUser = await db.tenantUser.findUnique({

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getDefaultTierInfo } from "@/lib/tier";
 
 export async function DELETE(
@@ -18,10 +19,7 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
 
   const entry = await db.colorLookup.findFirst({

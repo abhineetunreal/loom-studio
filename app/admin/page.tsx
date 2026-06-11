@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getDefaultTierInfo, getCurrentUserRole } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 import { db } from "@/lib/db";
 import { AdminPanel } from "./AdminPanel";
 
@@ -11,10 +12,7 @@ export default async function AdminPage() {
   if (tierInfo.tier !== "admin") redirect("/");
   const actorRole = currentUserRole ?? "ADMIN";
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true, name: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) redirect("/");
 
   const now = new Date();
@@ -52,7 +50,7 @@ export default async function AdminPage() {
     }),
     db.design.findMany({
       // Exclude user uploads from the Collections tab — they're managed via User Uploads tab
-      where: { isActive: true, uploadedById: null },
+      where: { tenantId: tenant.id, isActive: true, uploadedById: null },
       select: { id: true, name: true, slug: true, collectionId: true, isHidden: true },
       orderBy: { name: "asc" },
     }),

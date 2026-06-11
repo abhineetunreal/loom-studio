@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { getUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase";
+import { getCurrentTenant } from "@/lib/tenant";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,10 +36,7 @@ export async function saveColorwayAction(
   const authUser = await getUser();
   if (!authUser) return { ok: false, error: "Not authenticated" };
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return { ok: false, error: "Tenant not found" };
 
   const tenantUser = await db.tenantUser.findFirst({

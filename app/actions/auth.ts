@@ -9,6 +9,7 @@ import {
   getUser,
 } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 
 // ─── Sign out ─────────────────────────────────────────────────────────────────
 
@@ -119,31 +120,54 @@ async function provisionTenantUser(
   provider?: string
 ): Promise<void> {
   try {
-    const tenant = await db.tenant.findUnique({
-      where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-      select: { id: true, adminEmail: true },
+    // Find all tenants where this email is the admin
+    const ownerTenants = await db.tenant.findMany({
+      where: { adminEmail: { equals: email, mode: "insensitive" } },
+      select: { id: true },
     });
-    if (!tenant) return;
+    const ownerTenantIds = new Set(ownerTenants.map((t) => t.id));
 
-    const isOwner = email.toLowerCase() === tenant.adminEmail.toLowerCase();
+    // Upsert OWNER for each matching tenant
+    for (const { id: tenantId } of ownerTenants) {
+      await db.tenantUser.upsert({
+        where: { tenantId_email: { tenantId, email } },
+        update: {
+          authUserId,
+          name: name ?? undefined,
+          provider: provider ?? undefined,
+          role: "OWNER" as const,
+        },
+        create: {
+          tenantId,
+          email,
+          name: name ?? null,
+          authUserId,
+          provider: provider ?? null,
+          role: "OWNER",
+        },
+      });
+    }
 
-    await db.tenantUser.upsert({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
-      update: {
-        authUserId,
-        name: name ?? undefined,
-        provider: provider ?? undefined,
-        ...(isOwner ? { role: "OWNER" as const } : {}),
-      },
-      create: {
-        tenantId: tenant.id,
-        email,
-        name: name ?? null,
-        authUserId,
-        provider: provider ?? null,
-        role: isOwner ? "OWNER" : "PENDING",
-      },
-    });
+    // Upsert current-domain tenant as PENDING (only on create, don't demote existing)
+    const currentTenant = await getCurrentTenant();
+    if (currentTenant && !ownerTenantIds.has(currentTenant.id)) {
+      await db.tenantUser.upsert({
+        where: { tenantId_email: { tenantId: currentTenant.id, email } },
+        update: {
+          authUserId,
+          name: name ?? undefined,
+          provider: provider ?? undefined,
+        },
+        create: {
+          tenantId: currentTenant.id,
+          email,
+          name: name ?? null,
+          authUserId,
+          provider: provider ?? null,
+          role: "PENDING",
+        },
+      });
+    }
   } catch (err) {
     console.error("Failed to provision TenantUser:", err);
   }

@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getDefaultTierInfo } from "@/lib/tier";
 import { createAdminClient, DESIGNS_BUCKET, getPublicUrl } from "@/lib/supabase";
 import { bmpToPng, ctfToPng, extractPalette, applyOneLoomLookup } from "@/lib/design-processing";
@@ -73,10 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Tenant ─────────────────────────────────────────────────────────────────
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
   }

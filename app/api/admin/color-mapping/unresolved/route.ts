@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getDefaultTierInfo } from "@/lib/tier";
 import type { PaletteEntry } from "@/types";
 
@@ -16,10 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
 
   const designs = await db.design.findMany({

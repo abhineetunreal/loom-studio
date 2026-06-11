@@ -4,6 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getUser } from "@/lib/auth";
 import { getSignedUrl, USER_DESIGNS_BUCKET } from "@/lib/supabase";
 
@@ -13,10 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
 
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) return NextResponse.json({ designs: [] });
 
   const tenantUser = await db.tenantUser.findFirst({

@@ -3,6 +3,7 @@ import path from "node:path";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 import DesignViewer from "@/components/design/DesignViewer";
 import { resolveDesignImageUrl } from "@/lib/design-urls";
 import { getUser } from "@/lib/auth";
@@ -95,10 +96,7 @@ export default async function DesignPage({ params }: Props) {
   let savedColorMap: Record<string, YarnOption> | undefined;
 
   if (authUser) {
-    const tenant = await db.tenant.findUnique({
-      where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-      select: { id: true },
-    });
+    const tenant = await getCurrentTenant();
     if (tenant) {
       const tenantUser = await db.tenantUser.findFirst({
         where: { tenantId: tenant.id, authUserId: authUser.id },

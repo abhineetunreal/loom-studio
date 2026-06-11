@@ -16,10 +16,13 @@ datasource db {
 model Tenant {
   id           String   @id @default(cuid())
   slug         String   @unique // used in subdomain: slug.loomstudio.com
-  name         String // "Carpets Bazaar", "Kashmir Rugs Co"
-  logoUrl      String?
+  name         String   // internal name e.g. "Carpets Bazaar"
+  displayName  String?  // public-facing brand name shown in the UI
+  logoUrl      String?  // URL to brand logo; replaces "Loom Studio" text when set
+  faviconUrl   String?  // URL to brand favicon
   primaryColor String   @default("#1a1612")
-  domain       String?  @unique // custom domain if any
+  accentColor  String?  // secondary brand color
+  domain       String?  @unique // custom domain for white-label routing
   adminEmail   String
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())

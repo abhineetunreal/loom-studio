@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAuthClient } from "@/lib/supabase-server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 
 // Handles both OAuth (Google) and magic link redirects from Supabase.
 // Supabase redirects here with ?code=... after successful auth.
@@ -43,33 +44,54 @@ async function upsertTenantUser(
   provider?: string
 ): Promise<void> {
   try {
-    const tenant = await db.tenant.findUnique({
-      where: { slug: "carpetsbazaar" },
-      select: { id: true, adminEmail: true },
+    // Find all tenants where this email is the admin
+    const ownerTenants = await db.tenant.findMany({
+      where: { adminEmail: { equals: email, mode: "insensitive" } },
+      select: { id: true },
     });
+    const ownerTenantIds = new Set(ownerTenants.map((t) => t.id));
 
-    if (!tenant) return; // tenant not seeded yet — skip silently
+    // Upsert OWNER for each matching tenant
+    for (const { id: tenantId } of ownerTenants) {
+      await db.tenantUser.upsert({
+        where: { tenantId_email: { tenantId, email } },
+        update: {
+          authUserId,
+          name: name ?? undefined,
+          provider: provider ?? undefined,
+          role: "OWNER" as const,
+        },
+        create: {
+          tenantId,
+          email,
+          name: name ?? null,
+          authUserId,
+          provider: provider ?? null,
+          role: "OWNER",
+        },
+      });
+    }
 
-    const isOwner = email.toLowerCase() === tenant.adminEmail.toLowerCase();
-
-    await db.tenantUser.upsert({
-      where: { tenantId_email: { tenantId: tenant.id, email } },
-      update: {
-        authUserId,
-        name: name ?? undefined,
-        provider: provider ?? undefined,
-        // Keep owner email upgraded even if the row pre-dates the OWNER role.
-        ...(isOwner ? { role: "OWNER" as const } : {}),
-      },
-      create: {
-        tenantId: tenant.id,
-        email,
-        name: name ?? null,
-        authUserId,
-        provider: provider ?? null,
-        role: isOwner ? "OWNER" : "PENDING",
-      },
-    });
+    // Upsert current-domain tenant as PENDING (only on create, don't demote existing)
+    const currentTenant = await getCurrentTenant();
+    if (currentTenant && !ownerTenantIds.has(currentTenant.id)) {
+      await db.tenantUser.upsert({
+        where: { tenantId_email: { tenantId: currentTenant.id, email } },
+        update: {
+          authUserId,
+          name: name ?? undefined,
+          provider: provider ?? undefined,
+        },
+        create: {
+          tenantId: currentTenant.id,
+          email,
+          name: name ?? null,
+          authUserId,
+          provider: provider ?? null,
+          role: "PENDING",
+        },
+      });
+    }
   } catch (err) {
     // Don't break the auth flow if DB write fails
     console.error("Failed to upsert TenantUser:", err);

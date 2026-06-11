@@ -11,16 +11,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getDefaultTierInfo } from "@/lib/tier";
 import type { PaletteEntry } from "@/types";
 
 async function getAdminTenant() {
   const { tier } = await getDefaultTierInfo();
   if (tier !== "admin") return null;
-  return db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  return getCurrentTenant();
 }
 
 export async function GET() {

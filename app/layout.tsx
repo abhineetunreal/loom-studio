@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 import { getCollectionAccessIds } from "@/lib/collections";
 import { getUser } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
@@ -14,27 +15,27 @@ const geist = Geist({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Loom Studio",
-  description: "Browse and customize hand-knotted rug designs.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await getCurrentTenant();
+  const title = tenant?.displayName ?? tenant?.name ?? "Loom Studio";
+  return {
+    title,
+    description: "Browse and customize hand-knotted rug designs.",
+    icons: tenant?.faviconUrl ? { icon: tenant.faviconUrl } : undefined,
+  };
+}
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [tierInfo, user] = await Promise.all([
+  const [tierInfo, user, tenant] = await Promise.all([
     getDefaultTierInfo(),
     getUser(),
+    getCurrentTenant(),
   ]);
 
   const isDemo = tierInfo.tier === "demo";
   const isAdmin = tierInfo.tier === "admin";
-
-  // Resolve tenant once — used by both collection filtering and canUpload lookup
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
 
   // canUpload — only relevant for authenticated, non-demo users
   let canUpload = false;
@@ -58,26 +59,29 @@ export default async function RootLayout({
       ? { OR: [{ collectionId: { in: collectionIds } }, { collectionId: null }] }
       : undefined;
 
-  const designs = await db.design.findMany({
-    where: {
-      isActive: true,
-      uploadedById: null, // user uploads are served only via the My Uploads tab
-      ...(isDemo ? { isDemo: true } : {}),
-      ...(isAdmin ? {} : { isHidden: false }),
-      ...collectionWhere,
-    },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      imageUrl: true,
-      uploadedById: true,
-      width: true,
-      height: true,
-      collection: { select: { id: true, name: true, slug: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const designs = tenant
+    ? await db.design.findMany({
+        where: {
+          tenantId: tenant.id,
+          isActive: true,
+          uploadedById: null,
+          ...(isDemo ? { isDemo: true } : {}),
+          ...(isAdmin ? {} : { isHidden: false }),
+          ...collectionWhere,
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          imageUrl: true,
+          uploadedById: true,
+          width: true,
+          height: true,
+          collection: { select: { id: true, name: true, slug: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   // Resolve signed URLs for user-uploaded designs (system designs use public URLs)
   const resolvedDesigns = await resolveDesignImageUrls(designs);
@@ -90,6 +94,13 @@ export default async function RootLayout({
       }
     : null;
 
+  const tenantBranding = tenant
+    ? {
+        displayName: tenant.displayName ?? tenant.name,
+        logoUrl: tenant.logoUrl ?? null,
+      }
+    : null;
+
   return (
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
       <body className="h-full flex flex-col bg-stone-50 text-stone-900">
@@ -98,6 +109,7 @@ export default async function RootLayout({
           tierInfo={tierInfo}
           canUpload={canUpload}
           user={userInfo}
+          tenant={tenantBranding}
         >
           {children}
         </AppShell>

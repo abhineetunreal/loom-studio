@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
 
@@ -12,10 +13,7 @@ async function requireAdmin(): Promise<void> {
 }
 
 async function getDefaultTenantId(): Promise<string> {
-  const tenant = await db.tenant.findUnique({
-    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-    select: { id: true },
-  });
+  const tenant = await getCurrentTenant();
   if (!tenant) throw new Error("Tenant not found");
   return tenant.id;
 }
