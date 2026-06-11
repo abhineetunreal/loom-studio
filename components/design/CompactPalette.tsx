@@ -80,7 +80,7 @@ export default function CompactPalette({
                 {/* Code / label */}
                 <span
                   className={`text-[14px] flex-1 min-w-0 truncate ${
-                    isSelected ? "text-white" : "text-stone-700"
+                    isSelected ? "text-white" : "text-stone-800"
                   }`}
                 >
                   {displayCode}
