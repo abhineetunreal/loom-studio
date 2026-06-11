@@ -6,9 +6,14 @@ import {
   rejectUserAction,
   bulkApproveAction,
   changeRoleAction,
+  setCanUploadAction,
 } from "@/app/actions/admin";
+import { assignableRoles, canActorModifyTarget } from "@/lib/role-utils";
 import { setUserCollectionAccessAction } from "@/app/actions/collections";
 import { CollectionsTab } from "./CollectionsTab";
+import { UserUploadsTab } from "./UserUploadsTab";
+import { CatalogTab } from "./CatalogTab";
+import { ColorMappingTab } from "./ColorMappingTab";
 import type { CollectionSummary, DesignBrief } from "./CollectionsTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +23,7 @@ type User = {
   email: string;
   name: string | null;
   role: string;
+  canUpload: boolean;
   provider: string | null;
   createdAt: string;
 };
@@ -30,6 +36,7 @@ type Stats = {
 };
 
 type Props = {
+  actorRole: string;
   tenantName: string;
   users: User[];
   stats: Stats;
@@ -38,11 +45,12 @@ type Props = {
   userAccess: Array<{ tenantUserId: string; collectionId: string }>;
 };
 
-type Tab = "pending" | "all" | "collections";
+type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors";
 
 // ─── AdminPanel ───────────────────────────────────────────────────────────────
 
 export function AdminPanel({
+  actorRole,
   tenantName,
   users,
   stats,
@@ -110,10 +118,29 @@ export function AdminPanel({
               </span>
             )}
           </TabButton>
+          <TabButton
+            active={tab === "uploads"}
+            onClick={() => setTab("uploads")}
+          >
+            User Uploads
+          </TabButton>
+          <TabButton
+            active={tab === "catalog"}
+            onClick={() => setTab("catalog")}
+          >
+            Catalog
+          </TabButton>
+          <TabButton
+            active={tab === "colors"}
+            onClick={() => setTab("colors")}
+          >
+            Color Mapping
+          </TabButton>
         </div>
 
         {tab === "pending" && (
           <PendingTab
+            actorRole={actorRole}
             users={pendingUsers}
             collections={collections}
             accessByUser={accessByUser}
@@ -122,6 +149,7 @@ export function AdminPanel({
         )}
         {tab === "all" && (
           <AllUsersTab
+            actorRole={actorRole}
             users={users}
             collections={collections}
             accessByUser={accessByUser}
@@ -131,6 +159,9 @@ export function AdminPanel({
         {tab === "collections" && (
           <CollectionsTab collections={collections} designs={designs} />
         )}
+        {tab === "uploads" && <UserUploadsTab />}
+        {tab === "catalog" && <CatalogTab collections={collections} />}
+        {tab === "colors" && <ColorMappingTab />}
       </div>
 
       {/* User access modal */}
@@ -149,11 +180,13 @@ export function AdminPanel({
 // ─── PendingTab ───────────────────────────────────────────────────────────────
 
 function PendingTab({
+  actorRole,
   users,
   collections,
   accessByUser,
   onOpenAccess,
 }: {
+  actorRole: string;
   users: User[];
   collections: CollectionSummary[];
   accessByUser: Map<string, string[]>;
@@ -302,14 +335,14 @@ function PendingTab({
 
 // ─── AllUsersTab ──────────────────────────────────────────────────────────────
 
-const ROLES = ["PENDING", "APPROVED", "DEMO", "ADMIN"] as const;
-
 function AllUsersTab({
+  actorRole,
   users,
   collections,
   accessByUser,
   onOpenAccess,
 }: {
+  actorRole: string;
   users: User[];
   collections: CollectionSummary[];
   accessByUser: Map<string, string[]>;
@@ -328,6 +361,11 @@ function AllUsersTab({
 
   const handleRoleChange = (id: string, role: string) =>
     startTransition(() => changeRoleAction(id, role));
+
+  const handleCanUploadChange = (id: string, canUpload: boolean) =>
+    startTransition(() => setCanUploadAction(id, canUpload));
+
+  const roleOptions = assignableRoles(actorRole);
 
   return (
     <div>
@@ -352,6 +390,9 @@ function AllUsersTab({
               <th className="px-3 py-2.5 text-left font-medium text-stone-600 hidden sm:table-cell">
                 Signed up
               </th>
+              <th className="px-3 py-2.5 text-center font-medium text-stone-600 hidden sm:table-cell">
+                Can Upload
+              </th>
               <th className="px-3 py-2.5 text-right font-medium text-stone-600">
                 Role
               </th>
@@ -361,52 +402,81 @@ function AllUsersTab({
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-3 py-8 text-center text-stone-400"
                 >
                   No users found.
                 </td>
               </tr>
             ) : (
-              filtered.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-stone-100 last:border-0 hover:bg-stone-50"
-                >
-                  <td className="px-3 py-2.5">
-                    <UserCell user={user} />
-                  </td>
-                  <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
-                    {user.provider ?? "—"}
-                  </td>
-                  <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
-                    {formatDate(user.createdAt)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {collections.length > 0 && (
-                        <AccessBadge
-                          count={accessByUser.get(user.id)?.length ?? 0}
-                          total={collections.length}
-                          onClick={() => onOpenAccess(user)}
-                        />
-                      )}
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                        disabled={isPending}
-                        className="text-xs border border-stone-200 rounded-md px-2 py-1 bg-white text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-900/10 disabled:opacity-50"
-                      >
-                        {ROLES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filtered.map((user) => {
+                const canEdit = canActorModifyTarget(actorRole, user.role);
+                return (
+                  <tr
+                    key={user.id}
+                    className={`border-b border-stone-100 last:border-0 ${
+                      canEdit ? "hover:bg-stone-50" : "bg-stone-50/60"
+                    }`}
+                  >
+                    <td className="px-3 py-2.5">
+                      <UserCell user={user} />
+                    </td>
+                    <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
+                      {user.provider ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-stone-500 hidden sm:table-cell">
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                      <input
+                        type="checkbox"
+                        checked={user.canUpload}
+                        onChange={(e) =>
+                          handleCanUploadChange(user.id, e.target.checked)
+                        }
+                        disabled={isPending || !canEdit}
+                        className="rounded border-stone-300 disabled:opacity-40"
+                        title={
+                          canEdit
+                            ? "Allow this user to upload designs"
+                            : "You cannot modify this account"
+                        }
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {collections.length > 0 && canEdit && (
+                          <AccessBadge
+                            count={accessByUser.get(user.id)?.length ?? 0}
+                            total={collections.length}
+                            onClick={() => onOpenAccess(user)}
+                          />
+                        )}
+                        {canEdit ? (
+                          <select
+                            value={user.role}
+                            onChange={(e) =>
+                              handleRoleChange(user.id, e.target.value)
+                            }
+                            disabled={isPending}
+                            className="text-xs border border-stone-200 rounded-md px-2 py-1 bg-white text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-900/10 disabled:opacity-50"
+                          >
+                            {roleOptions.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-md bg-stone-100 text-stone-500 font-medium">
+                            {user.role}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

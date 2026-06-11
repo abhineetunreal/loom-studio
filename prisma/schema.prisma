@@ -30,6 +30,7 @@ model Tenant {
   submissions    ColorwaySubmission[]
   collections    Collection[]
   savedColorways SavedColorway[]
+  colorLookups   ColorLookup[]
 }
 
 model TenantUser {
@@ -52,10 +53,11 @@ model TenantUser {
 }
 
 enum UserRole {
-  PENDING // just signed up, waiting for approval
+  PENDING  // just signed up, waiting for approval
   APPROVED // can access full catalog
-  ADMIN // can manage designs, approve users
-  DEMO // limited access, sample designs only
+  DEMO     // limited access, sample designs only
+  ADMIN    // can manage designs, approve users; cannot touch ADMIN/OWNER rows
+  OWNER    // highest tier; can promote/demote ADMIN; cannot be modified by non-self
 }
 
 // A rug design in the catalog
@@ -158,6 +160,20 @@ model SubmissionColorMapping {
   percentage   Float // what % of the design this color covers
   yarnId       String
   yarn         YarnColor          @relation(fields: [yarnId], references: [id])
+}
+
+// Rendered-hex → yarn code lookup (one per tenant, seeded from JSON)
+model ColorLookup {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  renderedHex String   // hex key from the design BMP/CTF, e.g. "#002453"
+  yarnCode    String   // OneLoom code, e.g. "OU 49"
+  catalogHex  String?  // catalog swatch hex (may differ from renderedHex)
+  library     String   @default("OneLoom")
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, renderedHex])
 }
 
 // A user's saved colorway for a design — one per user per design

@@ -8,6 +8,7 @@ import InlineYarnPicker from "./InlineYarnPicker";
 import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
+import { saveColorwayAction } from "@/app/actions/saveColorway";
 import type { DesignDetail, PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 // ─── Recolor state + reducer ──────────────────────────────────────────────────
@@ -81,6 +82,14 @@ type Props = {
   yarns: YarnOption[];
   /** Pre-matched yarns from the rendered-color lookup; pre-populates the color map on load. */
   initialColorMap?: Record<string, YarnOption>;
+  /**
+   * Previously saved colorway for this user+design, restored from SavedColorway.
+   * When provided it is used as the initial recolor state (takes precedence over
+   * initialColorMap) and a brief "Restored your saved colorway" toast is shown.
+   */
+  savedColorMap?: Record<string, YarnOption>;
+  /** True when this design was uploaded by a user (not seeded from catalog). */
+  isUserUpload: boolean;
   tierInfo: TierInfo;
 };
 
@@ -91,10 +100,21 @@ type CanvasPickState = {
   clientY: number;
 } | null;
 
-export default function DesignViewer({ design, yarns, initialColorMap, tierInfo }: Props) {
+export default function DesignViewer({
+  design,
+  yarns,
+  initialColorMap,
+  savedColorMap,
+  isUserUpload,
+  tierInfo,
+}: Props) {
+  // Saved colorway takes precedence over the lookup-matched initial map.
+  // For user uploads, initialColorMap is typically empty anyway.
+  const startingColorMap = savedColorMap ?? initialColorMap ?? {};
+
   const [recolor, dispatch] = useReducer(
     recolorReducer,
-    initialColorMap ?? {},
+    startingColorMap,
     (initial): RecolorState => ({ current: initial as ColorMap, past: [], future: [] })
   );
   // Set when YarnPicker should be open (from palette row click OR popover "choose yarn")
@@ -102,6 +122,9 @@ export default function DesignViewer({ design, yarns, initialColorMap, tierInfo 
   // Set when the floating popover should be shown (canvas click, before picker opens)
   const [canvasPick, setCanvasPick] = useState<CanvasPickState>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  const [textureEnabled, setTextureEnabled] = useState(true);
+  // Toast: shown briefly when a saved colorway was restored on page load
+  const [showRestoredToast, setShowRestoredToast] = useState(false);
   const canvasRef = useRef<RecolorCanvasHandle | null>(null);
 
   // Palette sorted by coverage — used to derive 1-based rank for the popover
@@ -124,6 +147,68 @@ export default function DesignViewer({ design, yarns, initialColorMap, tierInfo 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
+
+  // ── Restored-colorway toast ──────────────────────────────────────────────────
+  // Shown once on mount if a previously saved colorway was found and applied.
+  useEffect(() => {
+    if (!savedColorMap || Object.keys(savedColorMap).length === 0) return;
+    setShowRestoredToast(true);
+    const t = setTimeout(() => setShowRestoredToast(false), 3500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only on mount
+
+  // ── Save handler ─────────────────────────────────────────────────────────────
+  // Converts the hex-keyed recolor state to the palette-index-keyed format
+  // the DB expects, then calls the server action.
+  const handleSave = useCallback(async () => {
+    const snapshot = canvasRef.current?.getSnapshot() ?? null;
+
+    // Build index-keyed mapping — only slots with an assigned yarn
+    const colorMapping: Record<string, { yarnId: string; yarnCode: string; hex: string; library: string | null }> = {};
+    for (const entry of design.palette) {
+      const yarn = recolor.current[entry.hex];
+      if (!yarn) continue;
+      colorMapping[String(entry.index)] = {
+        yarnId: yarn.id,
+        yarnCode: yarn.code,
+        hex: yarn.hex,
+        library: yarn.library,
+      };
+    }
+
+    const result = await saveColorwayAction({
+      designId: design.id,
+      colorMapping,
+      snapshotDataUrl: snapshot,
+    });
+
+    if (!result.ok) throw new Error(result.error);
+  }, [design.id, design.palette, recolor]);
+
+  // ── 30-second auto-save ──────────────────────────────────────────────────────
+  // Debounced: timer restarts on every recolor change. Fires 30s after the last
+  // change — so a user actively editing won't trigger mid-edit saves.
+  useEffect(() => {
+    if (!isUserUpload || tierInfo.tier === "demo") return;
+    if (Object.keys(recolor.current).length === 0) return;
+    const t = setTimeout(() => {
+      handleSave().catch((err) => console.error("Auto-save failed:", err));
+    }, 30_000);
+    return () => clearTimeout(t);
+  }, [recolor.current, isUserUpload, tierInfo.tier, handleSave]);
+
+  // ── beforeunload warning ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isUserUpload) return;
+    function handler(e: BeforeUnloadEvent) {
+      if (Object.keys(recolor.current).length > 0) {
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isUserUpload, recolor.current]);
 
   // ── Color pick handlers ──────────────────────────────────────────────────────
 
@@ -172,8 +257,22 @@ export default function DesignViewer({ design, yarns, initialColorMap, tierInfo 
 
   const hasChanges = Object.keys(recolor.current).length > 0;
 
+  // Show save button for user uploads when the user can actually save
+  const canSave = isUserUpload && tierInfo.tier !== "demo";
+
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative flex h-full overflow-hidden">
+      {/* Restored-colorway toast */}
+      {showRestoredToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-3 py-1.5 rounded-full bg-stone-800/90 text-white text-xs font-medium shadow-lg whitespace-nowrap animate-fade-in"
+        >
+          Restored your saved colorway
+        </div>
+      )}
+
       {/* Zone B — canvas */}
       <CanvasZone
         design={design}
@@ -187,6 +286,9 @@ export default function DesignViewer({ design, yarns, initialColorMap, tierInfo 
         canUndo={!!recolor.past.length}
         canRedo={!!recolor.future.length}
         hasChanges={hasChanges}
+        onSave={canSave ? handleSave : undefined}
+        textureEnabled={textureEnabled}
+        onToggleTexture={() => setTextureEnabled((v) => !v)}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -201,6 +303,7 @@ export default function DesignViewer({ design, yarns, initialColorMap, tierInfo 
           onRevert={handleRevert}
           onRequestColorway={() => setShowSubmissionForm(true)}
           tierInfo={tierInfo}
+          isUserUpload={isUserUpload}
         />
       </div>
 

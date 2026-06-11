@@ -2,10 +2,11 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import RecolorCanvas, { type RecolorCanvasHandle } from "./RecolorCanvas";
+import { textureShader } from "@/lib/texture-shader";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 type Props = {
-  design: { imageUrl: string; width: number; height: number; palette: PaletteEntry[] };
+  design: { name: string; imageUrl: string; width: number; height: number; palette: PaletteEntry[] };
   colorMap: Record<string, YarnOption | null>;
   selectedHex: string | null;
   onColorPick: (hex: string, clientX: number, clientY: number) => void;
@@ -16,6 +17,10 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
   hasChanges: boolean;
+  /** When provided, a "Save colorway" button is shown in the toolbar */
+  onSave?: () => Promise<void>;
+  textureEnabled: boolean;
+  onToggleTexture: () => void;
 };
 
 function clampPan(
@@ -51,11 +56,23 @@ export default function CanvasZone({
   canUndo,
   canRedo,
   hasChanges,
+  onSave,
+  textureEnabled,
+  onToggleTexture,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  // True from mount until the first full render (recolor + texture) is painted.
+  // Drives the loading overlay — hides the blank canvas while pixels are loading.
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Texture tuning controls — knot size is inverted (slider right = larger knots = lower multiplier)
+  // knotSlider range 0.25–1.0; tileMultiplier = 1.25 - knotSlider → range 0.25×–1.0×; default 0.60 → 0.65×
+  const [knotSlider, setKnotSlider] = useState(0.60);
+  const [textureStrength, setTextureStrength] = useState(1.5);
+  const tileMultiplier = 1.25 - knotSlider;
 
   // Refs to avoid stale closures in event listeners
   const zoomRef = useRef(1);
@@ -335,6 +352,11 @@ export default function CanvasZone({
                 colorMap={colorMap}
                 selectedHex={selectedHex}
                 onColorPick={onColorPick}
+                textureEnabled={textureEnabled}
+                designName={design.name}
+                tileMultiplier={tileMultiplier}
+                textureStrength={textureStrength}
+                onRenderComplete={() => setIsLoading(false)}
               />
             </div>
 
@@ -347,6 +369,15 @@ export default function CanvasZone({
               onPointerUp={handlePointerUpWithState}
             />
           </>
+        )}
+
+        {/* Loading overlay — shown from mount until the first textured render lands.
+            Covers the blank canvas during image fetch + pixel loop.
+            z-20 so it sits above the pointer overlay. */}
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#e8e5dd]">
+            <SpinnerIcon className="w-8 h-8 text-stone-400 animate-spin" />
+          </div>
         )}
       </div>
 
@@ -378,6 +409,49 @@ export default function CanvasZone({
             Reset
           </button>
         </div>
+
+        {/* Centre: Flat/Textured toggle + tuning sliders.
+            Sliders are always in the DOM so toggling never shifts other toolbar items.
+            invisible + pointer-events-none hides them visually while preserving layout. */}
+        <TextureToggle
+          enabled={textureEnabled}
+          onToggle={onToggleTexture}
+        />
+        <div className={`flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200 ${textureEnabled ? "" : "invisible pointer-events-none"}`}>
+          <span className="text-xs text-stone-500 whitespace-nowrap">Knot size</span>
+          <input
+            type="range"
+            min={0.25}
+            max={1}
+            step={0.05}
+            value={knotSlider}
+            onChange={(e) => setKnotSlider(parseFloat(e.target.value))}
+            className="w-20 accent-stone-700"
+            aria-label="Knot size"
+          />
+          <span className="w-10 text-right text-xs text-stone-500 tabular-nums">
+            {tileMultiplier.toFixed(2)}×
+          </span>
+        </div>
+        <div className={`flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200 ${textureEnabled ? "" : "invisible pointer-events-none"}`}>
+          <span className="text-xs text-stone-500 whitespace-nowrap">Strength</span>
+          <input
+            type="range"
+            min={0}
+            max={1.5}
+            step={0.05}
+            value={textureStrength}
+            onChange={(e) => setTextureStrength(parseFloat(e.target.value))}
+            className="w-20 accent-stone-700"
+            aria-label="Texture strength"
+          />
+          <span className="w-8 text-right text-xs text-stone-500 tabular-nums">
+            {textureStrength.toFixed(2)}
+          </span>
+        </div>
+
+        {/* Centre: Save button (user-uploaded designs only) */}
+        {onSave && <SaveButton onSave={onSave} />}
 
         {/* Right: Zoom controls */}
         <div className="flex items-center gap-1 shrink-0">
@@ -411,6 +485,111 @@ export default function CanvasZone({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── TextureToggle ────────────────────────────────────────────────────────────
+
+function TextureToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleClick() {
+    if (enabled) {
+      // Turning off is instant
+      onToggle();
+      return;
+    }
+    // Turning on: preload textures first (no-op if already cached)
+    setLoading(true);
+    try {
+      await textureShader.load("422");
+    } finally {
+      setLoading(false);
+    }
+    onToggle();
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      title={enabled ? "Switch to flat rendering" : "Apply wool texture overlay"}
+      className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors disabled:cursor-wait ${
+        enabled
+          ? "border-stone-700 bg-stone-800 text-white hover:bg-stone-700"
+          : "border-stone-200 text-stone-600 hover:bg-stone-100"
+      }`}
+    >
+      {loading && <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />}
+      {enabled ? "Textured" : "Flat"}
+    </button>
+  );
+}
+
+// ─── SaveButton ───────────────────────────────────────────────────────────────
+// Self-contained button that manages its own loading/success/error state so
+// CanvasZone doesn't need to lift that state up.
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function SaveButton({ onSave }: { onSave: () => Promise<void> }) {
+  const [state, setState] = useState<SaveState>("idle");
+
+  async function handleClick() {
+    if (state === "saving") return;
+    setState("saving");
+    try {
+      await onSave();
+      setState("saved");
+      setTimeout(() => setState("idle"), 2500);
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 3000);
+    }
+  }
+
+  const label =
+    state === "saving" ? "Saving…"
+    : state === "saved" ? "Saved ✓"
+    : state === "error" ? "Save failed"
+    : "Save colorway";
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={state === "saving"}
+      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded border transition-colors disabled:cursor-wait ${
+        state === "saved"
+          ? "border-green-300 bg-green-50 text-green-700"
+          : state === "error"
+          ? "border-red-300 bg-red-50 text-red-700"
+          : "border-stone-300 bg-stone-800 text-white hover:bg-stone-700"
+      }`}
+    >
+      {state === "saving" ? (
+        <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />
+      ) : (
+        <SaveIcon className="w-3 h-3 shrink-0" />
+      )}
+      {label}
+    </button>
+  );
+}
+
+function SaveIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 3v4H7V3M12 12v5m0 0l-2-2m2 2l2-2" />
+    </svg>
+  );
+}
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" d="M12 3a9 9 0 109 9" />
+    </svg>
   );
 }
 

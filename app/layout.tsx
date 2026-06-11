@@ -6,6 +6,7 @@ import { getDefaultTierInfo } from "@/lib/tier";
 import { getCollectionAccessIds } from "@/lib/collections";
 import { getUser } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
+import { resolveDesignImageUrls } from "@/lib/design-urls";
 import type { DesignSummary } from "@/types";
 
 const geist = Geist({
@@ -29,17 +30,29 @@ export default async function RootLayout({
   const isDemo = tierInfo.tier === "demo";
   const isAdmin = tierInfo.tier === "admin";
 
-  // For APPROVED users: check if they have collection-level access restrictions
-  let collectionIds: string[] | null = null;
-  if (tierInfo.tier === "full") {
-    const tenant = await db.tenant.findUnique({
-      where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
-      select: { id: true },
+  // Resolve tenant once — used by both collection filtering and canUpload lookup
+  const tenant = await db.tenant.findUnique({
+    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
+    select: { id: true },
+  });
+
+  // canUpload — only relevant for authenticated, non-demo users
+  let canUpload = false;
+  if (tenant && user) {
+    const tenantUser = await db.tenantUser.findFirst({
+      where: { tenantId: tenant.id, authUserId: user.id },
+      select: { canUpload: true },
     });
-    if (tenant) collectionIds = await getCollectionAccessIds(tenant.id);
+    canUpload = tenantUser?.canUpload ?? false;
   }
 
-  // Build collection filter: only applies when APPROVED user has explicit restrictions
+  // For APPROVED users: check collection-level access restrictions
+  let collectionIds: string[] | null = null;
+  if (tierInfo.tier === "full" && tenant) {
+    collectionIds = await getCollectionAccessIds(tenant.id);
+  }
+
+  // Build collection filter — only applies when APPROVED user has explicit restrictions
   const collectionWhere =
     collectionIds !== null
       ? { OR: [{ collectionId: { in: collectionIds } }, { collectionId: null }] }
@@ -48,6 +61,7 @@ export default async function RootLayout({
   const designs = await db.design.findMany({
     where: {
       isActive: true,
+      uploadedById: null, // user uploads are served only via the My Uploads tab
       ...(isDemo ? { isDemo: true } : {}),
       ...(isAdmin ? {} : { isHidden: false }),
       ...collectionWhere,
@@ -57,12 +71,16 @@ export default async function RootLayout({
       name: true,
       slug: true,
       imageUrl: true,
+      uploadedById: true,
       width: true,
       height: true,
       collection: { select: { id: true, name: true, slug: true } },
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Resolve signed URLs for user-uploaded designs (system designs use public URLs)
+  const resolvedDesigns = await resolveDesignImageUrls(designs);
 
   const userInfo = user
     ? {
@@ -76,8 +94,9 @@ export default async function RootLayout({
     <html lang="en" className={`${geist.variable} h-full antialiased`}>
       <body className="h-full flex flex-col bg-stone-50 text-stone-900">
         <AppShell
-          designs={designs as unknown as DesignSummary[]}
+          designs={resolvedDesigns as unknown as DesignSummary[]}
           tierInfo={tierInfo}
+          canUpload={canUpload}
           user={userInfo}
         >
           {children}

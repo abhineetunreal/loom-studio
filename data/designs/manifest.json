@@ -12,49 +12,98 @@
         "hex": "#b4a5ab",
         "pixelCount": 459032,
         "percentage": 39.8,
-        "matchedYarnCode": "4_D BM 1360"
+        "matchedYarnCode": "BM 1360"
       },
       {
         "index": 1,
         "hex": "#b9b2b0",
         "pixelCount": 220648,
-        "percentage": 19.2,
-        "matchedYarnCode": "29_H BM 971"
+        "percentage": 19.2
       },
       {
         "index": 2,
         "hex": "#aba79a",
         "pixelCount": 148378,
-        "percentage": 12.9,
-        "matchedYarnCode": "7_G BM 983(SPC)"
+        "percentage": 12.9
       },
       {
         "index": 3,
         "hex": "#c8bca2",
         "pixelCount": 143167,
-        "percentage": 12.4,
-        "matchedYarnCode": "28_E SPC 07"
+        "percentage": 12.4
       },
       {
         "index": 4,
         "hex": "#c39698",
         "pixelCount": 96832,
         "percentage": 8.4,
-        "matchedYarnCode": "2_C AN-09"
+        "matchedYarnCode": "AN-09"
       },
       {
         "index": 5,
         "hex": "#ac9db1",
         "pixelCount": 43427,
-        "percentage": 3.8,
-        "matchedYarnCode": "32_E BM 1381"
+        "percentage": 3.8
       },
       {
         "index": 6,
         "hex": "#ada781",
         "pixelCount": 40516,
-        "percentage": 3.5,
-        "matchedYarnCode": "6_F OU 81"
+        "percentage": 3.5
+      }
+    ]
+  },
+  {
+    "slug": "3635",
+    "name": "3635",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3635/3635.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/3635/3635.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#b4a5ab",
+        "pixelCount": 459032,
+        "percentage": 39.8,
+        "matchedYarnCode": "BM 1360"
+      },
+      {
+        "index": 1,
+        "hex": "#b9b2b0",
+        "pixelCount": 220648,
+        "percentage": 19.2
+      },
+      {
+        "index": 2,
+        "hex": "#aba79a",
+        "pixelCount": 148378,
+        "percentage": 12.9
+      },
+      {
+        "index": 3,
+        "hex": "#c8bca2",
+        "pixelCount": 143167,
+        "percentage": 12.4
+      },
+      {
+        "index": 4,
+        "hex": "#c39698",
+        "pixelCount": 96832,
+        "percentage": 8.4,
+        "matchedYarnCode": "AN-09"
+      },
+      {
+        "index": 5,
+        "hex": "#ac9db1",
+        "pixelCount": 43427,
+        "percentage": 3.8
+      },
+      {
+        "index": 6,
+        "hex": "#ada781",
+        "pixelCount": 40516,
+        "percentage": 3.5
       }
     ]
   },
@@ -70,57 +119,50 @@
         "index": 0,
         "hex": "#95abbb",
         "pixelCount": 553694,
-        "percentage": 48.1,
-        "matchedYarnCode": "13_B BL 10B"
+        "percentage": 48.1
       },
       {
         "index": 1,
         "hex": "#2a497b",
         "pixelCount": 295474,
-        "percentage": 25.6,
-        "matchedYarnCode": "11_A BM 804"
+        "percentage": 25.6
       },
       {
         "index": 2,
         "hex": "#93989d",
         "pixelCount": 96963,
-        "percentage": 8.4,
-        "matchedYarnCode": "14_G SPC 06"
+        "percentage": 8.4
       },
       {
         "index": 3,
         "hex": "#657f91",
         "pixelCount": 76604,
-        "percentage": 6.6,
-        "matchedYarnCode": "16_G BI-08"
+        "percentage": 6.6
       },
       {
         "index": 4,
         "hex": "#cfcbc5",
         "pixelCount": 50123,
-        "percentage": 4.4,
-        "matchedYarnCode": "29_A OU-10II"
+        "percentage": 4.4
       },
       {
         "index": 5,
         "hex": "#bfcac9",
         "pixelCount": 38712,
-        "percentage": 3.4,
-        "matchedYarnCode": "13_H BI-11(NZ)"
+        "percentage": 3.4
       },
       {
         "index": 6,
         "hex": "#a55568",
         "pixelCount": 30059,
-        "percentage": 2.6,
-        "matchedYarnCode": "1_D BM-1328"
+        "percentage": 2.6
       },
       {
         "index": 7,
         "hex": "#d1c3c0",
         "pixelCount": 10371,
         "percentage": 0.9,
-        "matchedYarnCode": "4_E BM 1261"
+        "matchedYarnCode": "BM 1261"
       }
     ]
   },
@@ -136,57 +178,1699 @@
         "index": 0,
         "hex": "#b6c3c2",
         "pixelCount": 341302,
-        "percentage": 29.6,
-        "matchedYarnCode": "13_G BM-813"
+        "percentage": 29.6
       },
       {
         "index": 1,
         "hex": "#b8bfbe",
         "pixelCount": 227287,
-        "percentage": 19.7,
-        "matchedYarnCode": "34_E SJ ICE Green"
+        "percentage": 19.7
       },
       {
         "index": 2,
         "hex": "#d1c3c0",
         "pixelCount": 161913,
         "percentage": 14.1,
-        "matchedYarnCode": "4_E BM 1261"
+        "matchedYarnCode": "BM 1261"
       },
       {
         "index": 3,
         "hex": "#b6b1ad",
         "pixelCount": 132774,
-        "percentage": 11.5,
-        "matchedYarnCode": "29_G BM 995"
+        "percentage": 11.5
       },
       {
         "index": 4,
         "hex": "#b5ada4",
         "pixelCount": 117082,
-        "percentage": 10.2,
-        "matchedYarnCode": "29_E CH 511"
+        "percentage": 10.2
       },
       {
         "index": 5,
         "hex": "#a3b6ae",
         "pixelCount": 85892,
-        "percentage": 7.5,
-        "matchedYarnCode": "12_E BM-2035-50"
+        "percentage": 7.5
       },
       {
         "index": 6,
         "hex": "#c3c7b8",
         "pixelCount": 53680,
-        "percentage": 4.7,
-        "matchedYarnCode": "25_H SJ MALKA GREEN"
+        "percentage": 4.7
       },
       {
         "index": 7,
         "hex": "#cfcbc5",
         "pixelCount": 32070,
-        "percentage": 2.8,
-        "matchedYarnCode": "29_A OU-10II"
+        "percentage": 2.8
+      }
+    ]
+  },
+  {
+    "slug": "design-size98-x13",
+    "name": "Design Size98 X13",
+    "width": 1160,
+    "height": 1560,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/design-size98-x13/design-size98-x13.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/design-size98-x13/Design%20Size_9.8%20x13.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#a58735",
+        "pixelCount": 922774,
+        "percentage": 51
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 886826,
+        "percentage": 49
+      }
+    ]
+  },
+  {
+    "slug": "entry-rug4-20",
+    "name": "Entry Rug4 20",
+    "width": 600,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/entry-rug4-20/entry-rug4-20.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/entry-rug4-20/Entry%20Rug_4-20.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 381088,
+        "percentage": 44.1
+      },
+      {
+        "index": 1,
+        "hex": "#bfcac9",
+        "pixelCount": 175342,
+        "percentage": 20.3
+      },
+      {
+        "index": 2,
+        "hex": "#9bb0be",
+        "pixelCount": 162236,
+        "percentage": 18.8
+      },
+      {
+        "index": 3,
+        "hex": "#c1ae9b",
+        "pixelCount": 145334,
+        "percentage": 16.8
+      }
+    ]
+  },
+  {
+    "slug": "family-room",
+    "name": "Family Room",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/family-room/family-room.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/family-room/Family%20Room.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 497248,
+        "percentage": 43.2
+      },
+      {
+        "index": 1,
+        "hex": "#d1c3c0",
+        "pixelCount": 186228,
+        "percentage": 16.2,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 2,
+        "hex": "#9bb0be",
+        "pixelCount": 175169,
+        "percentage": 15.2
+      },
+      {
+        "index": 3,
+        "hex": "#b3aa92",
+        "pixelCount": 93982,
+        "percentage": 8.2
+      },
+      {
+        "index": 4,
+        "hex": "#c4cab0",
+        "pixelCount": 88907,
+        "percentage": 7.7
+      },
+      {
+        "index": 5,
+        "hex": "#cd9d8f",
+        "pixelCount": 72240,
+        "percentage": 6.3,
+        "matchedYarnCode": "OU-22"
+      },
+      {
+        "index": 6,
+        "hex": "#3d4c53",
+        "pixelCount": 32806,
+        "percentage": 2.8
+      },
+      {
+        "index": 7,
+        "hex": "#b6c3c2",
+        "pixelCount": 5420,
+        "percentage": 0.5
+      }
+    ]
+  },
+  {
+    "slug": "master-bedroom4-20",
+    "name": "Master Bedroom4 20",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/master-bedroom4-20/master-bedroom4-20.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/master-bedroom4-20/Master%20Bedroom__4-20.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#d1c3c0",
+        "pixelCount": 617883,
+        "percentage": 39.7,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 285890,
+        "percentage": 18.4
+      },
+      {
+        "index": 2,
+        "hex": "#aba79a",
+        "pixelCount": 222045,
+        "percentage": 14.3
+      },
+      {
+        "index": 3,
+        "hex": "#c8bca2",
+        "pixelCount": 150849,
+        "percentage": 9.7
+      },
+      {
+        "index": 4,
+        "hex": "#6c7970",
+        "pixelCount": 142609,
+        "percentage": 9.2
+      },
+      {
+        "index": 5,
+        "hex": "#848e71",
+        "pixelCount": 73341,
+        "percentage": 4.7
+      },
+      {
+        "index": 6,
+        "hex": "#9b8e7e",
+        "pixelCount": 62583,
+        "percentage": 4
+      }
+    ]
+  },
+  {
+    "slug": "n--1",
+    "name": "N  1",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--1/n--1.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--1/N-%20(1).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#c4c2bb",
+        "pixelCount": 610152,
+        "percentage": 39.2
+      },
+      {
+        "index": 1,
+        "hex": "#9da2a3",
+        "pixelCount": 390392,
+        "percentage": 25.1
+      },
+      {
+        "index": 2,
+        "hex": "#cfcbc5",
+        "pixelCount": 241677,
+        "percentage": 15.5
+      },
+      {
+        "index": 3,
+        "hex": "#b9ad89",
+        "pixelCount": 145099,
+        "percentage": 9.3
+      },
+      {
+        "index": 4,
+        "hex": "#657f91",
+        "pixelCount": 120644,
+        "percentage": 7.8
+      },
+      {
+        "index": 5,
+        "hex": "#838aa3",
+        "pixelCount": 47236,
+        "percentage": 3
+      }
+    ]
+  },
+  {
+    "slug": "n--10",
+    "name": "N  10",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--10/n--10.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--10/N-%20(10).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 531662,
+        "percentage": 34.2
+      },
+      {
+        "index": 1,
+        "hex": "#949677",
+        "pixelCount": 316469,
+        "percentage": 20.3
+      },
+      {
+        "index": 2,
+        "hex": "#c4b9b0",
+        "pixelCount": 152186,
+        "percentage": 9.8
+      },
+      {
+        "index": 3,
+        "hex": "#97a5b5",
+        "pixelCount": 140659,
+        "percentage": 9
+      },
+      {
+        "index": 4,
+        "hex": "#947052",
+        "pixelCount": 139688,
+        "percentage": 9
+      },
+      {
+        "index": 5,
+        "hex": "#d5a7a6",
+        "pixelCount": 120308,
+        "percentage": 7.7,
+        "matchedYarnCode": "OU-53"
+      },
+      {
+        "index": 6,
+        "hex": "#243b54",
+        "pixelCount": 83475,
+        "percentage": 5.4
+      },
+      {
+        "index": 7,
+        "hex": "#c8bca2",
+        "pixelCount": 70753,
+        "percentage": 4.5
+      }
+    ]
+  },
+  {
+    "slug": "n--11",
+    "name": "N  11",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--11/n--11.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--11/N-%20(11).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#bfcac9",
+        "pixelCount": 531662,
+        "percentage": 34.2
+      },
+      {
+        "index": 1,
+        "hex": "#9bb0be",
+        "pixelCount": 311994,
+        "percentage": 20.1
+      },
+      {
+        "index": 2,
+        "hex": "#b9ad89",
+        "pixelCount": 161615,
+        "percentage": 10.4
+      },
+      {
+        "index": 3,
+        "hex": "#cfcbc5",
+        "pixelCount": 160583,
+        "percentage": 10.3
+      },
+      {
+        "index": 4,
+        "hex": "#ad9c58",
+        "pixelCount": 122875,
+        "percentage": 7.9
+      },
+      {
+        "index": 5,
+        "hex": "#a2594a",
+        "pixelCount": 75333,
+        "percentage": 4.8
+      },
+      {
+        "index": 6,
+        "hex": "#355771",
+        "pixelCount": 71499,
+        "percentage": 4.6
+      },
+      {
+        "index": 7,
+        "hex": "#b6b9bd",
+        "pixelCount": 56663,
+        "percentage": 3.6
+      },
+      {
+        "index": 8,
+        "hex": "#d1c3c0",
+        "pixelCount": 30769,
+        "percentage": 2,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 9,
+        "hex": "#b3a866",
+        "pixelCount": 18144,
+        "percentage": 1.2
+      },
+      {
+        "index": 10,
+        "hex": "#6e86a8",
+        "pixelCount": 14063,
+        "percentage": 0.9
+      }
+    ]
+  },
+  {
+    "slug": "n--12",
+    "name": "N  12",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--12/n--12.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--12/N-%20(12).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#a1b6b6",
+        "pixelCount": 531463,
+        "percentage": 34.2
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 311994,
+        "percentage": 20.1
+      },
+      {
+        "index": 2,
+        "hex": "#758447",
+        "pixelCount": 189445,
+        "percentage": 12.2
+      },
+      {
+        "index": 3,
+        "hex": "#5b6f39",
+        "pixelCount": 140659,
+        "percentage": 9
+      },
+      {
+        "index": 4,
+        "hex": "#9fa485",
+        "pixelCount": 140376,
+        "percentage": 9
+      },
+      {
+        "index": 5,
+        "hex": "#749293",
+        "pixelCount": 123467,
+        "percentage": 7.9
+      },
+      {
+        "index": 6,
+        "hex": "#657f91",
+        "pixelCount": 86024,
+        "percentage": 5.5
+      },
+      {
+        "index": 7,
+        "hex": "#2a497b",
+        "pixelCount": 18144,
+        "percentage": 1.2
+      },
+      {
+        "index": 8,
+        "hex": "#cd9d8f",
+        "pixelCount": 13628,
+        "percentage": 0.9,
+        "matchedYarnCode": "OU-22"
+      }
+    ]
+  },
+  {
+    "slug": "n--13",
+    "name": "N  13",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--13/n--13.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--13/N-%20(13).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#bfcac9",
+        "pixelCount": 538645,
+        "percentage": 34.6
+      },
+      {
+        "index": 1,
+        "hex": "#a1b6b6",
+        "pixelCount": 315618,
+        "percentage": 20.3
+      },
+      {
+        "index": 2,
+        "hex": "#b6b9bd",
+        "pixelCount": 164980,
+        "percentage": 10.6
+      },
+      {
+        "index": 3,
+        "hex": "#d1c3c0",
+        "pixelCount": 151014,
+        "percentage": 9.7,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 4,
+        "hex": "#cfcbc5",
+        "pixelCount": 141206,
+        "percentage": 9.1
+      },
+      {
+        "index": 5,
+        "hex": "#b3a866",
+        "pixelCount": 120557,
+        "percentage": 7.8
+      },
+      {
+        "index": 6,
+        "hex": "#d2b2bd",
+        "pixelCount": 78112,
+        "percentage": 5,
+        "matchedYarnCode": "BM-1345"
+      },
+      {
+        "index": 7,
+        "hex": "#355771",
+        "pixelCount": 25356,
+        "percentage": 1.6
+      },
+      {
+        "index": 8,
+        "hex": "#b77079",
+        "pixelCount": 19712,
+        "percentage": 1.3
+      }
+    ]
+  },
+  {
+    "slug": "n--14",
+    "name": "N  14",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--14/n--14.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--14/N-%20(14).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#d1c3c0",
+        "pixelCount": 629482,
+        "percentage": 40.5,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 288029,
+        "percentage": 18.5
+      },
+      {
+        "index": 2,
+        "hex": "#bfcac9",
+        "pixelCount": 153576,
+        "percentage": 9.9
+      },
+      {
+        "index": 3,
+        "hex": "#ad9c58",
+        "pixelCount": 107982,
+        "percentage": 6.9
+      },
+      {
+        "index": 4,
+        "hex": "#c4cab0",
+        "pixelCount": 106207,
+        "percentage": 6.8
+      },
+      {
+        "index": 5,
+        "hex": "#b6b9bd",
+        "pixelCount": 81786,
+        "percentage": 5.3
+      },
+      {
+        "index": 6,
+        "hex": "#cd9d8f",
+        "pixelCount": 76389,
+        "percentage": 4.9,
+        "matchedYarnCode": "OU-22"
+      },
+      {
+        "index": 7,
+        "hex": "#729ca5",
+        "pixelCount": 60695,
+        "percentage": 3.9,
+        "matchedYarnCode": "OU-09"
+      },
+      {
+        "index": 8,
+        "hex": "#d2b2bd",
+        "pixelCount": 51054,
+        "percentage": 3.3,
+        "matchedYarnCode": "BM-1345"
+      }
+    ]
+  },
+  {
+    "slug": "n--15",
+    "name": "N  15",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--15/n--15.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--15/N-%20(15).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 987905,
+        "percentage": 85.8
+      },
+      {
+        "index": 1,
+        "hex": "#89aeae",
+        "pixelCount": 83691,
+        "percentage": 7.3
+      },
+      {
+        "index": 2,
+        "hex": "#a19588",
+        "pixelCount": 80404,
+        "percentage": 7
+      }
+    ]
+  },
+  {
+    "slug": "n--16",
+    "name": "N  16",
+    "width": 900,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--16/n--16.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--16/N-%20(16).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#9bb0be",
+        "pixelCount": 372862,
+        "percentage": 34.5
+      },
+      {
+        "index": 1,
+        "hex": "#aba79a",
+        "pixelCount": 222229,
+        "percentage": 20.6
+      },
+      {
+        "index": 2,
+        "hex": "#7faabc",
+        "pixelCount": 110658,
+        "percentage": 10.2,
+        "matchedYarnCode": "BM-767"
+      },
+      {
+        "index": 3,
+        "hex": "#cfcbc5",
+        "pixelCount": 108128,
+        "percentage": 10
+      },
+      {
+        "index": 4,
+        "hex": "#6d7b88",
+        "pixelCount": 95424,
+        "percentage": 8.8
+      },
+      {
+        "index": 5,
+        "hex": "#9d894d",
+        "pixelCount": 86747,
+        "percentage": 8
+      },
+      {
+        "index": 6,
+        "hex": "#d1c3c0",
+        "pixelCount": 61418,
+        "percentage": 5.7,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 7,
+        "hex": "#47717b",
+        "pixelCount": 17621,
+        "percentage": 1.6
+      },
+      {
+        "index": 8,
+        "hex": "#c39698",
+        "pixelCount": 4913,
+        "percentage": 0.5,
+        "matchedYarnCode": "AN-09"
+      }
+    ]
+  },
+  {
+    "slug": "n--17",
+    "name": "N  17",
+    "width": 960,
+    "height": 1200,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--17/n--17.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--17/N-%20(17).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 865942,
+        "percentage": 75.2
+      },
+      {
+        "index": 1,
+        "hex": "#838aa3",
+        "pixelCount": 286058,
+        "percentage": 24.8
+      }
+    ]
+  },
+  {
+    "slug": "n--18",
+    "name": "N  18",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--18/n--18.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--18/N-%20(18).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#b6b9bd",
+        "pixelCount": 585604,
+        "percentage": 37.7
+      },
+      {
+        "index": 1,
+        "hex": "#bab8af",
+        "pixelCount": 303923,
+        "percentage": 19.5
+      },
+      {
+        "index": 2,
+        "hex": "#939a8e",
+        "pixelCount": 198526,
+        "percentage": 12.8
+      },
+      {
+        "index": 3,
+        "hex": "#9fa485",
+        "pixelCount": 165252,
+        "percentage": 10.6
+      },
+      {
+        "index": 4,
+        "hex": "#a2ab9d",
+        "pixelCount": 104375,
+        "percentage": 6.7,
+        "matchedYarnCode": "CR 09"
+      },
+      {
+        "index": 5,
+        "hex": "#797879",
+        "pixelCount": 102294,
+        "percentage": 6.6
+      },
+      {
+        "index": 6,
+        "hex": "#9ba3a4",
+        "pixelCount": 69445,
+        "percentage": 4.5
+      },
+      {
+        "index": 7,
+        "hex": "#c2b1ac",
+        "pixelCount": 25781,
+        "percentage": 1.7,
+        "matchedYarnCode": "SPC 04"
+      }
+    ]
+  },
+  {
+    "slug": "n--19",
+    "name": "N  19",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--19/n--19.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--19/N-%20(19).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 598520,
+        "percentage": 38.5
+      },
+      {
+        "index": 1,
+        "hex": "#c3c7b8",
+        "pixelCount": 267737,
+        "percentage": 17.2
+      },
+      {
+        "index": 2,
+        "hex": "#c1bdaa",
+        "pixelCount": 244665,
+        "percentage": 15.7
+      },
+      {
+        "index": 3,
+        "hex": "#b6b1ad",
+        "pixelCount": 127455,
+        "percentage": 8.2
+      },
+      {
+        "index": 4,
+        "hex": "#b4a5ab",
+        "pixelCount": 102108,
+        "percentage": 6.6,
+        "matchedYarnCode": "BM 1360"
+      },
+      {
+        "index": 5,
+        "hex": "#a2ab9d",
+        "pixelCount": 84814,
+        "percentage": 5.5,
+        "matchedYarnCode": "CR 09"
+      },
+      {
+        "index": 6,
+        "hex": "#b6c3c2",
+        "pixelCount": 73929,
+        "percentage": 4.8
+      },
+      {
+        "index": 7,
+        "hex": "#9fa485",
+        "pixelCount": 39683,
+        "percentage": 2.6
+      },
+      {
+        "index": 8,
+        "hex": "#d1c3c0",
+        "pixelCount": 16289,
+        "percentage": 1,
+        "matchedYarnCode": "BM 1261"
+      }
+    ]
+  },
+  {
+    "slug": "n--2",
+    "name": "N  2",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--2/n--2.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--2/N-%20(2).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#bfcac9",
+        "pixelCount": 590959,
+        "percentage": 38
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 357787,
+        "percentage": 23
+      },
+      {
+        "index": 2,
+        "hex": "#9aa785",
+        "pixelCount": 198237,
+        "percentage": 12.7
+      },
+      {
+        "index": 3,
+        "hex": "#d1c3c0",
+        "pixelCount": 123835,
+        "percentage": 8,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 4,
+        "hex": "#c3c7b8",
+        "pixelCount": 112859,
+        "percentage": 7.3
+      },
+      {
+        "index": 5,
+        "hex": "#9bb0be",
+        "pixelCount": 60778,
+        "percentage": 3.9
+      },
+      {
+        "index": 6,
+        "hex": "#cd9d8f",
+        "pixelCount": 42625,
+        "percentage": 2.7,
+        "matchedYarnCode": "OU-22"
+      },
+      {
+        "index": 7,
+        "hex": "#c4cab0",
+        "pixelCount": 38840,
+        "percentage": 2.5
+      },
+      {
+        "index": 8,
+        "hex": "#627360",
+        "pixelCount": 29280,
+        "percentage": 1.9
+      }
+    ]
+  },
+  {
+    "slug": "n--3",
+    "name": "N  3",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--3/n--3.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--3/N-%20(3).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#959f93",
+        "pixelCount": 636047,
+        "percentage": 40.9
+      },
+      {
+        "index": 1,
+        "hex": "#b6c3c2",
+        "pixelCount": 406304,
+        "percentage": 26.1
+      },
+      {
+        "index": 2,
+        "hex": "#bfcac9",
+        "pixelCount": 273153,
+        "percentage": 17.6
+      },
+      {
+        "index": 3,
+        "hex": "#cfcbc5",
+        "pixelCount": 80657,
+        "percentage": 5.2
+      },
+      {
+        "index": 4,
+        "hex": "#b3a866",
+        "pixelCount": 80655,
+        "percentage": 5.2
+      },
+      {
+        "index": 5,
+        "hex": "#81879c",
+        "pixelCount": 43446,
+        "percentage": 2.8
+      },
+      {
+        "index": 6,
+        "hex": "#bb8675",
+        "pixelCount": 23322,
+        "percentage": 1.5,
+        "matchedYarnCode": "OU-64"
+      },
+      {
+        "index": 7,
+        "hex": "#627360",
+        "pixelCount": 11616,
+        "percentage": 0.7
+      }
+    ]
+  },
+  {
+    "slug": "n--4",
+    "name": "N  4",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--4/n--4.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--4/N-%20(4).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#d1c3c0",
+        "pixelCount": 615773,
+        "percentage": 39.6,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 1,
+        "hex": "#bfcac9",
+        "pixelCount": 403418,
+        "percentage": 25.9
+      },
+      {
+        "index": 2,
+        "hex": "#cfcbc5",
+        "pixelCount": 181293,
+        "percentage": 11.7
+      },
+      {
+        "index": 3,
+        "hex": "#7faabc",
+        "pixelCount": 150063,
+        "percentage": 9.6,
+        "matchedYarnCode": "BM-767"
+      },
+      {
+        "index": 4,
+        "hex": "#c8bca2",
+        "pixelCount": 114502,
+        "percentage": 7.4
+      },
+      {
+        "index": 5,
+        "hex": "#ada781",
+        "pixelCount": 50597,
+        "percentage": 3.3
+      },
+      {
+        "index": 6,
+        "hex": "#d5a7a6",
+        "pixelCount": 37306,
+        "percentage": 2.4,
+        "matchedYarnCode": "OU-53"
+      },
+      {
+        "index": 7,
+        "hex": "#c3c7b8",
+        "pixelCount": 2248,
+        "percentage": 0.1
+      }
+    ]
+  },
+  {
+    "slug": "n--5",
+    "name": "N  5",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--5/n--5.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--5/N-%20(5).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#a3b6ae",
+        "pixelCount": 550050,
+        "percentage": 35.4
+      },
+      {
+        "index": 1,
+        "hex": "#797879",
+        "pixelCount": 224281,
+        "percentage": 14.4
+      },
+      {
+        "index": 2,
+        "hex": "#c8c8a5",
+        "pixelCount": 212549,
+        "percentage": 13.7
+      },
+      {
+        "index": 3,
+        "hex": "#355771",
+        "pixelCount": 107839,
+        "percentage": 6.9
+      },
+      {
+        "index": 4,
+        "hex": "#a19272",
+        "pixelCount": 87091,
+        "percentage": 5.6
+      },
+      {
+        "index": 5,
+        "hex": "#5b6f39",
+        "pixelCount": 63022,
+        "percentage": 4.1
+      },
+      {
+        "index": 6,
+        "hex": "#bd7e91",
+        "pixelCount": 62288,
+        "percentage": 4,
+        "matchedYarnCode": "OU-82"
+      },
+      {
+        "index": 7,
+        "hex": "#958695",
+        "pixelCount": 55543,
+        "percentage": 3.6
+      },
+      {
+        "index": 8,
+        "hex": "#cfcbc5",
+        "pixelCount": 51804,
+        "percentage": 3.3
+      },
+      {
+        "index": 9,
+        "hex": "#91496b",
+        "pixelCount": 49266,
+        "percentage": 3.2,
+        "matchedYarnCode": "AK-05"
+      },
+      {
+        "index": 10,
+        "hex": "#657d8e",
+        "pixelCount": 46435,
+        "percentage": 3
+      },
+      {
+        "index": 11,
+        "hex": "#bb8675",
+        "pixelCount": 45032,
+        "percentage": 2.9,
+        "matchedYarnCode": "OU-64"
+      }
+    ]
+  },
+  {
+    "slug": "n--6",
+    "name": "N  6",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--6/n--6.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--6/N-%20(6).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 1127669,
+        "percentage": 72.5
+      },
+      {
+        "index": 1,
+        "hex": "#bfcac9",
+        "pixelCount": 107445,
+        "percentage": 6.9
+      },
+      {
+        "index": 2,
+        "hex": "#8da3bf",
+        "pixelCount": 101230,
+        "percentage": 6.5
+      },
+      {
+        "index": 3,
+        "hex": "#d2b2bd",
+        "pixelCount": 60176,
+        "percentage": 3.9,
+        "matchedYarnCode": "BM-1345"
+      },
+      {
+        "index": 4,
+        "hex": "#b9ad89",
+        "pixelCount": 59899,
+        "percentage": 3.9
+      },
+      {
+        "index": 5,
+        "hex": "#3e5160",
+        "pixelCount": 49407,
+        "percentage": 3.2
+      },
+      {
+        "index": 6,
+        "hex": "#657f91",
+        "pixelCount": 28655,
+        "percentage": 1.8
+      },
+      {
+        "index": 7,
+        "hex": "#95968b",
+        "pixelCount": 20719,
+        "percentage": 1.3
+      }
+    ]
+  },
+  {
+    "slug": "n--7",
+    "name": "N  7",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--7/n--7.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--7/N-%20(7).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#476e78",
+        "pixelCount": 521020,
+        "percentage": 33.5
+      },
+      {
+        "index": 1,
+        "hex": "#d1c3c0",
+        "pixelCount": 379738,
+        "percentage": 24.4,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 2,
+        "hex": "#a1b6b6",
+        "pixelCount": 132614,
+        "percentage": 8.5
+      },
+      {
+        "index": 3,
+        "hex": "#b9ad89",
+        "pixelCount": 105760,
+        "percentage": 6.8
+      },
+      {
+        "index": 4,
+        "hex": "#d5a7a6",
+        "pixelCount": 89737,
+        "percentage": 5.8,
+        "matchedYarnCode": "OU-53"
+      },
+      {
+        "index": 5,
+        "hex": "#a29f7d",
+        "pixelCount": 72465,
+        "percentage": 4.7
+      },
+      {
+        "index": 6,
+        "hex": "#243b54",
+        "pixelCount": 54843,
+        "percentage": 3.5
+      },
+      {
+        "index": 7,
+        "hex": "#729ca5",
+        "pixelCount": 54211,
+        "percentage": 3.5,
+        "matchedYarnCode": "OU-09"
+      },
+      {
+        "index": 8,
+        "hex": "#b6b9bd",
+        "pixelCount": 53500,
+        "percentage": 3.4
+      },
+      {
+        "index": 9,
+        "hex": "#bb8675",
+        "pixelCount": 42095,
+        "percentage": 2.7,
+        "matchedYarnCode": "OU-64"
+      },
+      {
+        "index": 10,
+        "hex": "#bfcac9",
+        "pixelCount": 16965,
+        "percentage": 1.1
+      },
+      {
+        "index": 11,
+        "hex": "#b6c3c2",
+        "pixelCount": 16134,
+        "percentage": 1
+      },
+      {
+        "index": 12,
+        "hex": "#925c51",
+        "pixelCount": 15726,
+        "percentage": 1
+      },
+      {
+        "index": 13,
+        "hex": "#cfcbc5",
+        "pixelCount": 392,
+        "percentage": 0
+      }
+    ]
+  },
+  {
+    "slug": "n--8",
+    "name": "N  8",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--8/n--8.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--8/N-%20(8).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#c3c1bd",
+        "pixelCount": 614656,
+        "percentage": 39.5
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 352779,
+        "percentage": 22.7
+      },
+      {
+        "index": 2,
+        "hex": "#bfcac9",
+        "pixelCount": 202804,
+        "percentage": 13
+      },
+      {
+        "index": 3,
+        "hex": "#a5aeb5",
+        "pixelCount": 179280,
+        "percentage": 11.5
+      },
+      {
+        "index": 4,
+        "hex": "#729ca5",
+        "pixelCount": 91013,
+        "percentage": 5.9,
+        "matchedYarnCode": "OU-09"
+      },
+      {
+        "index": 5,
+        "hex": "#b3a866",
+        "pixelCount": 62998,
+        "percentage": 4.1
+      },
+      {
+        "index": 6,
+        "hex": "#bb8675",
+        "pixelCount": 35732,
+        "percentage": 2.3,
+        "matchedYarnCode": "OU-64"
+      },
+      {
+        "index": 7,
+        "hex": "#d1c3c0",
+        "pixelCount": 15938,
+        "percentage": 1,
+        "matchedYarnCode": "BM 1261"
+      }
+    ]
+  },
+  {
+    "slug": "n--9",
+    "name": "N  9",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--9/n--9.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/n--9/N-%20(9).bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#b6c3c2",
+        "pixelCount": 666087,
+        "percentage": 42.8
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 324723,
+        "percentage": 20.9
+      },
+      {
+        "index": 2,
+        "hex": "#c8bca2",
+        "pixelCount": 213972,
+        "percentage": 13.8
+      },
+      {
+        "index": 3,
+        "hex": "#a2ab9d",
+        "pixelCount": 141145,
+        "percentage": 9.1,
+        "matchedYarnCode": "CR 09"
+      },
+      {
+        "index": 4,
+        "hex": "#cd9d8f",
+        "pixelCount": 91854,
+        "percentage": 5.9,
+        "matchedYarnCode": "OU-22"
+      },
+      {
+        "index": 5,
+        "hex": "#729ca5",
+        "pixelCount": 78788,
+        "percentage": 5.1,
+        "matchedYarnCode": "OU-09"
+      },
+      {
+        "index": 6,
+        "hex": "#d2b2bd",
+        "pixelCount": 38631,
+        "percentage": 2.5,
+        "matchedYarnCode": "BM-1345"
+      }
+    ]
+  },
+  {
+    "slug": "ou-167-j",
+    "name": "Ou 167 J",
+    "width": 1080,
+    "height": 1320,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-167-j/ou-167-j.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-167-j/OU%20167%20J.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#bfcac9",
+        "pixelCount": 465002,
+        "percentage": 32.6
+      },
+      {
+        "index": 1,
+        "hex": "#cfcbc5",
+        "pixelCount": 381510,
+        "percentage": 26.8
+      },
+      {
+        "index": 2,
+        "hex": "#b3aa92",
+        "pixelCount": 189345,
+        "percentage": 13.3
+      },
+      {
+        "index": 3,
+        "hex": "#52746d",
+        "pixelCount": 115070,
+        "percentage": 8.1
+      },
+      {
+        "index": 4,
+        "hex": "#d5a7a6",
+        "pixelCount": 86234,
+        "percentage": 6,
+        "matchedYarnCode": "OU-53"
+      },
+      {
+        "index": 5,
+        "hex": "#9aa785",
+        "pixelCount": 60390,
+        "percentage": 4.2
+      },
+      {
+        "index": 6,
+        "hex": "#97a5b5",
+        "pixelCount": 44230,
+        "percentage": 3.1
+      },
+      {
+        "index": 7,
+        "hex": "#2b3347",
+        "pixelCount": 42458,
+        "percentage": 3
+      },
+      {
+        "index": 8,
+        "hex": "#b6c3c2",
+        "pixelCount": 41361,
+        "percentage": 2.9
+      }
+    ]
+  },
+  {
+    "slug": "ou-190",
+    "name": "Ou 190",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-190/ou-190.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-190/OU%20190.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 524115,
+        "percentage": 33.7
+      },
+      {
+        "index": 1,
+        "hex": "#a1acb5",
+        "pixelCount": 291053,
+        "percentage": 18.7
+      },
+      {
+        "index": 2,
+        "hex": "#a19272",
+        "pixelCount": 222269,
+        "percentage": 14.3
+      },
+      {
+        "index": 3,
+        "hex": "#bfcac9",
+        "pixelCount": 155036,
+        "percentage": 10
+      },
+      {
+        "index": 4,
+        "hex": "#797c86",
+        "pixelCount": 133014,
+        "percentage": 8.6
+      },
+      {
+        "index": 5,
+        "hex": "#b6c3c2",
+        "pixelCount": 127162,
+        "percentage": 8.2
+      },
+      {
+        "index": 6,
+        "hex": "#c3c7b8",
+        "pixelCount": 80647,
+        "percentage": 5.2
+      },
+      {
+        "index": 7,
+        "hex": "#d1c3c0",
+        "pixelCount": 21904,
+        "percentage": 1.4,
+        "matchedYarnCode": "BM 1261"
+      }
+    ]
+  },
+  {
+    "slug": "ou-285",
+    "name": "Ou 285",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-285/ou-285.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-285/OU%20285.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#eecec1",
+        "pixelCount": 790538,
+        "percentage": 50.8
+      },
+      {
+        "index": 1,
+        "hex": "#e2e3e4",
+        "pixelCount": 393019,
+        "percentage": 25.3
+      },
+      {
+        "index": 2,
+        "hex": "#e3dce8",
+        "pixelCount": 371643,
+        "percentage": 23.9
+      }
+    ]
+  },
+  {
+    "slug": "ou-397",
+    "name": "Ou 397",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-397/ou-397.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-397/OU%20397.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#cfcbc5",
+        "pixelCount": 1281498,
+        "percentage": 82.4
+      },
+      {
+        "index": 1,
+        "hex": "#a58735",
+        "pixelCount": 273702,
+        "percentage": 17.6
+      }
+    ]
+  },
+  {
+    "slug": "ou-413-90-x-110-final",
+    "name": "Ou 413 90 X 110 Final",
+    "width": 1395,
+    "height": 1755,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-413-90-x-110-final/ou-413-90-x-110-final.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-413-90-x-110-final/OU%20413%209.0%20x%2011.0%20final.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#ced2ce",
+        "pixelCount": 1168792,
+        "percentage": 47.7
+      },
+      {
+        "index": 1,
+        "hex": "#e9ebe6",
+        "pixelCount": 670107,
+        "percentage": 27.4
+      },
+      {
+        "index": 2,
+        "hex": "#e0e2dc",
+        "pixelCount": 260514,
+        "percentage": 10.6
+      },
+      {
+        "index": 3,
+        "hex": "#d6d8df",
+        "pixelCount": 163254,
+        "percentage": 6.7
+      },
+      {
+        "index": 4,
+        "hex": "#b4bbbc",
+        "pixelCount": 144146,
+        "percentage": 5.9
+      },
+      {
+        "index": 5,
+        "hex": "#ffffff",
+        "pixelCount": 35997,
+        "percentage": 1.5
+      },
+      {
+        "index": 6,
+        "hex": "#000000",
+        "pixelCount": 5415,
+        "percentage": 0.2
+      }
+    ]
+  },
+  {
+    "slug": "ou-87-b",
+    "name": "Ou 87 B",
+    "width": 1080,
+    "height": 1440,
+    "imageUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-87-b/ou-87-b.png",
+    "sourceBmpUrl": "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/designs/ou-87-b/OU%2087%20B.bmp",
+    "palette": [
+      {
+        "index": 0,
+        "hex": "#d5a7a6",
+        "pixelCount": 728342,
+        "percentage": 46.8,
+        "matchedYarnCode": "OU-53"
+      },
+      {
+        "index": 1,
+        "hex": "#d1c3c0",
+        "pixelCount": 150440,
+        "percentage": 9.7,
+        "matchedYarnCode": "BM 1261"
+      },
+      {
+        "index": 2,
+        "hex": "#bfcac9",
+        "pixelCount": 109845,
+        "percentage": 7.1
+      },
+      {
+        "index": 3,
+        "hex": "#c8c8a5",
+        "pixelCount": 99859,
+        "percentage": 6.4
+      },
+      {
+        "index": 4,
+        "hex": "#8099b7",
+        "pixelCount": 82128,
+        "percentage": 5.3
+      },
+      {
+        "index": 5,
+        "hex": "#576855",
+        "pixelCount": 76327,
+        "percentage": 4.9
+      },
+      {
+        "index": 6,
+        "hex": "#a55568",
+        "pixelCount": 73947,
+        "percentage": 4.8
+      },
+      {
+        "index": 7,
+        "hex": "#cfcbc5",
+        "pixelCount": 70907,
+        "percentage": 4.6
+      },
+      {
+        "index": 8,
+        "hex": "#2a497b",
+        "pixelCount": 62854,
+        "percentage": 4
+      },
+      {
+        "index": 9,
+        "hex": "#0f1630",
+        "pixelCount": 40765,
+        "percentage": 2.6
+      },
+      {
+        "index": 10,
+        "hex": "#7e8176",
+        "pixelCount": 34160,
+        "percentage": 2.2
+      },
+      {
+        "index": 11,
+        "hex": "#b9ad89",
+        "pixelCount": 25626,
+        "percentage": 1.6
       }
     ]
   },

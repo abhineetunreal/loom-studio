@@ -1,24 +1,2306 @@
 {
-"_schema": "rendered hex -> OneLoom code",
-  "#b4a5ab": "4_D BM 1360",
-  "#c8bca2": "28_E SPC 07",
-  "#aba79a": "7_G BM 983(SPC)",
-  "#b9b2b0": "29_H BM 971",
-  "#c39698": "2_C AN-09",
-  "#ac9db1": "32_E BM 1381",
-  "#ada781": "6_F OU 81",
-  "#b6c3c2": "13_G BM-813",
-  "#d1c3c0": "4_E BM 1261",
-  "#b5ada4": "29_E CH 511",
-  "#b6b1ad": "29_G BM 995",
-  "#b8bfbe": "34_E SJ ICE Green",
-  "#cfcbc5": "29_A OU-10II",
-  "#a3b6ae": "12_E BM-2035-50",
-  "#c3c7b8": "25_H SJ MALKA GREEN",
-  "#95abbb": "13_B BL 10B",
-  "#93989d": "14_G SPC 06",
-  "#a55568": "1_D BM-1328",
-  "#2a497b": "11_A BM 804",
-  "#657f91": "16_G BI-08",
-  "#bfcac9": "13_H BI-11(NZ)"
+  "#002453": {
+    "catalogHex": "#002453",
+    "code": "OU 49"
+  },
+  "#0f1630": {
+    "catalogHex": "#0f1630",
+    "code": "OU 49"
+  },
+  "#131e4b": {
+    "catalogHex": "#131e4b",
+    "code": "BE 04"
+  },
+  "#142036": {
+    "catalogHex": "#142036",
+    "code": "SPC 17"
+  },
+  "#1d2d64": {
+    "catalogHex": "#1d2d64",
+    "code": "BE 04"
+  },
+  "#1e283c": {
+    "catalogHex": "#1e283c",
+    "code": "BM-826"
+  },
+  "#203127": {
+    "catalogHex": "#203127",
+    "code": "OU 47"
+  },
+  "#203555": {
+    "catalogHex": "#203555",
+    "code": "SPC 17"
+  },
+  "#214a57": {
+    "catalogHex": "#214a57",
+    "code": "OU-118"
+  },
+  "#242227": {
+    "catalogHex": "#242227",
+    "code": "OU-106"
+  },
+  "#243b54": {
+    "catalogHex": "#243b54",
+    "code": "BM-805"
+  },
+  "#263f56": {
+    "catalogHex": "#263f56",
+    "code": "OU 36"
+  },
+  "#26687c": {
+    "catalogHex": "#26687c",
+    "code": "OU-118"
+  },
+  "#28313c": {
+    "catalogHex": "#28313c",
+    "code": "231"
+  },
+  "#283627": {
+    "catalogHex": "#283627",
+    "code": "CD 03"
+  },
+  "#283c5d": {
+    "catalogHex": "#283c5d",
+    "code": "BM-826"
+  },
+  "#2a497b": {
+    "catalogHex": "#2a497b",
+    "code": "BM 804"
+  },
+  "#2b3347": {
+    "catalogHex": "#2b3347",
+    "code": "OU 12"
+  },
+  "#2b342a": {
+    "catalogHex": "#2b342a",
+    "code": "OU 114"
+  },
+  "#2b3d4f": {
+    "catalogHex": "#2b3d4f",
+    "code": "BM 1666"
+  },
+  "#2b4a38": {
+    "catalogHex": "#2b4a38",
+    "code": "OU 47"
+  },
+  "#2c231a": {
+    "catalogHex": "#2c231a",
+    "code": "OU-61"
+  },
+  "#2e5c9e": {
+    "catalogHex": "#2e5c9e",
+    "code": "BM 804"
+  },
+  "#302827": {
+    "catalogHex": "#302827",
+    "code": "OU-92"
+  },
+  "#303b49": {
+    "catalogHex": "#303b49",
+    "code": "231"
+  },
+  "#312f34": {
+    "catalogHex": "#312f34",
+    "code": "OU-106"
+  },
+  "#313520": {
+    "catalogHex": "#313520",
+    "code": "OU 45"
+  },
+  "#323234": {
+    "catalogHex": "#323234",
+    "code": "OU 48"
+  },
+  "#324061": {
+    "catalogHex": "#324061",
+    "code": "OU 12"
+  },
+  "#344c32": {
+    "catalogHex": "#344c32",
+    "code": "OU 93"
+  },
+  "#352b29": {
+    "catalogHex": "#352b29",
+    "code": "OU-92"
+  },
+  "#355771": {
+    "catalogHex": "#355771",
+    "code": "OU-74"
+  },
+  "#36292a": {
+    "catalogHex": "#36292a",
+    "code": "OU-91"
+  },
+  "#374123": {
+    "catalogHex": "#374123",
+    "code": "CM 05"
+  },
+  "#375677": {
+    "catalogHex": "#375677",
+    "code": "BM-805"
+  },
+  "#384e54": {
+    "catalogHex": "#384e54",
+    "code": "OU 44"
+  },
+  "#394a36": {
+    "catalogHex": "#394a36",
+    "code": "OU 114"
+  },
+  "#395c7f": {
+    "catalogHex": "#395c7f",
+    "code": "OU 36"
+  },
+  "#396384": {
+    "catalogHex": "#396384",
+    "code": "OU-74"
+  },
+  "#3b5772": {
+    "catalogHex": "#3b5772",
+    "code": "BM 1666"
+  },
+  "#3c4e34": {
+    "catalogHex": "#3c4e34",
+    "code": "BM 2144-10"
+  },
+  "#3d2438": {
+    "catalogHex": "#3d2438",
+    "code": "BMCC 32"
+  },
+  "#3d4c53": {
+    "catalogHex": "#3d4c53",
+    "code": "BM-721-2136-30"
+  },
+  "#3e3224": {
+    "catalogHex": "#3e3224",
+    "code": "OU-61"
+  },
+  "#3e432f": {
+    "catalogHex": "#3e432f",
+    "code": "BM 2144-10"
+  },
+  "#3e5160": {
+    "catalogHex": "#3e5160",
+    "code": "OU 90"
+  },
+  "#3f4e3b": {
+    "catalogHex": "#3f4e3b",
+    "code": "CD 03"
+  },
+  "#41482e": {
+    "catalogHex": "#41482e",
+    "code": "OU 45"
+  },
+  "#415676": {
+    "catalogHex": "#415676",
+    "code": "OU-25"
+  },
+  "#41595e": {
+    "catalogHex": "#41595e",
+    "code": "OU-44.."
+  },
+  "#426241": {
+    "catalogHex": "#426241",
+    "code": "OU 93"
+  },
+  "#433233": {
+    "catalogHex": "#433233",
+    "code": "OU-91"
+  },
+  "#44453f": {
+    "catalogHex": "#44453f",
+    "code": "OU 63"
+  },
+  "#455228": {
+    "catalogHex": "#455228",
+    "code": "CM 05"
+  },
+  "#46454a": {
+    "catalogHex": "#46454a",
+    "code": "OU 99"
+  },
+  "#465e68": {
+    "catalogHex": "#465e68",
+    "code": "BM-721-2136-30"
+  },
+  "#466167": {
+    "catalogHex": "#466167",
+    "code": "OU 44"
+  },
+  "#474e60": {
+    "catalogHex": "#474e60",
+    "code": "BO 06"
+  },
+  "#475b43": {
+    "catalogHex": "#475b43",
+    "code": "CD 03"
+  },
+  "#476e78": {
+    "catalogHex": "#476e78",
+    "code": "OU 73"
+  },
+  "#47717b": {
+    "catalogHex": "#47717b",
+    "code": "OU-73"
+  },
+  "#477a71": {
+    "catalogHex": "#477a71",
+    "code": "CH-05"
+  },
+  "#491c19": {
+    "catalogHex": "#491c19",
+    "code": "OU-38"
+  },
+  "#496267": {
+    "catalogHex": "#496267",
+    "code": "SJ TEPL (NZ)"
+  },
+  "#4a554c": {
+    "catalogHex": "#4a554c",
+    "code": "BM 446"
+  },
+  "#4b5c74": {
+    "catalogHex": "#4b5c74",
+    "code": "OU-127"
+  },
+  "#4b5f76": {
+    "catalogHex": "#4b5f76",
+    "code": "CF 05"
+  },
+  "#4b7394": {
+    "catalogHex": "#4b7394",
+    "code": "BI-05"
+  },
+  "#4c574f": {
+    "catalogHex": "#4c574f",
+    "code": "SJ GREEN"
+  },
+  "#4d5d75": {
+    "catalogHex": "#4d5d75",
+    "code": "OU-137"
+  },
+  "#4d808e": {
+    "catalogHex": "#4d808e",
+    "code": "OU 73"
+  },
+  "#4e515d": {
+    "catalogHex": "#4e515d",
+    "code": "OU 103"
+  },
+  "#4e584d": {
+    "catalogHex": "#4e584d",
+    "code": "B 04"
+  },
+  "#4f6987": {
+    "catalogHex": "#4f6987",
+    "code": "CF 05"
+  },
+  "#4f6a8b": {
+    "catalogHex": "#4f6a8b",
+    "code": "SJ Msdim Blue"
+  },
+  "#4f8c81": {
+    "catalogHex": "#4f8c81",
+    "code": "CH-05"
+  },
+  "#50574c": {
+    "catalogHex": "#50574c",
+    "code": "BM 476"
+  },
+  "#508bb9": {
+    "catalogHex": "#508bb9",
+    "code": "BI-05"
+  },
+  "#513f3a": {
+    "catalogHex": "#513f3a",
+    "code": "AI 01-P"
+  },
+  "#52534d": {
+    "catalogHex": "#52534d",
+    "code": "OU 69"
+  },
+  "#526989": {
+    "catalogHex": "#526989",
+    "code": "OU-127"
+  },
+  "#52746d": {
+    "catalogHex": "#52746d",
+    "code": "BM 601"
+  },
+  "#53787e": {
+    "catalogHex": "#53787e",
+    "code": "SJ TEPL (NZ)"
+  },
+  "#545a6d": {
+    "catalogHex": "#545a6d",
+    "code": "BO 06"
+  },
+  "#555c3d": {
+    "catalogHex": "#555c3d",
+    "code": "OU 45"
+  },
+  "#55738b": {
+    "catalogHex": "#55738b",
+    "code": "OU 90"
+  },
+  "#566756": {
+    "catalogHex": "#566756",
+    "code": "CS-9"
+  },
+  "#567476": {
+    "catalogHex": "#567476",
+    "code": "NZ-CBO 07"
+  },
+  "#57314b": {
+    "catalogHex": "#57314b",
+    "code": "BM 2075-20"
+  },
+  "#57565c": {
+    "catalogHex": "#57565c",
+    "code": "OU 99"
+  },
+  "#576855": {
+    "catalogHex": "#576855",
+    "code": "BM 434"
+  },
+  "#57857b": {
+    "catalogHex": "#57857b",
+    "code": "BM 601"
+  },
+  "#578f9e": {
+    "catalogHex": "#578f9e",
+    "code": "OU-73"
+  },
+  "#585954": {
+    "catalogHex": "#585954",
+    "code": "OU 100"
+  },
+  "#585c6a": {
+    "catalogHex": "#585c6a",
+    "code": "OU 103"
+  },
+  "#586056": {
+    "catalogHex": "#586056",
+    "code": "BM 476."
+  },
+  "#595b40": {
+    "catalogHex": "#595b40",
+    "code": "OU-71"
+  },
+  "#5a5f50": {
+    "catalogHex": "#5a5f50",
+    "code": "OU-35"
+  },
+  "#5a76a0": {
+    "catalogHex": "#5a76a0",
+    "code": "OU-25"
+  },
+  "#5b6c5f": {
+    "catalogHex": "#5b6c5f",
+    "code": "BM 446"
+  },
+  "#5b6f39": {
+    "catalogHex": "#5b6f39",
+    "code": "ARS306 (NZ)"
+  },
+  "#5c2d53": {
+    "catalogHex": "#5c2d53",
+    "code": "BMCC 32"
+  },
+  "#5c6271": {
+    "catalogHex": "#5c6271",
+    "code": "BN 05"
+  },
+  "#5c673b": {
+    "catalogHex": "#5c673b",
+    "code": "CM 06"
+  },
+  "#5c8088": {
+    "catalogHex": "#5c8088",
+    "code": "OU 66"
+  },
+  "#5e5b5a": {
+    "catalogHex": "#5e5b5a",
+    "code": "OU 96"
+  },
+  "#5e8082": {
+    "catalogHex": "#5e8082",
+    "code": "NZ-CBO 07"
+  },
+  "#5f6851": {
+    "catalogHex": "#5f6851",
+    "code": "BM 2144-10"
+  },
+  "#60444f": {
+    "catalogHex": "#60444f",
+    "code": "OU-08"
+  },
+  "#605346": {
+    "catalogHex": "#605346",
+    "code": "AD 06"
+  },
+  "#60625e": {
+    "catalogHex": "#60625e",
+    "code": "OU 63"
+  },
+  "#607978": {
+    "catalogHex": "#607978",
+    "code": "OU 3"
+  },
+  "#616657": {
+    "catalogHex": "#616657",
+    "code": "OU 35"
+  },
+  "#618ebd": {
+    "catalogHex": "#618ebd",
+    "code": "SJ Msdim Blue"
+  },
+  "#626264": {
+    "catalogHex": "#626264",
+    "code": "OU 01"
+  },
+  "#626448": {
+    "catalogHex": "#626448",
+    "code": "OU 71"
+  },
+  "#62683f": {
+    "catalogHex": "#62683f",
+    "code": "OU 04"
+  },
+  "#627360": {
+    "catalogHex": "#627360",
+    "code": "ACI 343"
+  },
+  "#627e83": {
+    "catalogHex": "#627e83",
+    "code": "OU-03II"
+  },
+  "#63612e": {
+    "catalogHex": "#63612e",
+    "code": "OU 117"
+  },
+  "#636774": {
+    "catalogHex": "#636774",
+    "code": "IE 17"
+  },
+  "#637778": {
+    "catalogHex": "#637778",
+    "code": "OU-41"
+  },
+  "#637864": {
+    "catalogHex": "#637864",
+    "code": "CS 09"
+  },
+  "#637c3c": {
+    "catalogHex": "#637c3c",
+    "code": "ARS306 (NZ)"
+  },
+  "#647368": {
+    "catalogHex": "#647368",
+    "code": "SJ GREEN"
+  },
+  "#64759f": {
+    "catalogHex": "#64759f",
+    "code": "BM 832"
+  },
+  "#657d8e": {
+    "catalogHex": "#657d8e",
+    "code": "A-04"
+  },
+  "#657f91": {
+    "catalogHex": "#657f91",
+    "code": "BI-08"
+  },
+  "#65959f": {
+    "catalogHex": "#65959f",
+    "code": "OU 66"
+  },
+  "#665e73": {
+    "catalogHex": "#665e73",
+    "code": "OU-52"
+  },
+  "#667787": {
+    "catalogHex": "#667787",
+    "code": "C 04-P"
+  },
+  "#675971": {
+    "catalogHex": "#675971",
+    "code": "OU-75"
+  },
+  "#68030e": {
+    "catalogHex": "#68030e",
+    "code": "OU-119"
+  },
+  "#686670": {
+    "catalogHex": "#686670",
+    "code": "OU 67"
+  },
+  "#686760": {
+    "catalogHex": "#686760",
+    "code": "OU 102"
+  },
+  "#695448": {
+    "catalogHex": "#695448",
+    "code": "OU-107"
+  },
+  "#696e4f": {
+    "catalogHex": "#696e4f",
+    "code": "OU-71"
+  },
+  "#697e9d": {
+    "catalogHex": "#697e9d",
+    "code": "OU-137"
+  },
+  "#697f69": {
+    "catalogHex": "#697f69",
+    "code": "CS-9"
+  },
+  "#6a6c61": {
+    "catalogHex": "#6a6c61",
+    "code": "OU 58"
+  },
+  "#6b6b64": {
+    "catalogHex": "#6b6b64",
+    "code": "BM 1538"
+  },
+  "#6b6d6c": {
+    "catalogHex": "#6b6d6c",
+    "code": "SPC 09"
+  },
+  "#6c3d36": {
+    "catalogHex": "#6c3d36",
+    "code": "DP-05"
+  },
+  "#6c5148": {
+    "catalogHex": "#6c5148",
+    "code": "OU-77"
+  },
+  "#6c6a60": {
+    "catalogHex": "#6c6a60",
+    "code": "OU 97"
+  },
+  "#6c7878": {
+    "catalogHex": "#6c7878",
+    "code": "OU 41 (NZ)"
+  },
+  "#6c7970": {
+    "catalogHex": "#6c7970",
+    "code": "BM 453"
+  },
+  "#6c7b6c": {
+    "catalogHex": "#6c7b6c",
+    "code": "B 04"
+  },
+  "#6c84b4": {
+    "catalogHex": "#6c84b4",
+    "code": "BM 832"
+  },
+  "#6d7a46": {
+    "catalogHex": "#6d7a46",
+    "code": "CM 06"
+  },
+  "#6d7b88": {
+    "catalogHex": "#6d7b88",
+    "code": "BD 10(NZ)"
+  },
+  "#6e809e": {
+    "catalogHex": "#6e809e",
+    "code": "OU-132"
+  },
+  "#6e86a8": {
+    "catalogHex": "#6e86a8",
+    "code": "SJ BLW  Dragon"
+  },
+  "#6e9096": {
+    "catalogHex": "#6e9096",
+    "code": "OU-03II"
+  },
+  "#6f633d": {
+    "catalogHex": "#6f633d",
+    "code": "OU 51"
+  },
+  "#6f856c": {
+    "catalogHex": "#6f856c",
+    "code": "BM 434"
+  },
+  "#717684": {
+    "catalogHex": "#717684",
+    "code": "IE 17"
+  },
+  "#71878a": {
+    "catalogHex": "#71878a",
+    "code": "OU 69II"
+  },
+  "#718972": {
+    "catalogHex": "#718972",
+    "code": "CS 09B"
+  },
+  "#72869c": {
+    "catalogHex": "#72869c",
+    "code": "A-06"
+  },
+  "#729ca5": {
+    "catalogHex": "#729ca5",
+    "code": "OU-09"
+  },
+  "#737d6e": {
+    "catalogHex": "#737d6e",
+    "code": "BM 476"
+  },
+  "#738872": {
+    "catalogHex": "#738872",
+    "code": "ACI 343"
+  },
+  "#739191": {
+    "catalogHex": "#739191",
+    "code": "OU-41"
+  },
+  "#749293": {
+    "catalogHex": "#749293",
+    "code": "OU 30"
+  },
+  "#755c52": {
+    "catalogHex": "#755c52",
+    "code": "AI 01-P"
+  },
+  "#757d6a": {
+    "catalogHex": "#757d6a",
+    "code": "OU-35"
+  },
+  "#758447": {
+    "catalogHex": "#758447",
+    "code": "CL 05"
+  },
+  "#766658": {
+    "catalogHex": "#766658",
+    "code": "OU 27"
+  },
+  "#766b5a": {
+    "catalogHex": "#766b5a",
+    "code": "AD 07-P"
+  },
+  "#767b87": {
+    "catalogHex": "#767b87",
+    "code": "E 010-P"
+  },
+  "#768175": {
+    "catalogHex": "#768175",
+    "code": "OU 111"
+  },
+  "#768db2": {
+    "catalogHex": "#768db2",
+    "code": "OU-132"
+  },
+  "#777c76": {
+    "catalogHex": "#777c76",
+    "code": "OU 69II-P"
+  },
+  "#778372": {
+    "catalogHex": "#778372",
+    "code": "BM 476."
+  },
+  "#778a90": {
+    "catalogHex": "#778a90",
+    "code": "OU-33"
+  },
+  "#778d77": {
+    "catalogHex": "#778d77",
+    "code": "CS 09"
+  },
+  "#7795a3": {
+    "catalogHex": "#7795a3",
+    "code": "OU-134"
+  },
+  "#797879": {
+    "catalogHex": "#797879",
+    "code": "OU 89"
+  },
+  "#797b71": {
+    "catalogHex": "#797b71",
+    "code": "OU 69"
+  },
+  "#797c86": {
+    "catalogHex": "#797c86",
+    "code": "EO 11"
+  },
+  "#798b8f": {
+    "catalogHex": "#798b8f",
+    "code": "OU-42"
+  },
+  "#799798": {
+    "catalogHex": "#799798",
+    "code": "CB 08"
+  },
+  "#7a3924": {
+    "catalogHex": "#7a3924",
+    "code": "OU-38"
+  },
+  "#7a7089": {
+    "catalogHex": "#7a7089",
+    "code": "OU-52"
+  },
+  "#7a8285": {
+    "catalogHex": "#7a8285",
+    "code": "BM-1602"
+  },
+  "#7a8967": {
+    "catalogHex": "#7a8967",
+    "code": "OU 43"
+  },
+  "#7b6a58": {
+    "catalogHex": "#7b6a58",
+    "code": "OU 37"
+  },
+  "#7b97bd": {
+    "catalogHex": "#7b97bd",
+    "code": "SJ BLW  Dragon"
+  },
+  "#7c7a86": {
+    "catalogHex": "#7c7a86",
+    "code": "OU 67"
+  },
+  "#7c8171": {
+    "catalogHex": "#7c8171",
+    "code": "BM 474"
+  },
+  "#7c91a9": {
+    "catalogHex": "#7c91a9",
+    "code": "BM-838NZ"
+  },
+  "#7c9db5": {
+    "catalogHex": "#7c9db5",
+    "code": "A-04"
+  },
+  "#7d6b88": {
+    "catalogHex": "#7d6b88",
+    "code": "OU-75"
+  },
+  "#7d6c61": {
+    "catalogHex": "#7d6c61",
+    "code": "OU 26"
+  },
+  "#7d8060": {
+    "catalogHex": "#7d8060",
+    "code": "OU 71"
+  },
+  "#7d8556": {
+    "catalogHex": "#7d8556",
+    "code": "OU 04"
+  },
+  "#7d8995": {
+    "catalogHex": "#7d8995",
+    "code": "SPC 05"
+  },
+  "#7e7268": {
+    "catalogHex": "#7e7268",
+    "code": "AD 08"
+  },
+  "#7e7980": {
+    "catalogHex": "#7e7980",
+    "code": "OU 86"
+  },
+  "#7e7b56": {
+    "catalogHex": "#7e7b56",
+    "code": "OU 79"
+  },
+  "#7e7d7a": {
+    "catalogHex": "#7e7d7a",
+    "code": "OU 96"
+  },
+  "#7e8176": {
+    "catalogHex": "#7e8176",
+    "code": "OU 24"
+  },
+  "#7e8e95": {
+    "catalogHex": "#7e8e95",
+    "code": "SPC 10"
+  },
+  "#7f7f43": {
+    "catalogHex": "#7f7f43",
+    "code": "OU-95"
+  },
+  "#7f8778": {
+    "catalogHex": "#7f8778",
+    "code": "OU 35"
+  },
+  "#7fa3bd": {
+    "catalogHex": "#7fa3bd",
+    "code": "BI-08"
+  },
+  "#7faabc": {
+    "catalogHex": "#7faabc",
+    "code": "BM-767"
+  },
+  "#808b79": {
+    "catalogHex": "#808b79",
+    "code": "A 07"
+  },
+  "#809084": {
+    "catalogHex": "#809084",
+    "code": "BM 453"
+  },
+  "#80908e": {
+    "catalogHex": "#80908e",
+    "code": "OU 41 (NZ)"
+  },
+  "#80919f": {
+    "catalogHex": "#80919f",
+    "code": "BM-1648"
+  },
+  "#8099b7": {
+    "catalogHex": "#8099b7",
+    "code": "BM 838"
+  },
+  "#816b58": {
+    "catalogHex": "#816b58",
+    "code": "OU-131"
+  },
+  "#818377": {
+    "catalogHex": "#818377",
+    "code": "OU 100"
+  },
+  "#818565": {
+    "catalogHex": "#818565",
+    "code": "OU 68"
+  },
+  "#81879c": {
+    "catalogHex": "#81879c",
+    "code": "BF-04"
+  },
+  "#819ea9": {
+    "catalogHex": "#819ea9",
+    "code": "BI-09"
+  },
+  "#825070": {
+    "catalogHex": "#825070",
+    "code": "BM 2075-20"
+  },
+  "#828145": {
+    "catalogHex": "#828145",
+    "code": "OU 117"
+  },
+  "#828b8e": {
+    "catalogHex": "#828b8e",
+    "code": "CSTM 01-P"
+  },
+  "#828c71": {
+    "catalogHex": "#828c71",
+    "code": "OU-31"
+  },
+  "#836637": {
+    "catalogHex": "#836637",
+    "code": "OU 06"
+  },
+  "#838767": {
+    "catalogHex": "#838767",
+    "code": "OU-68"
+  },
+  "#838aa3": {
+    "catalogHex": "#838aa3",
+    "code": "OU 121"
+  },
+  "#838b79": {
+    "catalogHex": "#838b79",
+    "code": "CS 12"
+  },
+  "#83a4a5": {
+    "catalogHex": "#83a4a5",
+    "code": "CB 08"
+  },
+  "#83ada6": {
+    "catalogHex": "#83ada6",
+    "code": "BM-599(NZ)"
+  },
+  "#848276": {
+    "catalogHex": "#848276",
+    "code": "OU 97"
+  },
+  "#848e71": {
+    "catalogHex": "#848e71",
+    "code": "A 03"
+  },
+  "#849492": {
+    "catalogHex": "#849492",
+    "code": "OU 41 (NZ)"
+  },
+  "#854c3a": {
+    "catalogHex": "#854c3a",
+    "code": "OU 29"
+  },
+  "#855147": {
+    "catalogHex": "#855147",
+    "code": "DP-05"
+  },
+  "#857660": {
+    "catalogHex": "#857660",
+    "code": "AD 06"
+  },
+  "#85835f": {
+    "catalogHex": "#85835f",
+    "code": "CM 11"
+  },
+  "#86743e": {
+    "catalogHex": "#86743e",
+    "code": "OU 02"
+  },
+  "#867d5f": {
+    "catalogHex": "#867d5f",
+    "code": "OU 32"
+  },
+  "#869f8a": {
+    "catalogHex": "#869f8a",
+    "code": "OU 115"
+  },
+  "#86a187": {
+    "catalogHex": "#86a187",
+    "code": "CS 09B"
+  },
+  "#876470": {
+    "catalogHex": "#876470",
+    "code": "OU-08"
+  },
+  "#879857": {
+    "catalogHex": "#879857",
+    "code": "CL 05"
+  },
+  "#88452d": {
+    "catalogHex": "#88452d",
+    "code": "OU-39"
+  },
+  "#89a5c2": {
+    "catalogHex": "#89a5c2",
+    "code": "BM-838NZ"
+  },
+  "#89aeae": {
+    "catalogHex": "#89aeae",
+    "code": "BM 660"
+  },
+  "#8a8b85": {
+    "catalogHex": "#8a8b85",
+    "code": "OU 05"
+  },
+  "#8a9aad": {
+    "catalogHex": "#8a9aad",
+    "code": "BJ 10(NZ)"
+  },
+  "#8b8156": {
+    "catalogHex": "#8b8156",
+    "code": "OU 51"
+  },
+  "#8b9987": {
+    "catalogHex": "#8b9987",
+    "code": "OU 111"
+  },
+  "#8ba9b1": {
+    "catalogHex": "#8ba9b1",
+    "code": "OU-33"
+  },
+  "#8c7c61": {
+    "catalogHex": "#8c7c61",
+    "code": "SJ TAN"
+  },
+  "#8c8c82": {
+    "catalogHex": "#8c8c82",
+    "code": "BM 1538"
+  },
+  "#8c9eac": {
+    "catalogHex": "#8c9eac",
+    "code": "BH-08"
+  },
+  "#8cbab3": {
+    "catalogHex": "#8cbab3",
+    "code": "BM-599(NZ)"
+  },
+  "#8d8d8b": {
+    "catalogHex": "#8d8d8b",
+    "code": "BM 973"
+  },
+  "#8d95a5": {
+    "catalogHex": "#8d95a5",
+    "code": "BF 07"
+  },
+  "#8d97a2": {
+    "catalogHex": "#8d97a2",
+    "code": "BF-07"
+  },
+  "#8da3bf": {
+    "catalogHex": "#8da3bf",
+    "code": "BJ-08"
+  },
+  "#8e0017": {
+    "catalogHex": "#8e0017",
+    "code": "OU-122"
+  },
+  "#8e6338": {
+    "catalogHex": "#8e6338",
+    "code": "OU 34"
+  },
+  "#8e8d7c": {
+    "catalogHex": "#8e8d7c",
+    "code": "OU 101"
+  },
+  "#8e8f8f": {
+    "catalogHex": "#8e8f8f",
+    "code": "OU 01"
+  },
+  "#8e9081": {
+    "catalogHex": "#8e9081",
+    "code": "OU 58"
+  },
+  "#8fb7c7": {
+    "catalogHex": "#8fb7c7",
+    "code": "OU-134"
+  },
+  "#907964": {
+    "catalogHex": "#907964",
+    "code": "OU-107"
+  },
+  "#9096a1": {
+    "catalogHex": "#9096a1",
+    "code": "E 010-P"
+  },
+  "#9098b4": {
+    "catalogHex": "#9098b4",
+    "code": "OU 121"
+  },
+  "#91496b": {
+    "catalogHex": "#91496b",
+    "code": "AK-05"
+  },
+  "#919fa7": {
+    "catalogHex": "#919fa7",
+    "code": "BE 09"
+  },
+  "#925c51": {
+    "catalogHex": "#925c51",
+    "code": "BM-1201"
+  },
+  "#92a47f": {
+    "catalogHex": "#92a47f",
+    "code": "OU 43"
+  },
+  "#92a6b8": {
+    "catalogHex": "#92a6b8",
+    "code": "BM-1662"
+  },
+  "#92a8b5": {
+    "catalogHex": "#92a8b5",
+    "code": "BD 10(NZ)"
+  },
+  "#92b2d3": {
+    "catalogHex": "#92b2d3",
+    "code": "BM 838"
+  },
+  "#92b9b8": {
+    "catalogHex": "#92b9b8",
+    "code": "OU 30"
+  },
+  "#938fad": {
+    "catalogHex": "#938fad",
+    "code": "BM-1404"
+  },
+  "#93989d": {
+    "catalogHex": "#93989d",
+    "code": "SPC 06"
+  },
+  "#939a8e": {
+    "catalogHex": "#939a8e",
+    "code": "OU 94"
+  },
+  "#947052": {
+    "catalogHex": "#947052",
+    "code": "OU-113"
+  },
+  "#949559": {
+    "catalogHex": "#949559",
+    "code": "OU-95"
+  },
+  "#949677": {
+    "catalogHex": "#949677",
+    "code": "OU 79(NZ)"
+  },
+  "#949ca0": {
+    "catalogHex": "#949ca0",
+    "code": "BM-1598"
+  },
+  "#949d9c": {
+    "catalogHex": "#949d9c",
+    "code": "CF 12"
+  },
+  "#949da3": {
+    "catalogHex": "#949da3",
+    "code": "SPC-02"
+  },
+  "#94a28d": {
+    "catalogHex": "#94a28d",
+    "code": "A 07"
+  },
+  "#94abb2": {
+    "catalogHex": "#94abb2",
+    "code": "SPC 10"
+  },
+  "#956239": {
+    "catalogHex": "#956239",
+    "code": "DN 10"
+  },
+  "#958695": {
+    "catalogHex": "#958695",
+    "code": "OU-83"
+  },
+  "#95939b": {
+    "catalogHex": "#95939b",
+    "code": "OU 86"
+  },
+  "#95968b": {
+    "catalogHex": "#95968b",
+    "code": "SPC 08"
+  },
+  "#959ba7": {
+    "catalogHex": "#959ba7",
+    "code": "EO 11"
+  },
+  "#959d9d": {
+    "catalogHex": "#959d9d",
+    "code": "BM-1602"
+  },
+  "#959f93": {
+    "catalogHex": "#959f93",
+    "code": "SPC 11"
+  },
+  "#95a8a7": {
+    "catalogHex": "#95a8a7",
+    "code": "CC-10"
+  },
+  "#95b6c2": {
+    "catalogHex": "#95b6c2",
+    "code": "BI-09"
+  },
+  "#968f82": {
+    "catalogHex": "#968f82",
+    "code": "BM 998-P"
+  },
+  "#96a185": {
+    "catalogHex": "#96a185",
+    "code": "OU-31"
+  },
+  "#976d44": {
+    "catalogHex": "#976d44",
+    "code": "SPC 14"
+  },
+  "#979984": {
+    "catalogHex": "#979984",
+    "code": "CT 12"
+  },
+  "#979f85": {
+    "catalogHex": "#979f85",
+    "code": "BM 487"
+  },
+  "#97a5b5": {
+    "catalogHex": "#97a5b5",
+    "code": "SJ HALIKA BLW"
+  },
+  "#97acba": {
+    "catalogHex": "#97acba",
+    "code": "C 04-P"
+  },
+  "#987d71": {
+    "catalogHex": "#987d71",
+    "code": "OU-77"
+  },
+  "#989e8f": {
+    "catalogHex": "#989e8f",
+    "code": "OU 24"
+  },
+  "#998a7b": {
+    "catalogHex": "#998a7b",
+    "code": "OU 27"
+  },
+  "#998c80": {
+    "catalogHex": "#998c80",
+    "code": "AG 11"
+  },
+  "#999a74": {
+    "catalogHex": "#999a74",
+    "code": "CM 11"
+  },
+  "#99a07e": {
+    "catalogHex": "#99a07e",
+    "code": "OU-68"
+  },
+  "#99a08d": {
+    "catalogHex": "#99a08d",
+    "code": "BM 474"
+  },
+  "#99abb6": {
+    "catalogHex": "#99abb6",
+    "code": "BJ 10"
+  },
+  "#99b1b7": {
+    "catalogHex": "#99b1b7",
+    "code": "OU-42"
+  },
+  "#9a8e6b": {
+    "catalogHex": "#9a8e6b",
+    "code": "A 5"
+  },
+  "#9aa07d": {
+    "catalogHex": "#9aa07d",
+    "code": "OU 68"
+  },
+  "#9aa4b6": {
+    "catalogHex": "#9aa4b6",
+    "code": "BF 07"
+  },
+  "#9aa785": {
+    "catalogHex": "#9aa785",
+    "code": "OU 31"
+  },
+  "#9b8e7e": {
+    "catalogHex": "#9b8e7e",
+    "code": "U 62"
+  },
+  "#9b9078": {
+    "catalogHex": "#9b9078",
+    "code": "AD 07-P"
+  },
+  "#9ba3a4": {
+    "catalogHex": "#9ba3a4",
+    "code": "BG 11"
+  },
+  "#9ba886": {
+    "catalogHex": "#9ba886",
+    "code": "A 03"
+  },
+  "#9bb0be": {
+    "catalogHex": "#9bb0be",
+    "code": "BM-1640 (NZ)"
+  },
+  "#9bb8d6": {
+    "catalogHex": "#9bb8d6",
+    "code": "BJ-08"
+  },
+  "#9c918b": {
+    "catalogHex": "#9c918b",
+    "code": "OU 07"
+  },
+  "#9c9787": {
+    "catalogHex": "#9c9787",
+    "code": "OU 105"
+  },
+  "#9cb0c4": {
+    "catalogHex": "#9cb0c4",
+    "code": "BJ 10(NZ)"
+  },
+  "#9d4938": {
+    "catalogHex": "#9d4938",
+    "code": "DK-04"
+  },
+  "#9d894d": {
+    "catalogHex": "#9d894d",
+    "code": "BM2152-20"
+  },
+  "#9d8a4a": {
+    "catalogHex": "#9d8a4a",
+    "code": "DF05"
+  },
+  "#9d9fa2": {
+    "catalogHex": "#9d9fa2",
+    "code": "OU 76"
+  },
+  "#9da09c": {
+    "catalogHex": "#9da09c",
+    "code": "OU 130"
+  },
+  "#9da2a3": {
+    "catalogHex": "#9da2a3",
+    "code": "BM 1584"
+  },
+  "#9e8f5c": {
+    "catalogHex": "#9e8f5c",
+    "code": "OU 02"
+  },
+  "#9e8f79": {
+    "catalogHex": "#9e8f79",
+    "code": "OU 37"
+  },
+  "#9e9285": {
+    "catalogHex": "#9e9285",
+    "code": "AD 08"
+  },
+  "#9e9d85": {
+    "catalogHex": "#9e9d85",
+    "code": "OU 32+1-P"
+  },
+  "#9ea994": {
+    "catalogHex": "#9ea994",
+    "code": "CS 12"
+  },
+  "#9eb8c7": {
+    "catalogHex": "#9eb8c7",
+    "code": "BM-1648"
+  },
+  "#9eb9a2": {
+    "catalogHex": "#9eb9a2",
+    "code": "OU 115"
+  },
+  "#9fa3a0": {
+    "catalogHex": "#9fa3a0",
+    "code": "SPC 09"
+  },
+  "#9fa485": {
+    "catalogHex": "#9fa485",
+    "code": "CP 12"
+  },
+  "#9fab8c": {
+    "catalogHex": "#9fab8c",
+    "code": "A 03"
+  },
+  "#9fb0bc": {
+    "catalogHex": "#9fb0bc",
+    "code": "SPC 05"
+  },
+  "#9fb1bf": {
+    "catalogHex": "#9fb1bf",
+    "code": "BH-08"
+  },
+  "#9fb8cb": {
+    "catalogHex": "#9fb8cb",
+    "code": "BH-08"
+  },
+  "#a09360": {
+    "catalogHex": "#a09360",
+    "code": "OU 108"
+  },
+  "#a0938f": {
+    "catalogHex": "#a0938f",
+    "code": "OU 84"
+  },
+  "#a19272": {
+    "catalogHex": "#a19272",
+    "code": "OU 60"
+  },
+  "#a19387": {
+    "catalogHex": "#a19387",
+    "code": "OU 26"
+  },
+  "#a19588": {
+    "catalogHex": "#a19588",
+    "code": "OU 98 III"
+  },
+  "#a1a2a1": {
+    "catalogHex": "#a1a2a1",
+    "code": "OU 89"
+  },
+  "#a1acb5": {
+    "catalogHex": "#a1acb5",
+    "code": "BD-11(NZ)"
+  },
+  "#a1b2c4": {
+    "catalogHex": "#a1b2c4",
+    "code": "BM 837"
+  },
+  "#a1b6b6": {
+    "catalogHex": "#a1b6b6",
+    "code": "CI-10"
+  },
+  "#a2594a": {
+    "catalogHex": "#a2594a",
+    "code": "OU-70"
+  },
+  "#a27676": {
+    "catalogHex": "#a27676",
+    "code": "OU 28-P"
+  },
+  "#a28b71": {
+    "catalogHex": "#a28b71",
+    "code": "OU-131"
+  },
+  "#a2969e": {
+    "catalogHex": "#a2969e",
+    "code": "SPC 12"
+  },
+  "#a29f7d": {
+    "catalogHex": "#a29f7d",
+    "code": "OU 32B"
+  },
+  "#a2ab9d": {
+    "catalogHex": "#a2ab9d",
+    "code": "CR 09"
+  },
+  "#a36350": {
+    "catalogHex": "#a36350",
+    "code": "OU-29"
+  },
+  "#a3a37a": {
+    "catalogHex": "#a3a37a",
+    "code": "OU 79"
+  },
+  "#a3b6ae": {
+    "catalogHex": "#a3b6ae",
+    "code": "BM-2035-50"
+  },
+  "#a58735": {
+    "catalogHex": "#a58735",
+    "code": "OU 46"
+  },
+  "#a59587": {
+    "catalogHex": "#a59587",
+    "code": "C 05"
+  },
+  "#a5a2c2": {
+    "catalogHex": "#a5a2c2",
+    "code": "BM-1404"
+  },
+  "#a5a7a5": {
+    "catalogHex": "#a5a7a5",
+    "code": "BM 973"
+  },
+  "#a5ae93": {
+    "catalogHex": "#a5ae93",
+    "code": "BM 487"
+  },
+  "#a5aeb5": {
+    "catalogHex": "#a5aeb5",
+    "code": "BM-1667"
+  },
+  "#a5bfbf": {
+    "catalogHex": "#a5bfbf",
+    "code": "CC-10"
+  },
+  "#a5cfcf": {
+    "catalogHex": "#a5cfcf",
+    "code": "BM 660"
+  },
+  "#a6abb1": {
+    "catalogHex": "#a6abb1",
+    "code": "BP 10"
+  },
+  "#a79c7c": {
+    "catalogHex": "#a79c7c",
+    "code": "OU 85"
+  },
+  "#a8aec7": {
+    "catalogHex": "#a8aec7",
+    "code": "BF-04"
+  },
+  "#a98051": {
+    "catalogHex": "#a98051",
+    "code": "BM 167"
+  },
+  "#a98e60": {
+    "catalogHex": "#a98e60",
+    "code": "OU 06"
+  },
+  "#a9bfcf": {
+    "catalogHex": "#a9bfcf",
+    "code": "BL 10B"
+  },
+  "#aa5a33": {
+    "catalogHex": "#aa5a33",
+    "code": "OU-39"
+  },
+  "#aa8562": {
+    "catalogHex": "#aa8562",
+    "code": "OU-113"
+  },
+  "#aa9a8a": {
+    "catalogHex": "#aa9a8a",
+    "code": "OU 98 I"
+  },
+  "#aab894": {
+    "catalogHex": "#aab894",
+    "code": "OU 31"
+  },
+  "#aba79a": {
+    "catalogHex": "#aba79a",
+    "code": "BM 983(SPC)"
+  },
+  "#abb5a6": {
+    "catalogHex": "#abb5a6",
+    "code": "OU 94"
+  },
+  "#ac6c54": {
+    "catalogHex": "#ac6c54",
+    "code": "OU-11"
+  },
+  "#ac9db1": {
+    "catalogHex": "#ac9db1",
+    "code": "BM 1381"
+  },
+  "#aca481": {
+    "catalogHex": "#aca481",
+    "code": "OU 32"
+  },
+  "#ad935c": {
+    "catalogHex": "#ad935c",
+    "code": "OU 06"
+  },
+  "#ad9889": {
+    "catalogHex": "#ad9889",
+    "code": "OU-87"
+  },
+  "#ad9c58": {
+    "catalogHex": "#ad9c58",
+    "code": "OU 17"
+  },
+  "#ada781": {
+    "catalogHex": "#ada781",
+    "code": "OU 81"
+  },
+  "#adcae1": {
+    "catalogHex": "#adcae1",
+    "code": "BM-1662"
+  },
+  "#ae4259": {
+    "catalogHex": "#ae4259",
+    "code": "OU-56"
+  },
+  "#ae8356": {
+    "catalogHex": "#ae8356",
+    "code": "OU 34"
+  },
+  "#aec4bc": {
+    "catalogHex": "#aec4bc",
+    "code": "BM-2035-50"
+  },
+  "#aeccdb": {
+    "catalogHex": "#aeccdb",
+    "code": "BL 10B"
+  },
+  "#af7e79": {
+    "catalogHex": "#af7e79",
+    "code": "OU-59"
+  },
+  "#af9daf": {
+    "catalogHex": "#af9daf",
+    "code": "OU 83"
+  },
+  "#afc1c0": {
+    "catalogHex": "#afc1c0",
+    "code": "CF 12"
+  },
+  "#b07c7a": {
+    "catalogHex": "#b07c7a",
+    "code": "OU-59"
+  },
+  "#b08c86": {
+    "catalogHex": "#b08c86",
+    "code": "OU-54"
+  },
+  "#b0a069": {
+    "catalogHex": "#b0a069",
+    "code": "BM2152-20"
+  },
+  "#b0b499": {
+    "catalogHex": "#b0b499",
+    "code": "CT 12"
+  },
+  "#b0bba9": {
+    "catalogHex": "#b0bba9",
+    "code": "CR 09"
+  },
+  "#b1725d": {
+    "catalogHex": "#b1725d",
+    "code": "OU 29"
+  },
+  "#b19782": {
+    "catalogHex": "#b19782",
+    "code": "OU 55"
+  },
+  "#b1b596": {
+    "catalogHex": "#b1b596",
+    "code": "OU 79(NZ)"
+  },
+  "#b1bbb7": {
+    "catalogHex": "#b1bbb7",
+    "code": "BI 11"
+  },
+  "#b1cccd": {
+    "catalogHex": "#b1cccd",
+    "code": "CI-10"
+  },
+  "#b2744a": {
+    "catalogHex": "#b2744a",
+    "code": "DO 06"
+  },
+  "#b2a092": {
+    "catalogHex": "#b2a092",
+    "code": "AI 12"
+  },
+  "#b2bbbc": {
+    "catalogHex": "#b2bbbc",
+    "code": "BM-1598"
+  },
+  "#b36186": {
+    "catalogHex": "#b36186",
+    "code": "AK-05"
+  },
+  "#b38c7c": {
+    "catalogHex": "#b38c7c",
+    "code": "BM-1193"
+  },
+  "#b3aa92": {
+    "catalogHex": "#b3aa92",
+    "code": "OU 98 II"
+  },
+  "#b3aaa8": {
+    "catalogHex": "#b3aaa8",
+    "code": "OU 84"
+  },
+  "#b3b09e": {
+    "catalogHex": "#b3b09e",
+    "code": "OU 105"
+  },
+  "#b3b4a0": {
+    "catalogHex": "#b3b4a0",
+    "code": "OU 101"
+  },
+  "#b4a5ab": {
+    "catalogHex": "#b4a5ab",
+    "code": "BM 1360"
+  },
+  "#b4ab87": {
+    "catalogHex": "#b4ab87",
+    "code": "A 5"
+  },
+  "#b4ab8a": {
+    "catalogHex": "#b4ab8a",
+    "code": "OU 85"
+  },
+  "#b4c1c5": {
+    "catalogHex": "#b4c1c5",
+    "code": "SPC-02"
+  },
+  "#b5a8ba": {
+    "catalogHex": "#b5a8ba",
+    "code": "OU-83"
+  },
+  "#b5aab1": {
+    "catalogHex": "#b5aab1",
+    "code": "SPC 12"
+  },
+  "#b5ada4": {
+    "catalogHex": "#b5ada4",
+    "code": "CH 511"
+  },
+  "#b5d3de": {
+    "catalogHex": "#b5d3de",
+    "code": "BM-1640 (NZ)"
+  },
+  "#b69b9b": {
+    "catalogHex": "#b69b9b",
+    "code": "OU-88"
+  },
+  "#b6a69d": {
+    "catalogHex": "#b6a69d",
+    "code": "BM 1171"
+  },
+  "#b6aa8b": {
+    "catalogHex": "#b6aa8b",
+    "code": "SJ TAN"
+  },
+  "#b6b1ad": {
+    "catalogHex": "#b6b1ad",
+    "code": "BM 995"
+  },
+  "#b6b6b0": {
+    "catalogHex": "#b6b6b0",
+    "code": "BM 1541"
+  },
+  "#b6b9bd": {
+    "catalogHex": "#b6b9bd",
+    "code": "BJ 11"
+  },
+  "#b6c1a7": {
+    "catalogHex": "#b6c1a7",
+    "code": "BM 537"
+  },
+  "#b6c3c2": {
+    "catalogHex": "#b6c3c2",
+    "code": "BM-813"
+  },
+  "#b6c7da": {
+    "catalogHex": "#b6c7da",
+    "code": "SJ HALIKA BLW"
+  },
+  "#b7ab70": {
+    "catalogHex": "#b7ab70",
+    "code": "OU 108"
+  },
+  "#b89260": {
+    "catalogHex": "#b89260",
+    "code": "BM 167"
+  },
+  "#b8bab7": {
+    "catalogHex": "#b8bab7",
+    "code": "BC 12"
+  },
+  "#b8bcbe": {
+    "catalogHex": "#b8bcbe",
+    "code": "OU 76"
+  },
+  "#b8bfbe": {
+    "catalogHex": "#b8bfbe",
+    "code": "SJ ICE Green"
+  },
+  "#b9ad89": {
+    "catalogHex": "#b9ad89",
+    "code": "OU 50"
+  },
+  "#b9b2b0": {
+    "catalogHex": "#b9b2b0",
+    "code": "BM 971"
+  },
+  "#b9b7a8": {
+    "catalogHex": "#b9b7a8",
+    "code": "OU 128"
+  },
+  "#b9c6d0": {
+    "catalogHex": "#b9c6d0",
+    "code": "BD-11(NZ)"
+  },
+  "#bab096": {
+    "catalogHex": "#bab096",
+    "code": "OU 98 II"
+  },
+  "#bab8af": {
+    "catalogHex": "#bab8af",
+    "code": "BF 11"
+  },
+  "#bab996": {
+    "catalogHex": "#bab996",
+    "code": "OU 32B"
+  },
+  "#bac6b8": {
+    "catalogHex": "#bac6b8",
+    "code": "SPC 11"
+  },
+  "#bac9ca": {
+    "catalogHex": "#bac9ca",
+    "code": "CSTM 01-P"
+  },
+  "#bb8675": {
+    "catalogHex": "#bb8675",
+    "code": "OU-64"
+  },
+  "#bbab67": {
+    "catalogHex": "#bbab67",
+    "code": "OU 17"
+  },
+  "#bbacbf": {
+    "catalogHex": "#bbacbf",
+    "code": "BM 1381"
+  },
+  "#bbaf9b": {
+    "catalogHex": "#bbaf9b",
+    "code": "U 62"
+  },
+  "#bcac9f": {
+    "catalogHex": "#bcac9f",
+    "code": "OU-87"
+  },
+  "#bcc1b3": {
+    "catalogHex": "#bcc1b3",
+    "code": "OU 69II-P"
+  },
+  "#bcc4a1": {
+    "catalogHex": "#bcc4a1",
+    "code": "CP 12"
+  },
+  "#bd7e91": {
+    "catalogHex": "#bd7e91",
+    "code": "OU-82"
+  },
+  "#bdb5ae": {
+    "catalogHex": "#bdb5ae",
+    "code": "OU 07"
+  },
+  "#bdb8b4": {
+    "catalogHex": "#bdb8b4",
+    "code": "OU 10IP"
+  },
+  "#bebebb": {
+    "catalogHex": "#bebebb",
+    "code": "CST 2"
+  },
+  "#bfb5b1": {
+    "catalogHex": "#bfb5b1",
+    "code": "BM-989"
+  },
+  "#bfbbb2": {
+    "catalogHex": "#bfbbb2",
+    "code": "BM 1521"
+  },
+  "#bfc1b4": {
+    "catalogHex": "#bfc1b4",
+    "code": "BE 12"
+  },
+  "#c0bbb1": {
+    "catalogHex": "#c0bbb1",
+    "code": "C 01"
+  },
+  "#c1ae9b": {
+    "catalogHex": "#c1ae9b",
+    "code": "BM 107"
+  },
+  "#c1b18a": {
+    "catalogHex": "#c1b18a",
+    "code": "OU 60"
+  },
+  "#c1bcae": {
+    "catalogHex": "#c1bcae",
+    "code": "OU 98 I"
+  },
+  "#c1bdaa": {
+    "catalogHex": "#c1bdaa",
+    "code": "A 01"
+  },
+  "#c1beb9": {
+    "catalogHex": "#c1beb9",
+    "code": "SPC 15"
+  },
+  "#c26145": {
+    "catalogHex": "#c26145",
+    "code": "DK-04"
+  },
+  "#c2b1ac": {
+    "catalogHex": "#c2b1ac",
+    "code": "SPC 04"
+  },
+  "#c2cbca": {
+    "catalogHex": "#c2cbca",
+    "code": "SJ ICE Green"
+  },
+  "#c39698": {
+    "catalogHex": "#c39698",
+    "code": "AN-09"
+  },
+  "#c3b793": {
+    "catalogHex": "#c3b793",
+    "code": "OU 60"
+  },
+  "#c3bfb2": {
+    "catalogHex": "#c3bfb2",
+    "code": "BF-12"
+  },
+  "#c3c1bd": {
+    "catalogHex": "#c3c1bd",
+    "code": "BM 869"
+  },
+  "#c3c7b8": {
+    "catalogHex": "#c3c7b8",
+    "code": "SJ MALKA GREEN"
+  },
+  "#c3cdcf": {
+    "catalogHex": "#c3cdcf",
+    "code": "BM 1584"
+  },
+  "#c49464": {
+    "catalogHex": "#c49464",
+    "code": "SPC 14"
+  },
+  "#c497ab": {
+    "catalogHex": "#c497ab",
+    "code": "ET-09"
+  },
+  "#c49b8d": {
+    "catalogHex": "#c49b8d",
+    "code": "BM 31"
+  },
+  "#c4b9b0": {
+    "catalogHex": "#c4b9b0",
+    "code": "BM 883"
+  },
+  "#c4c2b0": {
+    "catalogHex": "#c4c2b0",
+    "code": "BM 998-P"
+  },
+  "#c4c2bb": {
+    "catalogHex": "#c4c2bb",
+    "code": "BM 926"
+  },
+  "#c4cab0": {
+    "catalogHex": "#c4cab0",
+    "code": "CP 12"
+  },
+  "#c4d0d3": {
+    "catalogHex": "#c4d0d3",
+    "code": "BM-1667"
+  },
+  "#c5826e": {
+    "catalogHex": "#c5826e",
+    "code": "OU-29"
+  },
+  "#c58c5e": {
+    "catalogHex": "#c58c5e",
+    "code": "DN 10"
+  },
+  "#c5a54c": {
+    "catalogHex": "#c5a54c",
+    "code": "OU 46"
+  },
+  "#c5cecc": {
+    "catalogHex": "#c5cecc",
+    "code": "BG 11"
+  },
+  "#c68592": {
+    "catalogHex": "#c68592",
+    "code": "OU-28"
+  },
+  "#c7b2a7": {
+    "catalogHex": "#c7b2a7",
+    "code": "BM 29"
+  },
+  "#c7b6a8": {
+    "catalogHex": "#c7b6a8",
+    "code": "OU-87"
+  },
+  "#c88f84": {
+    "catalogHex": "#c88f84",
+    "code": "BM-1201"
+  },
+  "#c8bca2": {
+    "catalogHex": "#c8bca2",
+    "code": "SPC 07"
+  },
+  "#c8c8a5": {
+    "catalogHex": "#c8c8a5",
+    "code": "BM-381"
+  },
+  "#c8d0d1": {
+    "catalogHex": "#c8d0d1",
+    "code": "SPC 06"
+  },
+  "#c9885a": {
+    "catalogHex": "#c9885a",
+    "code": "DO 06"
+  },
+  "#c9dad9": {
+    "catalogHex": "#c9dad9",
+    "code": "BM-813"
+  },
+  "#ca7258": {
+    "catalogHex": "#ca7258",
+    "code": "OU-70"
+  },
+  "#ca8c98": {
+    "catalogHex": "#ca8c98",
+    "code": "OU 28-P"
+  },
+  "#cabcaf": {
+    "catalogHex": "#cabcaf",
+    "code": "C 05"
+  },
+  "#cbb4ab": {
+    "catalogHex": "#cbb4ab",
+    "code": "AK-12"
+  },
+  "#cbc2b3": {
+    "catalogHex": "#cbc2b3",
+    "code": "OU 98 III"
+  },
+  "#cbc5ae": {
+    "catalogHex": "#cbc5ae",
+    "code": "OU 98 II"
+  },
+  "#cbcbc2": {
+    "catalogHex": "#cbcbc2",
+    "code": "BF 11"
+  },
+  "#cbd7d7": {
+    "catalogHex": "#cbd7d7",
+    "code": "BI-11(NZ)"
+  },
+  "#cc7b7b": {
+    "catalogHex": "#cc7b7b",
+    "code": "BM-1286"
+  },
+  "#ccc9ba": {
+    "catalogHex": "#ccc9ba",
+    "code": "BM 983(SPC)"
+  },
+  "#cccabf": {
+    "catalogHex": "#cccabf",
+    "code": "OU 128"
+  },
+  "#cd515e": {
+    "catalogHex": "#cd515e",
+    "code": "OU-56"
+  },
+  "#cd727c": {
+    "catalogHex": "#cd727c",
+    "code": "OU-28"
+  },
+  "#cd9d8f": {
+    "catalogHex": "#cd9d8f",
+    "code": "OU-22"
+  },
+  "#cea1b4": {
+    "catalogHex": "#cea1b4",
+    "code": "ET-09"
+  },
+  "#ceccc4": {
+    "catalogHex": "#ceccc4",
+    "code": "BM 1521"
+  },
+  "#cecdcb": {
+    "catalogHex": "#cecdcb",
+    "code": "BM 971"
+  },
+  "#cecec9": {
+    "catalogHex": "#cecec9",
+    "code": "BM 995"
+  },
+  "#cecfaa": {
+    "catalogHex": "#cecfaa",
+    "code": "BM-381"
+  },
+  "#cecfc9": {
+    "catalogHex": "#cecfc9",
+    "code": "BM 1541"
+  },
+  "#cedbda": {
+    "catalogHex": "#cedbda",
+    "code": "BI-11(NZ)"
+  },
+  "#cfd2c9": {
+    "catalogHex": "#cfd2c9",
+    "code": "BE 12"
+  },
+  "#d0d3d0": {
+    "catalogHex": "#d0d3d0",
+    "code": "BC 12"
+  },
+  "#d0d3d6": {
+    "catalogHex": "#d0d3d6",
+    "code": "BJ 11"
+  },
+  "#d1c3c0": {
+    "catalogHex": "#d1c3c0",
+    "code": "BM 1261"
+  },
+  "#d1cc8e": {
+    "catalogHex": "#d1cc8e",
+    "code": "OU 80"
+  },
+  "#d1ceb7": {
+    "catalogHex": "#d1ceb7",
+    "code": "OU 98 II"
+  },
+  "#d1d1c8": {
+    "catalogHex": "#d1d1c8",
+    "code": "OU-10II"
+  },
+  "#d1d1cc": {
+    "catalogHex": "#d1d1cc",
+    "code": "BM 869"
+  },
+  "#d2b0ac": {
+    "catalogHex": "#d2b0ac",
+    "code": "OU-54"
+  },
+  "#d2b2bd": {
+    "catalogHex": "#d2b2bd",
+    "code": "BM-1345"
+  },
+  "#d2cea9": {
+    "catalogHex": "#d2cea9",
+    "code": "OU 81"
+  },
+  "#d2cec6": {
+    "catalogHex": "#d2cec6",
+    "code": "CH 511"
+  },
+  "#d2d3cf": {
+    "catalogHex": "#d2d3cf",
+    "code": "CST 2"
+  },
+  "#d2d3d0": {
+    "catalogHex": "#d2d3d0",
+    "code": "SPC 15"
+  },
+  "#d3a2a4": {
+    "catalogHex": "#d3a2a4",
+    "code": "AN-09"
+  },
+  "#d3bca8": {
+    "catalogHex": "#d3bca8",
+    "code": "OU 55"
+  },
+  "#d3cc97": {
+    "catalogHex": "#d3cc97",
+    "code": "OU 80"
+  },
+  "#d3d2cc": {
+    "catalogHex": "#d3d2cc",
+    "code": "OU 10IP"
+  },
+  "#d47d7d": {
+    "catalogHex": "#d47d7d",
+    "code": "BM-1286"
+  },
+  "#d4d2b9": {
+    "catalogHex": "#d4d2b9",
+    "code": "OU 32+1-P"
+  },
+  "#d4d5cd": {
+    "catalogHex": "#d4d5cd",
+    "code": "BM 12"
+  },
+  "#d4d6c9": {
+    "catalogHex": "#d4d6c9",
+    "code": "SPC 08"
+  },
+  "#d55d7c": {
+    "catalogHex": "#d55d7c",
+    "code": "BM-1328"
+  },
+  "#d5a7a6": {
+    "catalogHex": "#d5a7a6",
+    "code": "OU-53"
+  },
+  "#d5cac2": {
+    "catalogHex": "#d5cac2",
+    "code": "BM 1171"
+  },
+  "#d5d4cb": {
+    "catalogHex": "#d5d4cb",
+    "code": "BF-12"
+  },
+  "#d6dbce": {
+    "catalogHex": "#d6dbce",
+    "code": "SJ MALKA GREEN"
+  },
+  "#d7d7d1": {
+    "catalogHex": "#d7d7d1",
+    "code": "BM 926"
+  },
+  "#d7e6e5": {
+    "catalogHex": "#d7e6e5",
+    "code": "BI-11(NZ)"
+  },
+  "#d88da3": {
+    "catalogHex": "#d88da3",
+    "code": "OU-82"
+  },
+  "#d8d7c7": {
+    "catalogHex": "#d8d7c7",
+    "code": "A 01"
+  },
+  "#d9b5a5": {
+    "catalogHex": "#d9b5a5",
+    "code": "BM-1193"
+  },
+  "#d9d7cd": {
+    "catalogHex": "#d9d7cd",
+    "code": "C 01"
+  },
+  "#dae0cc": {
+    "catalogHex": "#dae0cc",
+    "code": "CP 12"
+  },
+  "#db617f": {
+    "catalogHex": "#db617f",
+    "code": "BM-1328"
+  },
+  "#dbcbbc": {
+    "catalogHex": "#dbcbbc",
+    "code": "AI 12"
+  },
+  "#dcd2ac": {
+    "catalogHex": "#dcd2ac",
+    "code": "OU 50"
+  },
+  "#dcd6d3": {
+    "catalogHex": "#dcd6d3",
+    "code": "BM-989"
+  },
+  "#dd9478": {
+    "catalogHex": "#dd9478",
+    "code": "OU-11"
+  },
+  "#ddd0d7": {
+    "catalogHex": "#ddd0d7",
+    "code": "BM 1360"
+  },
+  "#ded8d2": {
+    "catalogHex": "#ded8d2",
+    "code": "BM 883"
+  },
+  "#dfd1bf": {
+    "catalogHex": "#dfd1bf",
+    "code": "BM 107"
+  },
+  "#e1d9c1": {
+    "catalogHex": "#e1d9c1",
+    "code": "SPC 07"
+  },
+  "#e297ae": {
+    "catalogHex": "#e297ae",
+    "code": "OU-82"
+  },
+  "#e37e89": {
+    "catalogHex": "#e37e89",
+    "code": "OU-15"
+  },
+  "#e38294": {
+    "catalogHex": "#e38294",
+    "code": "OU-15"
+  },
+  "#e38a87": {
+    "catalogHex": "#e38a87",
+    "code": "OU-78"
+  },
+  "#e3b5ba": {
+    "catalogHex": "#e3b5ba",
+    "code": "AN-09"
+  },
+  "#e3d4ce": {
+    "catalogHex": "#e3d4ce",
+    "code": "AK-12"
+  },
+  "#e5a994": {
+    "catalogHex": "#e5a994",
+    "code": "OU-64"
+  },
+  "#e5b6a9": {
+    "catalogHex": "#e5b6a9",
+    "code": "OU-22"
+  },
+  "#e6d3c7": {
+    "catalogHex": "#e6d3c7",
+    "code": "BM 29"
+  },
+  "#e6e5df": {
+    "catalogHex": "#e6e5df",
+    "code": "OU-10II"
+  },
+  "#e8d0d0": {
+    "catalogHex": "#e8d0d0",
+    "code": "OU-88"
+  },
+  "#eababa": {
+    "catalogHex": "#eababa",
+    "code": "OU-53"
+  },
+  "#ecbeaf": {
+    "catalogHex": "#ecbeaf",
+    "code": "BM 31"
+  },
+  "#ede2de": {
+    "catalogHex": "#ede2de",
+    "code": "SPC 04"
+  },
+  "#ede4e4": {
+    "catalogHex": "#ede4e4",
+    "code": "BM 1261"
+  },
+  "#f0ccd7": {
+    "catalogHex": "#f0ccd7",
+    "code": "BM-1345"
+  },
+  "#f69c97": {
+    "catalogHex": "#f69c97",
+    "code": "OU-78"
+  }
 }

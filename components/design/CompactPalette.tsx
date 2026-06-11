@@ -13,6 +13,8 @@ type Props = {
   onRevert: (hex: string) => void;
   onRequestColorway: () => void;
   tierInfo: TierInfo;
+  /** True for user-uploaded designs: unassigned slots show "Color N" instead of the raw hex */
+  isUserUpload: boolean;
 };
 
 export default function CompactPalette({
@@ -25,6 +27,7 @@ export default function CompactPalette({
   onRevert,
   onRequestColorway,
   tierInfo,
+  isUserUpload,
 }: Props) {
   const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
   const isDemo = tierInfo.tier === "demo";
@@ -33,8 +36,8 @@ export default function CompactPalette({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="shrink-0 px-2 py-1.5 border-b border-stone-200">
-        <p className="text-[10px] font-semibold truncate text-stone-800">{designName}</p>
-        <p className="text-[9px] text-stone-400">{palette.length} colors</p>
+        <p className="text-xs font-semibold truncate text-stone-800">{designName}</p>
+        <p className="text-[10px] text-stone-400">{palette.length} colors</p>
       </div>
 
       {/* Scrollable rows */}
@@ -46,16 +49,21 @@ export default function CompactPalette({
           const isChanged = (assignedYarn?.id ?? null) !== (initialYarn?.id ?? null);
           const swatchHex = assignedYarn?.hex ?? entry.hex;
 
-          // Demo tier: "Color 1", "Color 2", … — no codes revealed
-          const displayCode = isDemo
+          // Label priority:
+          //   demo tier         → "Color N" (no codes ever revealed)
+          //   user upload, no yarn assigned → "Color N" (no raw hex shown; raw palette has no library meaning)
+          //   user upload, yarn assigned    → yarn.code (e.g. "ARS-472" or "108")
+          //   catalog design, no yarn       → raw hex
+          //   catalog design, yarn assigned → yarn.code
+          const displayCode = isDemo || (isUserUpload && !assignedYarn)
             ? `Color ${i + 1}`
-            : (assignedYarn?.code ?? entry.hex.toUpperCase());
+            : (assignedYarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase());
 
           return (
             <li key={entry.hex} className="relative">
               <button
                 onClick={() => onSelectColor(entry.hex)}
-                className={`w-full px-1.5 py-[3px] flex items-center gap-1.5 text-left rounded transition-colors ${
+                className={`w-full px-1.5 py-1.5 flex items-center gap-2 text-left rounded transition-colors ${
                   isChanged ? "pr-6" : ""
                 } ${
                   isSelected
@@ -65,20 +73,20 @@ export default function CompactPalette({
               >
                 {/* Swatch */}
                 <span
-                  className="w-4 h-4 rounded-sm shrink-0 border border-black/10"
+                  className="w-6 h-6 rounded shrink-0 border border-black/10"
                   style={{ backgroundColor: swatchHex }}
                   aria-hidden
                 />
                 {/* Code / label */}
                 <span
-                  className={`text-[9px] flex-1 min-w-0 truncate ${
+                  className={`text-[14px] flex-1 min-w-0 truncate ${
                     isSelected ? "text-white" : "text-stone-700"
                   }`}
                 >
                   {displayCode}
                 </span>
                 {/* Percentage */}
-                <span className="text-[9px] tabular-nums shrink-0 text-stone-400">
+                <span className="text-[13px] tabular-nums shrink-0 text-stone-400">
                   {entry.percentage.toFixed(1)}%
                 </span>
               </button>
@@ -107,13 +115,13 @@ export default function CompactPalette({
       <div className="shrink-0 p-2">
         {isDemo ? (
           tierInfo.pendingApproval ? (
-            <p className="w-full text-center text-[10px] py-1.5 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+            <p className="w-full text-center text-xs py-1.5 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
               Account pending approval
             </p>
           ) : (
             <Link
               href="/auth/signin"
-              className="block w-full text-center bg-stone-800 text-white text-[10px] py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
+              className="block w-full text-center bg-stone-800 text-white text-xs py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
             >
               Sign in to request
             </Link>
@@ -121,7 +129,7 @@ export default function CompactPalette({
         ) : (
           <button
             onClick={onRequestColorway}
-            className="w-full bg-stone-900 text-white text-[10px] py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
+            className="w-full bg-stone-900 text-white text-xs py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
           >
             Request colorway
           </button>

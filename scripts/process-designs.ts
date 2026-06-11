@@ -5,9 +5,10 @@
  * Converts BMP design files → web-ready PNGs and uploads both to Supabase Storage.
  *
  * Pipeline per file:
- *   1. Parse the BMP color table directly from file bytes → authoritative palette
- *   2. Convert BMP → PNG using jimp (handles 8bpp indexed BMPs from CAD software)
- *   3. Verify: scan all pixels in both files, assert same set of unique RGB values
+ *   1. Convert BMP → PNG using lib/design-processing.bmpToPng
+ *      (sharp fast path for 24bpp; jimp fallback for 8bpp indexed)
+ *   2. Verify: scan BMP + PNG pixels, assert same set of unique RGB values
+ *   3. Extract palette with coverage stats and OneLoom yarn-code lookup
  *   4. Upload PNG + original BMP to Supabase Storage
  *   5. Write data/designs/manifest.json for the seed script
  *
@@ -23,11 +24,20 @@ import fs from "fs";
 import path from "path";
 import { Jimp } from "jimp";
 import { createClient } from "@supabase/supabase-js";
+import { PrismaClient } from "@/app/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { bmpToPng, extractPalette, applyOneLoomLookup, loadOneLoomLookup } from "../lib/design-processing";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ws = require("ws");
 
+function createDbClient() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) throw new Error("DATABASE_URL is not set");
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter });
+}
+
 const DESIGNS_BUCKET = process.env.SUPABASE_DESIGNS_BUCKET ?? "designs";
-const LOOKUP_PATH = path.join(process.cwd(), "data", "oneloom-rendered-lookup.json");
 
 function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -40,58 +50,18 @@ function createAdminClient() {
 const DESIGNS_DIR = path.join(process.cwd(), "data", "designs");
 const OUTPUT_DIR = path.join(DESIGNS_DIR, "converted");
 
-// ─── BMP header helpers ───────────────────────────────────────────────────────
+// ─── Local helper: scan a file's pixels for palette verification ──────────────
 
-type RgbColor = { r: number; g: number; b: number };
-
-function readBmpBitDepth(buf: Buffer): number {
-  // BMP file header: 14 bytes; DIB header starts at 14.
-  // Bit depth is at DIB offset 14 (abs 28), 2 bytes LE.
-  return buf.readUInt16LE(28);
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
 }
-
-// Reads the indexed color table from an 8bpp BMP header.
-// Only valid for indexed (≤8bpp) BMPs — 24/32bpp have no color table.
-function parseBmpColorTable(buf: Buffer): RgbColor[] {
-  // Color table size: stored at DIB offset 32 (abs 46); 0 means use 2^bitDepth
-  const colorTableSize = buf.readUInt32LE(46) || 256;
-
-  // Color table starts at byte 54 (14-byte file header + 40-byte DIB header)
-  // Each entry is 4 bytes: Blue, Green, Red, Reserved
-  const colorTable: RgbColor[] = [];
-  for (let i = 0; i < colorTableSize; i++) {
-    const offset = 54 + i * 4;
-    if (offset + 3 >= buf.length) break;
-    colorTable.push({
-      b: buf[offset],
-      g: buf[offset + 1],
-      r: buf[offset + 2],
-    });
-  }
-  return colorTable;
-}
-
-function rgbToHex({ r, g, b }: RgbColor): string {
-  return (
-    "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")
-  );
-}
-
-// ─── Pixel palette extraction ─────────────────────────────────────────────────
-// Scans every pixel of a jimp image and returns the set of unique hex colors.
-// Used for both the source BMP and output PNG to verify they match.
 
 async function extractUsedColors(filePath: string): Promise<Set<string>> {
   const img = await Jimp.read(filePath);
   const usedColors = new Set<string>();
-
   img.scan(0, 0, img.width, img.height, (x, y, idx) => {
-    const r = img.bitmap.data[idx];
-    const g = img.bitmap.data[idx + 1];
-    const b = img.bitmap.data[idx + 2];
-    usedColors.add(rgbToHex({ r, g, b }));
+    usedColors.add(rgbToHex(img.bitmap.data[idx], img.bitmap.data[idx + 1], img.bitmap.data[idx + 2]));
   });
-
   return usedColors;
 }
 
@@ -121,17 +91,6 @@ function assertPalettesMatch(
         .join("\n")
     );
   }
-}
-
-// ─── Conversion ───────────────────────────────────────────────────────────────
-
-async function convertBmpToPng(
-  bmpPath: string,
-  pngPath: string
-): Promise<{ width: number; height: number }> {
-  const img = await Jimp.read(bmpPath);
-  await img.write(pngPath as `${string}.png`);
-  return { width: img.width, height: img.height };
 }
 
 // ─── Bucket setup ─────────────────────────────────────────────────────────────
@@ -169,22 +128,6 @@ async function uploadFile(
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-// Load the rendered-color → OneLoom code lookup table.
-// Only keys starting with "#" are treated as color entries; others are metadata.
-function loadRenderedLookup(): Map<string, string> {
-  if (!fs.existsSync(LOOKUP_PATH)) return new Map();
-  try {
-    const raw = JSON.parse(fs.readFileSync(LOOKUP_PATH, "utf-8")) as Record<string, string>;
-    const entries = Object.entries(raw)
-      .filter(([k]) => /^#[0-9a-f]{6}$/i.test(k))
-      .map(([k, v]): [string, string] => [k.toLowerCase(), v]);
-    return new Map(entries);
-  } catch {
-    console.warn(`  ⚠ Could not parse ${LOOKUP_PATH} — skipping lookup.`);
-    return new Map();
-  }
-}
-
 async function processDesigns(): Promise<void> {
   if (!fs.existsSync(DESIGNS_DIR)) {
     console.error(`data/designs/ not found at ${DESIGNS_DIR}`);
@@ -193,8 +136,21 @@ async function processDesigns(): Promise<void> {
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  // Ensure the Supabase bucket exists before we start uploading
   await ensureBucketExists(DESIGNS_BUCKET);
+
+  // Load OneLoom lookup from DB once for the whole batch
+  const dbClient = createDbClient();
+  const tenantSlug = process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar";
+  const tenant = await dbClient.tenant.findUnique({
+    where: { slug: tenantSlug },
+    select: { id: true },
+  });
+  const lookup = tenant
+    ? await loadOneLoomLookup(tenant.id)
+    : new Map<string, { code: string; catalogHex: string | null }>();
+  await dbClient.$disconnect();
+
+  console.log(`Loaded ${lookup.size} OneLoom lookup entries from DB.`);
 
   const bmpFiles = fs
     .readdirSync(DESIGNS_DIR)
@@ -206,9 +162,6 @@ async function processDesigns(): Promise<void> {
   }
 
   console.log(`Found ${bmpFiles.length} BMP file(s). Processing...\n`);
-
-  const renderedLookup = loadRenderedLookup();
-  console.log(`Rendered-color lookup: ${renderedLookup.size} entr${renderedLookup.size === 1 ? "y" : "ies"} loaded.\n`);
 
   const results = [];
 
@@ -224,25 +177,13 @@ async function processDesigns(): Promise<void> {
 
     console.log(`Processing: ${bmpFile}`);
 
-    // 1. Read bit depth; parse indexed color table only for 8bpp BMPs
+    // 1. Convert BMP → PNG (sharp fast path; jimp fallback for indexed BMPs)
     const bmpBuffer = fs.readFileSync(bmpPath);
-    const bitDepth = readBmpBitDepth(bmpBuffer);
-    console.log(`  Bit depth: ${bitDepth}bpp`);
-
-    if (bitDepth === 8) {
-      const colorTable = parseBmpColorTable(bmpBuffer);
-      console.log(`  BMP color table: ${colorTable.length} entries (includes unused slots)`);
-    } else if (bitDepth === 24 || bitDepth === 32) {
-      console.log(`  Direct-color BMP — palette derived from pixel scan`);
-    } else {
-      throw new Error(`Unsupported bit depth ${bitDepth}bpp in ${bmpFile}`);
-    }
-
-    // 2. Convert BMP → PNG
-    const { width, height } = await convertBmpToPng(bmpPath, pngPath);
+    const { png: pngBuffer, width, height } = await bmpToPng(bmpBuffer);
+    fs.writeFileSync(pngPath, pngBuffer);
     console.log(`  Converted → ${pngFile} (${width}×${height})`);
 
-    // 3. Extract actually-used pixel colors from both files
+    // 2. Verify palette consistency: BMP scan vs PNG scan
     console.log(`  Scanning pixels for palette verification...`);
     const [bmpColors, pngColors] = await Promise.all([
       extractUsedColors(bmpPath),
@@ -250,37 +191,20 @@ async function processDesigns(): Promise<void> {
     ]);
     console.log(`  BMP used colors: ${bmpColors.size}`);
     console.log(`  PNG used colors: ${pngColors.size}`);
-
-    // 4. Hard fail if palettes don't match
     assertPalettesMatch(bmpColors, pngColors, bmpFile);
     console.log(`  ✓ Palette verified: ${bmpColors.size} colors match exactly`);
 
-    // 5. Build PaletteEntry array (sorted by pixel coverage, descending)
-    const totalPixels = width * height;
-    // Count each color's pixel coverage from the BMP scan
-    const img = await Jimp.read(bmpPath);
-    const pixelCounts = new Map<string, number>();
-    img.scan(0, 0, img.width, img.height, (x, y, idx) => {
-      const hex = rgbToHex({
-        r: img.bitmap.data[idx],
-        g: img.bitmap.data[idx + 1],
-        b: img.bitmap.data[idx + 2],
-      });
-      pixelCounts.set(hex, (pixelCounts.get(hex) ?? 0) + 1);
-    });
-
-    const palette = Array.from(pixelCounts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([hex, pixelCount], index) => {
-        const matchedYarnCode = renderedLookup.get(hex);
-        return {
-          index,
-          hex,
-          pixelCount,
-          percentage: Math.round((pixelCount / totalPixels) * 1000) / 10,
-          ...(matchedYarnCode ? { matchedYarnCode } : {}),
-        };
-      });
+    // 3. Extract palette with coverage stats and apply OneLoom yarn-code lookup
+    const rawPalette = await extractPalette(pngBuffer);
+    const palette = applyOneLoomLookup(rawPalette, lookup).map(
+      ({ index, hex, pixelCount, coverage, code }) => ({
+        index,
+        hex,
+        pixelCount,
+        percentage: coverage,
+        ...(code !== null ? { matchedYarnCode: code } : {}),
+      })
+    );
 
     const matchCount = palette.filter((e) => e.matchedYarnCode).length;
     console.log(`  Palette (top 5 by coverage):`);
@@ -294,7 +218,7 @@ async function processDesigns(): Promise<void> {
       console.log(`  Lookup: ${matchCount} of ${palette.length} palette color${palette.length !== 1 ? "s" : ""} matched`);
     }
 
-    // 6. Upload to Supabase Storage
+    // 4. Upload to Supabase Storage
     console.log(`  Uploading to Supabase...`);
     const [imageUrl, sourceBmpUrl] = await Promise.all([
       uploadFile(pngPath, `${slug}/${pngFile}`, "image/png"),
@@ -317,7 +241,7 @@ async function processDesigns(): Promise<void> {
     console.log();
   }
 
-  // 7. Write manifest for seed script
+  // 5. Write manifest for seed script
   const manifestPath = path.join(DESIGNS_DIR, "manifest.json");
   fs.writeFileSync(manifestPath, JSON.stringify(results, null, 2));
   console.log(`Wrote manifest → ${manifestPath}`);

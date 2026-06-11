@@ -9,6 +9,7 @@
     "lint": "eslint",
     "process-designs": "tsx scripts/process-designs.ts",
     "import-yarns": "tsx scripts/import-yarn-libraries.ts",
+    "seed-color-lookup": "tsx scripts/seed-color-lookup.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",

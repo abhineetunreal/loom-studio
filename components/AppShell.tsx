@@ -16,12 +16,13 @@ type UserInfo = {
 type Props = {
   designs: DesignSummary[];
   tierInfo: TierInfo;
+  canUpload: boolean;
   user: UserInfo | null;
   children: React.ReactNode;
 };
 
 
-export default function AppShell({ designs, tierInfo, user, children }: Props) {
+export default function AppShell({ designs, tierInfo, canUpload, user, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -82,12 +83,13 @@ export default function AppShell({ designs, tierInfo, user, children }: Props) {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <LeftPanel
           designs={designs}
+          canUpload={canUpload}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
         />
-        <main className="flex-1 overflow-hidden min-w-0">{children}</main>
+        <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>
     </>
   );

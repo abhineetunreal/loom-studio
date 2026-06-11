@@ -5,7 +5,7 @@
 // demo  │ Unauthenticated, PENDING, DEMO role   │ isDemo designs only; yarn codes
 //       │                                       │ hidden; no submission button
 // full  │ APPROVED role                         │ All designs, all yarn codes
-// admin │ ADMIN role                            │ Full + admin features
+// admin │ ADMIN or OWNER role                   │ Full + admin features
 
 import { db } from "./db";
 import { getSession } from "./auth";
@@ -35,6 +35,7 @@ export async function getTierForUser(tenantId: string): Promise<TierInfo> {
   if (!tenantUser) return { tier: "demo", pendingApproval: false };
 
   switch (tenantUser.role) {
+    case "OWNER":
     case "ADMIN":
       return { tier: "admin", pendingApproval: false };
     case "APPROVED":
@@ -58,4 +59,26 @@ export async function getDefaultTierInfo(): Promise<TierInfo> {
   });
   if (!tenant) return { tier: "demo", pendingApproval: false };
   return getTierForUser(tenant.id);
+}
+
+/**
+ * Returns the current session user's raw role string for the default tenant,
+ * or null if the user is not authenticated / not a tenant member.
+ * Used by admin actions that need to distinguish OWNER from ADMIN.
+ */
+export async function getCurrentUserRole(): Promise<string | null> {
+  const session = await getSession();
+  if (!session?.user.email) return null;
+
+  const tenant = await db.tenant.findUnique({
+    where: { slug: process.env.DEFAULT_TENANT_SLUG ?? "carpetsbazaar" },
+    select: { id: true },
+  });
+  if (!tenant) return null;
+
+  const tenantUser = await db.tenantUser.findUnique({
+    where: { tenantId_email: { tenantId: tenant.id, email: session.user.email } },
+    select: { role: true },
+  });
+  return tenantUser?.role ?? null;
 }

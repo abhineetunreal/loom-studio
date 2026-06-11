@@ -5,13 +5,15 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import type { DesignSummary } from "@/types";
+import UploadsTab from "./UploadsTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "designs" | "visualizations" | "favorites";
+type Tab = "designs" | "visualizations" | "favorites" | "uploads";
 
 type Props = {
   designs: DesignSummary[];
+  canUpload: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
@@ -22,6 +24,7 @@ type Props = {
 
 export default function LeftPanel({
   designs,
+  canUpload,
   collapsed,
   onToggleCollapse,
   mobileOpen,
@@ -102,21 +105,34 @@ export default function LeftPanel({
   // ── Shared panel content ───────────────────────────────────────────────────
 
   const panelContent = (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col flex-1 overflow-hidden">
       {/* Tab bar */}
       <div className="flex items-center border-b border-stone-200 shrink-0 bg-white">
-        <div className="flex flex-1">
-          {(["designs", "visualizations", "favorites"] as Tab[]).map((tab) => (
+        <div className="flex flex-1 overflow-x-auto scrollbar-none">
+          {(
+            [
+              "designs",
+              "visualizations",
+              "favorites",
+              ...(canUpload ? (["uploads"] as Tab[]) : []),
+            ] as Tab[]
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 px-0.5 py-2.5 text-[10px] font-medium capitalize transition-colors whitespace-nowrap ${
+              className={`flex-1 px-0.5 py-2.5 text-[10px] font-medium transition-colors whitespace-nowrap min-w-0 ${
                 activeTab === tab
                   ? "text-stone-900 border-b-2 border-stone-900 -mb-px"
                   : "text-stone-400 hover:text-stone-600"
               }`}
             >
-              {tab === "favorites" ? "Favorites" : tab === "visualizations" ? "Rooms" : "Designs"}
+              {tab === "favorites"
+                ? "Saved"
+                : tab === "visualizations"
+                ? "Rooms"
+                : tab === "uploads"
+                ? "Uploads"
+                : "Designs"}
             </button>
           ))}
         </div>
@@ -172,7 +188,7 @@ export default function LeftPanel({
                   </button>
 
                   {expandedFolders.has(collection) && (
-                    <div className="grid grid-cols-2 gap-[3px] px-1 pb-1">
+                    <div className="grid grid-cols-2 gap-1 px-1 pb-1">
                       {items.map((d) => (
                         <DesignThumb
                           key={d.id}
@@ -206,7 +222,7 @@ export default function LeftPanel({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-[3px]">
+              <div className="grid grid-cols-2 gap-1">
                 {favoriteDesigns.map((d) => (
                   <DesignThumb
                     key={d.id}
@@ -236,6 +252,11 @@ export default function LeftPanel({
               this feature for a future update.
             </p>
           </div>
+        )}
+
+        {/* ── My Uploads tab ── */}
+        {activeTab === "uploads" && canUpload && (
+          <UploadsTab onNavigate={onMobileClose} />
         )}
       </div>
     </div>
@@ -314,11 +335,11 @@ function DesignThumb({
             src={design.imageUrl}
             alt={design.name}
             fill
-            sizes="90px"
-            className="object-contain p-1"
+            sizes="120px"
+            className="object-contain p-0.5"
           />
         </div>
-        <p className="text-[10px] text-stone-600 truncate px-1.5 py-1 leading-tight bg-white">
+        <p className="text-[14px] font-medium text-stone-600 truncate px-1.5 py-1 leading-tight bg-white">
           {design.name}
         </p>
       </Link>

@@ -50,18 +50,24 @@ async function upsertTenantUser(
 
     if (!tenant) return; // tenant not seeded yet — skip silently
 
-    const isAdmin = email.toLowerCase() === tenant.adminEmail.toLowerCase();
+    const isOwner = email.toLowerCase() === tenant.adminEmail.toLowerCase();
 
     await db.tenantUser.upsert({
       where: { tenantId_email: { tenantId: tenant.id, email } },
-      update: { authUserId, name: name ?? undefined, provider: provider ?? undefined },
+      update: {
+        authUserId,
+        name: name ?? undefined,
+        provider: provider ?? undefined,
+        // Keep owner email upgraded even if the row pre-dates the OWNER role.
+        ...(isOwner ? { role: "OWNER" as const } : {}),
+      },
       create: {
         tenantId: tenant.id,
         email,
         name: name ?? null,
         authUserId,
         provider: provider ?? null,
-        role: isAdmin ? "ADMIN" : "PENDING",
+        role: isOwner ? "OWNER" : "PENDING",
       },
     });
   } catch (err) {
