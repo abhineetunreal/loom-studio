@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   approveUserAction,
   rejectUserAction,
@@ -350,6 +351,8 @@ function AllUsersTab({
 }) {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [showInvite, setShowInvite] = useState(false);
+  const router = useRouter();
 
   const filtered = search.trim()
     ? users.filter(
@@ -369,13 +372,31 @@ function AllUsersTab({
 
   return (
     <div>
-      <input
-        type="text"
-        placeholder="Search by name or email…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full mb-3 px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10"
-      />
+      <div className="flex gap-2 mb-3">
+        <input
+          type="text"
+          placeholder="Search by name or email…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10"
+        />
+        <button
+          onClick={() => setShowInvite(true)}
+          className="px-3 py-2 text-sm font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors whitespace-nowrap"
+        >
+          Invite user
+        </button>
+      </div>
+
+      {showInvite && (
+        <InviteUserModal
+          onClose={() => setShowInvite(false)}
+          onInvited={() => {
+            setShowInvite(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
         <table className="w-full text-sm">
@@ -593,6 +614,144 @@ function UserAccessModal({
             Save
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── InviteUserModal ──────────────────────────────────────────────────────────
+
+function InviteUserModal({
+  onClose,
+  onInvited,
+}: {
+  onClose: () => void;
+  onInvited: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [status, setStatus] = useState<
+    | null
+    | { type: "exists"; role: string }
+    | { type: "success" }
+    | { type: "error"; message: string }
+  >(null);
+  const [submitting, setSubmitting] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setStatus(null);
+
+    try {
+      const res = await fetch("/api/admin/invite-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), name: name.trim() || undefined }),
+      });
+
+      if (res.status === 409) {
+        const data = await res.json();
+        setStatus({ type: "exists", role: data.role });
+      } else if (res.ok) {
+        setStatus({ type: "success" });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setStatus({ type: "error", message: data.error ?? "Something went wrong." });
+      }
+    } catch {
+      setStatus({ type: "error", message: "Network error. Please try again." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-stone-100">
+          <p className="font-medium text-stone-900">Invite user</p>
+          <p className="text-xs text-stone-400 mt-0.5">
+            Creates an approved account. They can sign in immediately.
+          </p>
+        </div>
+
+        <form onSubmit={submit} className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={emailRef}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">
+              Name <span className="text-stone-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Jane Smith"
+              className="w-full px-3 py-2 text-sm border border-stone-200 rounded-lg bg-white placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-900/10"
+            />
+          </div>
+
+          {status?.type === "exists" && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              This user already exists with role{" "}
+              <span className="font-medium">{status.role}</span>.
+            </p>
+          )}
+          {status?.type === "success" && (
+            <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              User invited successfully. They can now access the studio by signing
+              in.
+            </p>
+          )}
+          {status?.type === "error" && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {status.message}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
+            >
+              {status?.type === "success" ? "Close" : "Cancel"}
+            </button>
+            {status?.type !== "success" && (
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-4 py-1.5 text-sm font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors"
+              >
+                {submitting ? "Sending…" : "Send invite"}
+              </button>
+            )}
+            {status?.type === "success" && (
+              <button
+                type="button"
+                onClick={onInvited}
+                className="px-4 py-1.5 text-sm font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors"
+              >
+                Done
+              </button>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );
