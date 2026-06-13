@@ -24,6 +24,7 @@ model Tenant {
   accentColor  String?  // secondary brand color
   domain       String?  @unique // custom domain for white-label routing
   adminEmail   String
+  ssoSecret    String?  // shared secret for SSO token verification
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
