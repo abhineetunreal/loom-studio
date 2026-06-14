@@ -12,6 +12,10 @@ export default function SSOCallbackPage() {
   useEffect(() => {
     const tokenHash = searchParams.get("token_hash");
     const type = searchParams.get("type");
+    const rawNext = searchParams.get("next");
+
+    // Only allow relative URLs for `next` to prevent open redirect attacks
+    const next = rawNext && rawNext.startsWith("/") ? rawNext : "/";
 
     if (!tokenHash || type !== "email") {
       setError("Invalid sign-in link.");
@@ -29,7 +33,7 @@ export default function SSOCallbackPage() {
         if (error) {
           setError("Sign-in failed. Please try again.");
         } else {
-          router.replace("/");
+          router.replace(next);
         }
       });
   }, [router, searchParams]);

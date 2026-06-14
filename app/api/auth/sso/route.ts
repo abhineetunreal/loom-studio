@@ -7,6 +7,10 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const token = searchParams.get("token");
   const tenantSlug = searchParams.get("tenant");
+  const rawNext = searchParams.get("next");
+
+  // Only allow relative URLs for `next` to prevent open redirect attacks
+  const next = rawNext && rawNext.startsWith("/") ? rawNext : null;
 
   if (!token || !tenantSlug) {
     return NextResponse.redirect(new URL("/?error=sso_missing_params", origin));
@@ -76,10 +80,10 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to client-side callback to establish session
-  return NextResponse.redirect(
-    new URL(
-      `/auth/sso-callback?token_hash=${encodeURIComponent(hashedToken)}&type=email`,
-      origin
-    )
-  );
+  const callbackUrl = new URL("/auth/sso-callback", origin);
+  callbackUrl.searchParams.set("token_hash", hashedToken);
+  callbackUrl.searchParams.set("type", "email");
+  if (next) callbackUrl.searchParams.set("next", next);
+
+  return NextResponse.redirect(callbackUrl);
 }

@@ -56,6 +56,7 @@ export type DesignDetail = DesignSummary & {
   width: number;
   height: number;
   palette: PaletteEntry[];
+  externalSku: string | null;
 };
 
 // ─── Submission ───────────────────────────────────────────────────────────────

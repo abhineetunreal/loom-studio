@@ -93,6 +93,8 @@ type Props = {
   tierInfo: TierInfo;
   /** Display name for the yarn library — derived from the tenant's displayName/name. */
   yarnLibraryName: string;
+  /** Full URL to the product page on the brand's website, if available. */
+  viewProductUrl?: string;
 };
 
 // State for the floating popover shown on canvas click (before the full picker opens)
@@ -110,6 +112,7 @@ export default function DesignViewer({
   isUserUpload,
   tierInfo,
   yarnLibraryName,
+  viewProductUrl,
 }: Props) {
   // Saved colorway takes precedence over the lookup-matched initial map.
   // For user uploads, initialColorMap is typically empty anyway.
@@ -307,6 +310,7 @@ export default function DesignViewer({
           onRequestColorway={() => setShowSubmissionForm(true)}
           tierInfo={tierInfo}
           isUserUpload={isUserUpload}
+          viewProductUrl={viewProductUrl}
         />
       </div>
 

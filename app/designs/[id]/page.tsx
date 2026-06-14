@@ -56,6 +56,7 @@ export default async function DesignPage({ params }: Props) {
         height: true,
         collection: { select: { id: true, name: true, slug: true } },
         palette: true,
+        externalSku: true,
       },
     }),
     db.yarnColor.findMany({
@@ -128,6 +129,12 @@ export default async function DesignPage({ params }: Props) {
     }
   }
 
+  // Build "View Product" URL if both tenant.websiteUrl and design.externalSku are set
+  const viewProductUrl =
+    tenant?.websiteUrl && design.externalSku
+      ? `${tenant.websiteUrl}/product-by-sku/${encodeURIComponent(design.externalSku)}`
+      : undefined;
+
   return (
     <div className="h-full overflow-hidden">
       <DesignViewer
@@ -138,6 +145,7 @@ export default async function DesignPage({ params }: Props) {
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}
+        viewProductUrl={viewProductUrl}
       />
     </div>
   );

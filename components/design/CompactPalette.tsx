@@ -15,6 +15,8 @@ type Props = {
   tierInfo: TierInfo;
   /** True for user-uploaded designs: unassigned slots show "Color N" instead of the raw hex */
   isUserUpload: boolean;
+  /** Full URL to the product page on the brand's website. Only shown when set. */
+  viewProductUrl?: string;
 };
 
 export default function CompactPalette({
@@ -28,6 +30,7 @@ export default function CompactPalette({
   onRequestColorway,
   tierInfo,
   isUserUpload,
+  viewProductUrl,
 }: Props) {
   const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
   const isDemo = tierInfo.tier === "demo";
@@ -37,7 +40,23 @@ export default function CompactPalette({
       {/* Header */}
       <div className="shrink-0 px-2 py-1.5 border-b border-stone-200">
         <p className="text-xs font-semibold truncate text-stone-800">{designName}</p>
-        <p className="text-[10px] text-stone-400">{palette.length} colors</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[10px] text-stone-400">{palette.length} colors</p>
+          {viewProductUrl && (
+            <a
+              href={viewProductUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-0.5 text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
+              title="View product page"
+            >
+              View product
+              <svg className="w-2.5 h-2.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Scrollable rows */}

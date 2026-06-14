@@ -1,14 +1,54 @@
-// Admin-only: delete a catalog design and its associated storage objects.
-// User-uploaded designs (uploadedById !== null) are rejected — those belong
-// to the user, not the catalog, and must be managed separately.
+// Admin-only: manage a single catalog design.
 //
-// DELETE /api/admin/designs/:id
-// Returns: { ok: true }
+// PATCH /api/admin/designs/:id  — update externalSku
+// DELETE /api/admin/designs/:id — delete design and storage objects
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
 import { createAdminClient, DESIGNS_BUCKET } from "@/lib/supabase";
+import { getCurrentTenant } from "@/lib/tenant";
+
+// ─── PATCH ────────────────────────────────────────────────────────────────────
+
+export async function PATCH(
+  request: NextRequest,
+  ctx: RouteContext<"/api/admin/designs/[id]">
+) {
+  const { tier } = await getDefaultTierInfo();
+  if (tier !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const { id } = await ctx.params;
+  const body = await request.json() as { externalSku?: string | null };
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
+  }
+
+  // Normalize empty string to null
+  const externalSku = body.externalSku?.trim() || null;
+
+  try {
+    const updated = await db.design.update({
+      where: { id },
+      data: { externalSku },
+      select: { id: true, externalSku: true },
+    });
+    return NextResponse.json({ ok: true, externalSku: updated.externalSku });
+  } catch (err: unknown) {
+    // P2002 = unique constraint violation (another design has this SKU in the same tenant)
+    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
+      return NextResponse.json(
+        { error: "This SKU is already used by another design in this catalog." },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
+}
 
 // Extract the storage path from a public URL in the designs bucket.
 // getPublicUrl returns something like:

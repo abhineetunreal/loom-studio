@@ -27,6 +27,7 @@ export type TenantRecord = {
   primaryColor: string;
   accentColor: string | null;
   adminEmail: string;
+  websiteUrl: string | null;
 };
 
 const SELECT = {
@@ -39,6 +40,7 @@ const SELECT = {
   primaryColor: true,
   accentColor: true,
   adminEmail: true,
+  websiteUrl: true,
 } as const;
 
 // ─── Cache ────────────────────────────────────────────────────────────────────

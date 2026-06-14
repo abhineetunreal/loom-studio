@@ -241,6 +241,13 @@ export function CatalogTab({ collections }: Props) {
     setDesigns((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
+  // ── Handle SKU update ─────────────────────────────────────────────────────
+  const handleSkuChange = useCallback((designId: string, sku: string | null) => {
+    setDesigns((prev) =>
+      prev.map((d) => (d.id === designId ? { ...d, externalSku: sku } : d))
+    );
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* ── Section 1: Upload Zone ─────────────────────────────────────────── */}
@@ -322,6 +329,7 @@ export function CatalogTab({ collections }: Props) {
           loading={designsLoading}
           error={designsError}
           onDelete={handleDelete}
+          onSkuChange={handleSkuChange}
         />
       </section>
     </div>
@@ -394,12 +402,14 @@ function DesignsList({
   loading,
   error,
   onDelete,
+  onSkuChange,
 }: {
   designs: CatalogDesign[];
   collections: CollectionSummary[];
   loading: boolean;
   error: string | null;
   onDelete: (id: string, name: string) => void;
+  onSkuChange: (designId: string, sku: string | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -459,6 +469,7 @@ function DesignsList({
               isPending={isPending}
               onCollectionChange={handleCollectionChange}
               onDelete={onDelete}
+              onSkuChange={onSkuChange}
             />
           ))}
         </div>
@@ -475,13 +486,58 @@ function DesignCard({
   isPending,
   onCollectionChange,
   onDelete,
+  onSkuChange,
 }: {
   design: CatalogDesign;
   collections: CollectionSummary[];
   isPending: boolean;
   onCollectionChange: (designId: string, collectionId: string) => void;
   onDelete: (id: string, name: string) => void;
+  onSkuChange: (designId: string, sku: string | null) => void;
 }) {
+  const [editingSku, setEditingSku] = useState(false);
+  const [skuInput, setSkuInput] = useState(design.externalSku ?? "");
+  const [skuSaving, setSkuSaving] = useState(false);
+  const [skuError, setSkuError] = useState<string | null>(null);
+
+  async function saveSku() {
+    const trimmed = skuInput.trim();
+    const newSku = trimmed || null;
+    if (newSku === design.externalSku) {
+      setEditingSku(false);
+      return;
+    }
+    setSkuSaving(true);
+    setSkuError(null);
+    try {
+      const res = await fetch(`/api/admin/designs/${design.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ externalSku: newSku }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string; externalSku?: string | null };
+      if (!res.ok) {
+        setSkuError(data.error ?? "Failed to save SKU");
+      } else {
+        onSkuChange(design.id, data.externalSku ?? null);
+        setEditingSku(false);
+      }
+    } catch {
+      setSkuError("Network error");
+    } finally {
+      setSkuSaving(false);
+    }
+  }
+
+  function handleSkuKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") saveSku();
+    if (e.key === "Escape") {
+      setSkuInput(design.externalSku ?? "");
+      setSkuError(null);
+      setEditingSku(false);
+    }
+  }
+
   return (
     <div className="bg-white border border-stone-200 rounded-xl overflow-hidden flex flex-col hover:shadow-md transition-shadow group">
       {/* Thumbnail — clickable, opens design in new tab */}
@@ -522,6 +578,47 @@ function DesignCard({
           <span className="mx-1">·</span>
           {design.width}×{design.height}
         </p>
+
+        {/* SKU field */}
+        {editingSku ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex gap-1">
+              <input
+                autoFocus
+                type="text"
+                value={skuInput}
+                onChange={(e) => setSkuInput(e.target.value)}
+                onKeyDown={handleSkuKeyDown}
+                onBlur={saveSku}
+                placeholder="e.g. 3740"
+                disabled={skuSaving}
+                className="flex-1 text-xs border border-stone-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-stone-900/10 disabled:opacity-50"
+              />
+            </div>
+            {skuError && (
+              <p className="text-[10px] text-red-500 leading-tight">{skuError}</p>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setSkuInput(design.externalSku ?? "");
+              setSkuError(null);
+              setEditingSku(true);
+            }}
+            className="flex items-center gap-1 text-left w-full"
+            title="Edit SKU"
+          >
+            {design.externalSku ? (
+              <span className="text-xs text-stone-500 font-mono">
+                SKU: {design.externalSku}
+              </span>
+            ) : (
+              <span className="text-xs text-stone-300 italic">No SKU</span>
+            )}
+            <PencilIcon />
+          </button>
+        )}
 
         {/* Collection dropdown */}
         <select
@@ -566,6 +663,14 @@ function TrashIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg className="w-3 h-3 text-stone-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
     </svg>
   );
 }

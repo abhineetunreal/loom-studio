@@ -19,6 +19,7 @@ export type CatalogDesign = {
   height: number;
   colorCount: number;
   collectionId: string | null;
+  externalSku: string | null;
   createdAt: string;
 };
 
@@ -44,6 +45,7 @@ export async function GET() {
       height: true,
       palette: true,
       collectionId: true,
+      externalSku: true,
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
@@ -60,6 +62,7 @@ export async function GET() {
       ? (d.palette as PaletteEntry[]).length
       : 0,
     collectionId: d.collectionId,
+    externalSku: d.externalSku,
     createdAt: d.createdAt.toISOString(),
   }));
 

@@ -25,6 +25,7 @@ model Tenant {
   domain       String?  @unique // custom domain for white-label routing
   adminEmail   String
   ssoSecret    String?  // shared secret for SSO token verification
+  websiteUrl   String?  // brand's main website URL for product linking
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
@@ -85,11 +86,14 @@ model Design {
   isHidden      Boolean     @default(false) // hide from users within an accessible collection
   isActive     Boolean     @default(true)
   isDemo       Boolean     @default(false) // DEMO tier users only see isDemo designs
+  externalSku  String?     // SKU matching the website's product catalog
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   submissions    ColorwaySubmission[]
   savedColorways SavedColorway[]
+
+  @@unique([tenantId, externalSku])
 }
 
 model Collection {
