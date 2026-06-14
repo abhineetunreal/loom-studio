@@ -28,6 +28,9 @@ type Props = {
   canSave: boolean;
   /** Called once the first full render is painted — used to gate region-fill replay */
   onRenderComplete?: () => void;
+  /** When true, extends the loading overlay over the canvas until the caller clears it.
+   *  Used to hide the flash of unregion-filled colors while restoring a saved colorway. */
+  colorwayLoading?: boolean;
   textureEnabled: boolean;
   onToggleTexture: () => void;
   /** Current recolor mode — "global" or "region" (flood fill). */
@@ -78,6 +81,7 @@ export default function CanvasZone({
   tierInfo,
   canSave,
   onRenderComplete,
+  colorwayLoading,
   textureEnabled,
   onToggleTexture,
   mode,
@@ -409,17 +413,18 @@ export default function CanvasZone({
           </>
         )}
 
-        {/* Loading overlay — shown from mount until the first textured render lands.
-            Covers the blank canvas during image fetch + pixel loop.
-            z-20 so it sits above the pointer overlay. */}
-        {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#e8e5dd]">
+        {/* Loading overlay — shown during image fetch + pixel loop, and while restoring a saved colorway. */}
+        {(isLoading || colorwayLoading) && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#e8e5dd]">
             <SpinnerIcon className="w-8 h-8 text-stone-400 animate-spin" />
+            {colorwayLoading && !isLoading && (
+              <p className="text-xs text-stone-500">Loading colorway…</p>
+            )}
           </div>
         )}
 
         {/* Floating action buttons — bottom-right of canvas area, above pointer overlay */}
-        {!isLoading && (
+        {!isLoading && !colorwayLoading && (
           <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2 items-end pointer-events-none">
             {/* Request colorway (primary) */}
             {tierInfo.pendingApproval ? (

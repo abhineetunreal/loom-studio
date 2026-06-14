@@ -159,6 +159,11 @@ export default function DesignViewer({
   const [showSavedToast, setShowSavedToast] = useState(false);
   // True once the canvas has rendered for the first time — gates region-fill replay
   const [canvasReady, setCanvasReady] = useState(false);
+  // True while a saved colorway with region fills is being restored — keeps canvas covered
+  // until all fills have been applied so the user never sees the intermediate state.
+  const [colorwayLoading, setColorwayLoading] = useState(
+    !!(savedOperations?.regionFills.length)
+  );
   const canvasRef = useRef<RecolorCanvasHandle | null>(null);
 
   // ── Recolor mode ─────────────────────────────────────────────────────────────
@@ -356,14 +361,18 @@ export default function DesignViewer({
   // ── Replay saved region fills after canvas first renders ─────────────────────
   // Region fills need the pixel data to be loaded before they can be applied.
   // We wait for `canvasReady` (set by the onRenderComplete callback) then replay.
+  // colorwayLoading keeps the canvas covered until this effect completes.
   useEffect(() => {
     if (!canvasReady) return;
-    if (!savedOperations?.regionFills.length) return;
-    const yarnById = new Map(yarns.map((y) => [y.id, y]));
-    for (const fill of savedOperations.regionFills) {
-      const yarn = yarnById.get(fill.newYarnId);
-      if (yarn) canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
+    if (savedOperations?.regionFills.length) {
+      const yarnById = new Map(yarns.map((y) => [y.id, y]));
+      for (const fill of savedOperations.regionFills) {
+        const yarn = yarnById.get(fill.newYarnId);
+        if (yarn) canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
+      }
     }
+    // Reveal the canvas only after all fills are applied
+    setColorwayLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasReady]); // only fires once when canvas becomes ready
 
@@ -549,6 +558,7 @@ export default function DesignViewer({
         onRequestColorway={() => setShowSubmissionForm(true)}
         tierInfo={tierInfo}
         canSave={canSave}
+        colorwayLoading={colorwayLoading}
         onRenderComplete={() => setCanvasReady(true)}
         textureEnabled={textureEnabled}
         onToggleTexture={() => setTextureEnabled((v) => !v)}
