@@ -132,6 +132,8 @@ type Props = {
   designName?: string;
   tileMultiplier?: number;
   textureStrength?: number;
+  /** Multiplicative scale on the physically-calculated photo tile size. Default 1.0. */
+  swatchScale?: number;
   /** Called once the first full render (recolor + texture) is painted to the canvas. */
   onRenderComplete?: () => void;
   /** Current interaction mode. */
@@ -152,7 +154,7 @@ type Props = {
 const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCanvas(
   {
     imageUrl, width, height, palette, colorMap, selectedHex, onColorPick,
-    textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5,
+    textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5, swatchScale = 1.0,
     onRenderComplete, mode, fillYarn,
     onRegionFillDelta, onRegionUndoDelta, onRegionClear,
   },
@@ -479,9 +481,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
-      const { tileSizeX: photoTileSizeX, tileSizeY: photoTileSizeY } = computePhotoTileSizes(
+      const { tileSizeX: basePhotoTileX, tileSizeY: basePhotoTileY } = computePhotoTileSizes(
         width, height, designName ?? "", tileMultiplier
       );
+      const photoTileSizeX = basePhotoTileX * swatchScale;
+      const photoTileSizeY = basePhotoTileY * swatchScale;
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
         ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,
@@ -509,7 +513,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     return () => { cancelled = true; };
   // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, pixelsVersion, overrideVersion, swatchVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, pixelsVersion, overrideVersion, swatchVersion]);
 
   // ── Click/touch: pick color from original pixel data ────────────────────────
   function pickColorAt(clientX: number, clientY: number) {

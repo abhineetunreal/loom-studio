@@ -104,6 +104,15 @@ export default function CanvasZone({
   const [knotSlider, setKnotSlider] = useState(0.60);
   const [textureStrength, setTextureStrength] = useState(1.5);
   const tileMultiplier = 1.25 - knotSlider;
+  // Photo-swatch scale: multiplicative factor on the physically-calculated tile size.
+  // Separate from tileMultiplier — only affects photo-type colors.
+  const [swatchScale, setSwatchScale] = useState(1.0);
+
+  // True when any yarn in the current colorMap (or the active fill yarn) is a photo swatch.
+  // Controls visibility of the Swatch Scale slider.
+  const hasPhotoColors =
+    Object.values(colorMap).some((y) => y?.renderType === "photo") ||
+    selectedFillYarn?.renderType === "photo";
 
   // Refs to avoid stale closures in event listeners
   const zoomRef = useRef(1);
@@ -393,6 +402,7 @@ export default function CanvasZone({
                 designName={design.name}
                 tileMultiplier={tileMultiplier}
                 textureStrength={textureStrength}
+                swatchScale={swatchScale}
                 onRenderComplete={() => { setIsLoading(false); onRenderComplete?.(); }}
                 mode={mode}
                 fillYarn={selectedFillYarn ?? undefined}
@@ -528,6 +538,24 @@ export default function CanvasZone({
             {textureStrength.toFixed(2)}
           </span>
         </div>
+        {hasPhotoColors && (
+          <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
+            <span className="text-xs text-stone-500 whitespace-nowrap">Swatch Scale</span>
+            <input
+              type="range"
+              min={0.1}
+              max={8.0}
+              step={0.05}
+              value={swatchScale}
+              onChange={(e) => setSwatchScale(parseFloat(e.target.value))}
+              className="w-20 accent-stone-700"
+              aria-label="Swatch scale"
+            />
+            <span className="w-8 text-right text-xs text-stone-500 tabular-nums">
+              {swatchScale.toFixed(2)}
+            </span>
+          </div>
+        )}
 
         {/* Right: Zoom controls */}
         <div className="flex items-center gap-1 shrink-0">
