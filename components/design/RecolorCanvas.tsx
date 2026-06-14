@@ -334,15 +334,31 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   }, [imageUrl, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Lazy-load photo swatch images ────────────────────────────────────────────
-  // Only loads swatches for photo yarns ACTUALLY IN USE in the current colorMap.
-  // Caches globally (module-level swatchCache) so navigating back is instant.
+  // Watches BOTH colorMap (global assigns) AND fillYarn (region-fill mode).
+  //
+  // Critical: region fills do NOT change colorMap — they write to photoUrlOverrideLayerRef
+  // directly.  Without fillYarn in the deps, a photo fill yarn's swatch would never
+  // be loaded, leaving the cache empty and the render permanently on the shader path.
+  //
+  // By watching fillYarn, the swatch pre-loads the moment the user picks a photo
+  // fill yarn — before they even click — so the first fill render shows the photo.
   useEffect(() => {
     const toLoad: string[] = [];
+
+    // Swatches for colors already assigned in the global map
     for (const yarn of Object.values(colorMap)) {
       if (yarn?.renderType === "photo" && yarn.swatchImageUrl && !swatchCache.has(yarn.swatchImageUrl)) {
         toLoad.push(yarn.swatchImageUrl);
       }
     }
+
+    // Pre-load the active region-fill yarn's swatch so it's ready before the user clicks
+    if (fillYarn?.renderType === "photo" && fillYarn.swatchImageUrl && !swatchCache.has(fillYarn.swatchImageUrl)) {
+      if (!toLoad.includes(fillYarn.swatchImageUrl)) {
+        toLoad.push(fillYarn.swatchImageUrl);
+      }
+    }
+
     if (toLoad.length === 0) return;
 
     let cancelled = false;
@@ -370,11 +386,14 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
           console.warn("[Canvas] Failed to load swatch:", err);
         }
       }));
+      // Bump swatchVersion even if some loads failed — re-render will pick up
+      // whatever did load.  Failed swatches fall back to flat yarn.hex color.
       if (!cancelled) setSwatchVersion((v) => v + 1);
     })();
 
     return () => { cancelled = true; };
-  }, [colorMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorMap, fillYarn]); // fillYarn dep is critical for region-fill photo swatches
 
   // ── Re-render when colorMap, override layer, or texture toggle changes ───────
   //
