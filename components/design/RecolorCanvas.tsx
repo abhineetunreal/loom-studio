@@ -178,7 +178,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
   // ── Expose handle methods to parent ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
-    getSnapshot(maxWidth = 800) {
+    getSnapshot(maxWidth = 300) {
       const canvas = canvasRef.current;
       if (!canvas) return null;
       const scale = Math.min(1, maxWidth / canvas.width);
@@ -187,8 +187,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const offscreen = document.createElement("canvas");
       offscreen.width = w;
       offscreen.height = h;
-      offscreen.getContext("2d")!.drawImage(canvas, 0, 0, w, h);
-      return offscreen.toDataURL("image/png");
+      try {
+        offscreen.getContext("2d")!.drawImage(canvas, 0, 0, w, h);
+        return offscreen.toDataURL("image/png");
+      } catch {
+        // Canvas tainted by CORS — snapshot unavailable
+        return null;
+      }
     },
     pickColorAt(clientX: number, clientY: number) {
       pickColorAt(clientX, clientY);

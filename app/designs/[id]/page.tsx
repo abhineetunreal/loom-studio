@@ -6,8 +6,9 @@ import { getDefaultTierInfo } from "@/lib/tier";
 import { getCurrentTenant } from "@/lib/tenant";
 import DesignViewer from "@/components/design/DesignViewer";
 import { resolveDesignImageUrl } from "@/lib/design-urls";
-import { getUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import type { PaletteEntry, YarnOption } from "@/types";
+import type { ColorwayOperations } from "@/components/design/DesignViewer";
 
 // ─── Rendered-color lookup ────────────────────────────────────────────────────
 // Reads data/oneloom-rendered-lookup.json at request time (server component).
@@ -34,15 +35,19 @@ function loadRenderedLookup(): Map<string, string> {
   }
 }
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ colorway?: string }>;
+};
 
-export default async function DesignPage({ params }: Props) {
+export default async function DesignPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { colorway: colorwayId } = await searchParams;
 
   // Resolve tenant first (cached after first call) so the yarn query can be scoped.
   const tenant = await getCurrentTenant();
 
-  const [design, rawYarns, tierInfo, authUser] = await Promise.all([
+  const [design, rawYarns, tierInfo, session] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -65,7 +70,7 @@ export default async function DesignPage({ params }: Props) {
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getDefaultTierInfo(),
-    getUser(),
+    getSession(),
   ]);
 
   if (!design) notFound();
@@ -95,26 +100,52 @@ export default async function DesignPage({ params }: Props) {
     if (yarn) initialColorMap[entry.hex] = yarn;
   }
 
-  // ── Restore saved colorway (7.3) ──────────────────────────────────────────
-  // Look up any previously saved colorway for this user+design pair.
+  // ── Restore saved colorway ────────────────────────────────────────────────
+  // If ?colorway=ID is in the URL, load that specific saved colorway.
+  // Otherwise fall back to the most recently saved colorway for this user+design.
   let savedColorMap: Record<string, YarnOption> | undefined;
+  let savedOperations: ColorwayOperations | undefined;
 
-  if (authUser) {
-    if (tenant) {
-      const tenantUser = await db.tenantUser.findFirst({
-        where: { tenantId: tenant.id, authUserId: authUser.id },
-        select: { id: true },
-      });
-      if (tenantUser) {
-        const saved = await db.savedColorway.findFirst({
-          where: { designId: design.id, userId: tenantUser.id },
-          select: { colorMapping: true },
-          orderBy: { updatedAt: "desc" },
-        });
-        if (saved?.colorMapping) {
-          // colorMapping is index-keyed: { "0": { yarnId, yarnCode, hex, library }, … }
+  const userEmail = session?.user.email;
+  if (userEmail && tenant) {
+    const tenantUser = await db.tenantUser.findUnique({
+      where: { tenantId_email: { tenantId: tenant.id, email: userEmail } },
+      select: { id: true },
+    });
+
+    if (tenantUser) {
+      // Load the specific colorway by ID (from ?colorway= param), or the most recent one
+      const saved = colorwayId
+        ? await db.savedColorway.findFirst({
+            where: { id: colorwayId, designId: design.id, userId: tenantUser.id },
+            select: { colorMapping: true, operations: true },
+          })
+        : await db.savedColorway.findFirst({
+            where: { designId: design.id, userId: tenantUser.id },
+            select: { colorMapping: true, operations: true },
+            orderBy: { updatedAt: "desc" },
+          });
+
+      if (saved) {
+        const yarnById = new Map(yarns.map((y) => [y.id, y]));
+
+        // New format: operations JSON with globalMap + regionFills
+        if (saved.operations) {
+          const ops = saved.operations as ColorwayOperations;
+          if (ops.globalMap && typeof ops.globalMap === "object") {
+            savedOperations = ops;
+            savedColorMap = {};
+            for (const [hex, entry] of Object.entries(ops.globalMap)) {
+              const yarn = yarnById.get(entry.yarnId);
+              if (yarn) savedColorMap[hex] = yarn;
+            }
+            if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;
+          }
+        }
+
+        // Legacy format: index-keyed colorMapping (for old saves without operations)
+        if (!savedColorMap && saved.colorMapping) {
           const mapping = saved.colorMapping as Record<string, { yarnId: string }>;
-          const yarnById = new Map(yarns.map((y) => [y.id, y]));
           savedColorMap = {};
           for (const [indexStr, entry] of Object.entries(mapping)) {
             const idx = parseInt(indexStr, 10);
@@ -123,7 +154,6 @@ export default async function DesignPage({ params }: Props) {
             const yarn = yarnById.get(entry.yarnId);
             if (yarn) savedColorMap[paletteEntry.hex] = yarn;
           }
-          // Discard if nothing resolved (e.g. all yarn IDs were deleted)
           if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;
         }
       }
@@ -143,6 +173,7 @@ export default async function DesignPage({ params }: Props) {
         yarns={yarns}
         initialColorMap={initialColorMap}
         savedColorMap={savedColorMap}
+        savedOperations={savedOperations}
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}

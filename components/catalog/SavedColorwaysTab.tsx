@@ -69,8 +69,8 @@ export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => vo
     });
   }
 
-  async function handleDelete(colorwayId: string) {
-    await fetch(`/api/colorways/${colorwayId}`, { method: "DELETE" });
+  function handleDelete(colorwayId: string) {
+    fetch(`/api/colorways/${colorwayId}`, { method: "DELETE" }).catch(() => {});
     setRootColorways((prev) => prev.filter((c) => c.id !== colorwayId));
     setFolderColorways((prev) => {
       const next = { ...prev };
@@ -116,12 +116,12 @@ export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => vo
               <span className="text-stone-400 font-normal">{folder._count.colorways}</span>
             </button>
             {isOpen && (
-              <div className="px-2 pb-1">
+              <div className="grid grid-cols-2 gap-1 px-1 pb-1">
                 {items.length === 0 ? (
-                  <p className="text-[10px] text-stone-400 px-1 py-1">Empty folder</p>
+                  <p className="col-span-2 text-[10px] text-stone-400 px-1 py-1">Empty folder</p>
                 ) : (
                   items.map((c) => (
-                    <ColorwayRow
+                    <ColorwayThumb
                       key={c.id}
                       colorway={c}
                       onDelete={handleDelete}
@@ -137,27 +137,31 @@ export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => vo
 
       {/* Root (no folder) colorways */}
       {rootColorways.length > 0 && (
-        <div className="px-2 pb-1 mt-1">
+        <div className="mt-1">
           {folders.length > 0 && (
-            <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide px-1 mb-1">Unsorted</p>
+            <p className="text-[10px] font-medium text-stone-400 uppercase tracking-wide px-2 py-1">Unsorted</p>
           )}
-          {rootColorways.map((c) => (
-            <ColorwayRow
-              key={c.id}
-              colorway={c}
-              onDelete={handleDelete}
-              onNavigate={onNavigate}
-            />
-          ))}
+          <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+            {rootColorways.map((c) => (
+              <ColorwayThumb
+                key={c.id}
+                colorway={c}
+                onDelete={handleDelete}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ─── ColorwayRow ──────────────────────────────────────────────────────────────
+// ─── ColorwayThumb ────────────────────────────────────────────────────────────
+// Same visual treatment as DesignThumb in the Designs tab: square image,
+// name label below, heart-style three-dot menu on hover.
 
-function ColorwayRow({
+function ColorwayThumb({
   colorway,
   onDelete,
   onNavigate,
@@ -168,40 +172,50 @@ function ColorwayRow({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Prefer the recolored snapshot; fall back to original design image
   const thumb = colorway.snapshotUrl ?? colorway.design.imageUrl;
   const dateStr = new Date(colorway.updatedAt).toLocaleDateString(undefined, {
     month: "short", day: "numeric",
   });
 
   return (
-    <div className="relative group flex items-center gap-2 px-1 py-1.5 rounded-lg hover:bg-stone-50 transition-colors">
-      {/* Thumbnail */}
+    <div className="relative group">
       <Link
-        href={`/designs/${colorway.design.id}`}
+        href={`/designs/${colorway.design.id}?colorway=${colorway.id}`}
         onClick={onNavigate}
-        className="shrink-0 w-9 h-9 rounded border border-stone-200 overflow-hidden bg-stone-100 relative"
-        title={`Open ${colorway.design.name}`}
+        className="block rounded-lg overflow-hidden border border-stone-200 hover:border-stone-400 hover:shadow-sm transition-all"
+        title={`Restore "${colorway.name}"`}
       >
-        <Image
-          src={thumb}
-          alt={colorway.name}
-          fill
-          sizes="36px"
-          className="object-contain p-0.5"
-        />
+        {/* Square thumbnail */}
+        <div className="aspect-square relative bg-stone-100">
+          <Image
+            src={thumb}
+            alt={colorway.name}
+            fill
+            sizes="120px"
+            className="object-contain p-0.5"
+          />
+        </div>
+
+        {/* Label area */}
+        <div className="px-1.5 py-1 bg-white">
+          <p className="text-[11px] font-medium text-stone-700 truncate leading-tight">
+            {colorway.name}
+          </p>
+          <p className="text-[10px] text-stone-400 truncate leading-tight">
+            from {colorway.design.name}
+          </p>
+          <p className="text-[10px] text-stone-400 truncate leading-tight">
+            {dateStr}
+          </p>
+        </div>
       </Link>
 
-      {/* Text */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-stone-700 truncate leading-tight">{colorway.name}</p>
-        <p className="text-[10px] text-stone-400 truncate leading-tight">{colorway.design.name} · {dateStr}</p>
-      </div>
-
-      {/* Three-dot menu */}
-      <div className="relative">
+      {/* Three-dot overflow menu */}
+      <div className="absolute top-1 right-1">
         <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-all"
+          onClick={(e) => { e.preventDefault(); setMenuOpen((v) => !v); }}
+          className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded-full bg-white/90 shadow-sm text-stone-400 hover:text-stone-700 transition-all"
           aria-label="More options"
         >
           <DotsIcon />
@@ -247,7 +261,7 @@ function BookmarkIcon({ className }: { className?: string }) {
 
 function DotsIcon() {
   return (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
       <circle cx="12" cy="5" r="1.5" />
       <circle cx="12" cy="12" r="1.5" />
       <circle cx="12" cy="19" r="1.5" />

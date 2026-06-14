@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 type Props = {
@@ -11,7 +10,6 @@ type Props = {
   selectedHex: string | null;
   onSelectColor: (hex: string) => void;
   onRevert: (hex: string) => void;
-  onRequestColorway: () => void;
   tierInfo: TierInfo;
   /** True for user-uploaded designs: unassigned slots show "Color N" instead of the raw hex */
   isUserUpload: boolean;
@@ -30,7 +28,6 @@ export default function CompactPalette({
   selectedHex,
   onSelectColor,
   onRevert,
-  onRequestColorway,
   tierInfo,
   isUserUpload,
   viewProductUrl,
@@ -177,30 +174,6 @@ export default function CompactPalette({
         })}
       </ul>
 
-      {/* Footer — changes based on tier */}
-      <div className="shrink-0 p-2">
-        {isDemo ? (
-          tierInfo.pendingApproval ? (
-            <p className="w-full text-center text-xs py-1.5 text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
-              Account pending approval
-            </p>
-          ) : (
-            <Link
-              href="/auth/signin"
-              className="block w-full text-center bg-stone-800 text-white text-xs py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
-            >
-              Sign in to request
-            </Link>
-          )
-        ) : (
-          <button
-            onClick={onRequestColorway}
-            className="w-full bg-stone-900 text-white text-xs py-1.5 rounded-lg hover:bg-stone-700 transition-colors"
-          >
-            Request colorway
-          </button>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import RecolorCanvas, { type RecolorCanvasHandle, type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import { textureShader } from "@/lib/texture-shader";
-import type { PaletteEntry, YarnOption } from "@/types";
+import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 type Props = {
   design: { name: string; imageUrl: string; width: number; height: number; palette: PaletteEntry[] };
@@ -17,8 +18,16 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
   hasChanges: boolean;
-  /** When provided, a "Save colorway" button is shown in the toolbar */
+  /** Opens the save modal when the user clicks "Save colorway" */
   onSave?: () => Promise<void>;
+  /** Opens the colorway submission form */
+  onRequestColorway: () => void;
+  /** Tier info — controls which request-colorway CTA is shown */
+  tierInfo: TierInfo;
+  /** When true the "Save colorway" floating button is shown */
+  canSave: boolean;
+  /** Called once the first full render is painted — used to gate region-fill replay */
+  onRenderComplete?: () => void;
   textureEnabled: boolean;
   onToggleTexture: () => void;
   /** Current recolor mode — "global" or "region" (flood fill). */
@@ -65,6 +74,10 @@ export default function CanvasZone({
   canRedo,
   hasChanges,
   onSave,
+  onRequestColorway,
+  tierInfo,
+  canSave,
+  onRenderComplete,
   textureEnabled,
   onToggleTexture,
   mode,
@@ -376,7 +389,7 @@ export default function CanvasZone({
                 designName={design.name}
                 tileMultiplier={tileMultiplier}
                 textureStrength={textureStrength}
-                onRenderComplete={() => setIsLoading(false)}
+                onRenderComplete={() => { setIsLoading(false); onRenderComplete?.(); }}
                 mode={mode}
                 fillYarn={selectedFillYarn ?? undefined}
                 onRegionFillDelta={onRegionFillDelta}
@@ -402,6 +415,42 @@ export default function CanvasZone({
         {isLoading && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#e8e5dd]">
             <SpinnerIcon className="w-8 h-8 text-stone-400 animate-spin" />
+          </div>
+        )}
+
+        {/* Floating action buttons — bottom-right of canvas area, above pointer overlay */}
+        {!isLoading && (
+          <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2 items-end pointer-events-none">
+            {/* Request colorway (primary) */}
+            {tierInfo.pendingApproval ? (
+              <p className="pointer-events-auto text-xs px-3 py-2 text-amber-700 bg-amber-50/95 rounded-lg border border-amber-200 shadow whitespace-nowrap">
+                Account pending approval
+              </p>
+            ) : tierInfo.tier === "demo" ? (
+              <Link
+                href="/auth/signin"
+                className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
+              >
+                Sign in to request
+              </Link>
+            ) : (
+              <button
+                onClick={onRequestColorway}
+                className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
+              >
+                Request colorway
+              </button>
+            )}
+
+            {/* Save colorway (secondary) — only for approved users */}
+            {canSave && onSave && (
+              <button
+                onClick={onSave}
+                className="pointer-events-auto text-xs px-4 py-2 rounded-lg border border-stone-800 bg-white/90 text-stone-900 shadow hover:bg-stone-50 transition-colors whitespace-nowrap"
+              >
+                Save colorway
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -475,9 +524,6 @@ export default function CanvasZone({
           </span>
         </div>
 
-        {/* Centre: Save button (user-uploaded designs only) */}
-        {onSave && <SaveButton onSave={onSave} />}
-
         {/* Right: Zoom controls */}
         <div className="flex items-center gap-1 shrink-0">
           <button
@@ -548,65 +594,6 @@ function TextureToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () =
       {loading && <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />}
       {enabled ? "Textured" : "Flat"}
     </button>
-  );
-}
-
-// ─── SaveButton ───────────────────────────────────────────────────────────────
-// Self-contained button that manages its own loading/success/error state so
-// CanvasZone doesn't need to lift that state up.
-
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-function SaveButton({ onSave }: { onSave: () => Promise<void> }) {
-  const [state, setState] = useState<SaveState>("idle");
-
-  async function handleClick() {
-    if (state === "saving") return;
-    setState("saving");
-    try {
-      await onSave();
-      setState("saved");
-      setTimeout(() => setState("idle"), 2500);
-    } catch {
-      setState("error");
-      setTimeout(() => setState("idle"), 3000);
-    }
-  }
-
-  const label =
-    state === "saving" ? "Saving…"
-    : state === "saved" ? "Saved ✓"
-    : state === "error" ? "Save failed"
-    : "Save colorway";
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={state === "saving"}
-      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded border transition-colors disabled:cursor-wait ${
-        state === "saved"
-          ? "border-green-300 bg-green-50 text-green-700"
-          : state === "error"
-          ? "border-red-300 bg-red-50 text-red-700"
-          : "border-stone-300 bg-stone-800 text-white hover:bg-stone-700"
-      }`}
-    >
-      {state === "saving" ? (
-        <SpinnerIcon className="w-3 h-3 animate-spin shrink-0" />
-      ) : (
-        <SaveIcon className="w-3 h-3 shrink-0" />
-      )}
-      {label}
-    </button>
-  );
-}
-
-function SaveIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4z" />
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 3v4H7V3M12 12v5m0 0l-2-2m2 2l2-2" />
-    </svg>
   );
 }
 

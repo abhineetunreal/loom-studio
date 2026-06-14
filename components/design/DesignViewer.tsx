@@ -105,6 +105,11 @@ type Props = {
    * initialColorMap) and a brief "Restored your saved colorway" toast is shown.
    */
   savedColorMap?: Record<string, YarnOption>;
+  /**
+   * Full operations from a specific saved colorway (globalMap + regionFills).
+   * When provided, region fills are replayed onto the canvas after it first renders.
+   */
+  savedOperations?: ColorwayOperations;
   /** True when this design was uploaded by a user (not seeded from catalog). */
   isUserUpload: boolean;
   tierInfo: TierInfo;
@@ -126,6 +131,7 @@ export default function DesignViewer({
   yarns,
   initialColorMap,
   savedColorMap,
+  savedOperations,
   isUserUpload,
   tierInfo,
   yarnLibraryName,
@@ -149,6 +155,10 @@ export default function DesignViewer({
   const [textureEnabled, setTextureEnabled] = useState(true);
   // Toast: shown briefly when a saved colorway was restored on page load
   const [showRestoredToast, setShowRestoredToast] = useState(false);
+  // Toast: shown briefly after a successful save
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  // True once the canvas has rendered for the first time — gates region-fill replay
+  const [canvasReady, setCanvasReady] = useState(false);
   const canvasRef = useRef<RecolorCanvasHandle | null>(null);
 
   // ── Recolor mode ─────────────────────────────────────────────────────────────
@@ -328,13 +338,34 @@ export default function DesignViewer({
 
   // ── Restored-colorway toast ──────────────────────────────────────────────────
   // Shown once on mount if a previously saved colorway was found and applied.
+  const hasSavedState = !!(
+    (savedColorMap && Object.keys(savedColorMap).length > 0) ||
+    (savedOperations && (
+      Object.keys(savedOperations.globalMap).length > 0 ||
+      savedOperations.regionFills.length > 0
+    ))
+  );
   useEffect(() => {
-    if (!savedColorMap || Object.keys(savedColorMap).length === 0) return;
+    if (!hasSavedState) return;
     setShowRestoredToast(true);
     const t = setTimeout(() => setShowRestoredToast(false), 3500);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally only on mount
+
+  // ── Replay saved region fills after canvas first renders ─────────────────────
+  // Region fills need the pixel data to be loaded before they can be applied.
+  // We wait for `canvasReady` (set by the onRenderComplete callback) then replay.
+  useEffect(() => {
+    if (!canvasReady) return;
+    if (!savedOperations?.regionFills.length) return;
+    const yarnById = new Map(yarns.map((y) => [y.id, y]));
+    for (const fill of savedOperations.regionFills) {
+      const yarn = yarnById.get(fill.newYarnId);
+      if (yarn) canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasReady]); // only fires once when canvas becomes ready
 
   // ── Build current operations JSON ─────────────────────────────────────────────
   const buildOperations = useCallback((): ColorwayOperations => {
@@ -373,7 +404,11 @@ export default function DesignViewer({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Save handler (called from SaveModal) ──────────────────────────────────────
+  // Captures snapshot from the CURRENT recolored canvas, POSTs to the API.
+  // On success: closes the modal and shows a brief "Saved" toast.
+  // Does NOT reset recolor state or navigate — the user continues editing.
   const handleSaveSubmit = useCallback(async (name: string, folderId: string | null) => {
+    // Capture snapshot of the current recolored canvas (not the original)
     const snapshot = canvasRef.current?.getSnapshot() ?? null;
     const operations = buildOperations();
 
@@ -392,6 +427,9 @@ export default function DesignViewer({
       const data = await res.json().catch(() => ({}));
       throw new Error((data as { error?: string }).error ?? "Save failed");
     }
+    // Show success toast — modal will close itself after this resolves
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 2500);
   }, [design.id, buildOperations]);
 
   // ── Rebuild effective palette when global colorMap changes ───────────────────
@@ -471,6 +509,17 @@ export default function DesignViewer({
         </div>
       )}
 
+      {/* Saved toast — shown after a successful save */}
+      {showSavedToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-3 py-1.5 rounded-full bg-green-700/90 text-white text-xs font-medium shadow-lg whitespace-nowrap animate-fade-in"
+        >
+          Colorway saved
+        </div>
+      )}
+
       {/* Zone B — canvas */}
       <CanvasZone
         design={design}
@@ -491,7 +540,11 @@ export default function DesignViewer({
         canUndo={!!recolor.past.length}
         canRedo={!!recolor.future.length}
         hasChanges={hasChanges}
-        onSave={canSave && hasChanges ? async () => { setShowSaveModal(true); } : undefined}
+        onSave={canSave ? async () => { setShowSaveModal(true); } : undefined}
+        onRequestColorway={() => setShowSubmissionForm(true)}
+        tierInfo={tierInfo}
+        canSave={canSave}
+        onRenderComplete={() => setCanvasReady(true)}
         textureEnabled={textureEnabled}
         onToggleTexture={() => setTextureEnabled((v) => !v)}
         mode={recolorMode}
@@ -512,7 +565,6 @@ export default function DesignViewer({
           selectedHex={canvasPick?.hex ?? selectedHex}
           onSelectColor={handlePaletteColorPick}
           onRevert={handleRevert}
-          onRequestColorway={() => setShowSubmissionForm(true)}
           tierInfo={tierInfo}
           isUserUpload={isUserUpload}
           viewProductUrl={viewProductUrl}
