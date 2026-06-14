@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase";
+import { createAuthClient } from "@/lib/supabase-server";
 import { verifySSOToken } from "@/lib/sso";
 
 export async function GET(request: NextRequest) {
@@ -11,6 +12,13 @@ export async function GET(request: NextRequest) {
 
   // Only allow relative URLs for `next` to prevent open redirect attacks
   const next = rawNext && rawNext.startsWith("/") ? rawNext : null;
+
+  // ── Session check: skip SSO flow if already logged in ─────────────────────
+  const supabase = await createAuthClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    return NextResponse.redirect(new URL(next ?? "/", origin));
+  }
 
   if (!token || !tenantSlug) {
     return NextResponse.redirect(new URL("/?error=sso_missing_params", origin));
