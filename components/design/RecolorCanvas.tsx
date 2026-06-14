@@ -29,7 +29,7 @@ import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "re
 import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
 import type { PhotoSwatchData } from "@/lib/texture-shader";
-import { computePhotoTileSizesSS } from "@/lib/texture-scale";
+import { computePhotoTileSizes } from "@/lib/texture-scale";
 import { floodFill } from "@/lib/flood-fill";
 import type { PaletteEntry, YarnOption } from "@/types";
 
@@ -479,7 +479,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
-      const { tileSizeX: photoTileSizeX, tileSizeY: photoTileSizeY } = computePhotoTileSizesSS(
+      const { tileSizeX: photoTileSizeX, tileSizeY: photoTileSizeY } = computePhotoTileSizes(
         width, height, designName ?? "", tileMultiplier
       );
       const t1 = performance.now();

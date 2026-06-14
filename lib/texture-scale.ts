@@ -17,8 +17,8 @@ export function computePhotoTileSizes(
   const widthInches = dims.widthFeet * 12;
   const heightInches = dims.heightFeet * 12;
   return {
-    tileSizeX: (cadWidthPx / widthInches) * SWATCH_PHYSICAL_INCHES * knotMultiplier,
-    tileSizeY: (cadHeightPx / heightInches) * SWATCH_PHYSICAL_INCHES * knotMultiplier,
+    tileSizeX: (cadWidthPx / widthInches) * SWATCH_PHYSICAL_INCHES / knotMultiplier,
+    tileSizeY: (cadHeightPx / heightInches) * SWATCH_PHYSICAL_INCHES / knotMultiplier,
   };
 }
 
