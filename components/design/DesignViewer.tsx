@@ -133,6 +133,14 @@ export default function DesignViewer({
   const [showRestoredToast, setShowRestoredToast] = useState(false);
   const canvasRef = useRef<RecolorCanvasHandle | null>(null);
 
+  // ── Recolor mode ─────────────────────────────────────────────────────────────
+  // "global"  — existing behavior: yarn assignment replaces a color everywhere.
+  // "region"  — flood-fill paint bucket: yarn pick sets the fill color,
+  //             canvas click paints the connected region only.
+  const [recolorMode, setRecolorMode] = useState<"global" | "region">("global");
+  // Yarn selected as the active region-fill color (region mode only)
+  const [selectedFillYarn, setSelectedFillYarn] = useState<YarnOption | null>(null);
+
   // Palette sorted by coverage — used to derive 1-based rank for the popover
   const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);
 
@@ -143,7 +151,11 @@ export default function DesignViewer({
       if (!mod) return;
       if (e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        dispatch({ type: "UNDO" });
+        // Try region-fill undo first; fall back to global colorMap undo if the
+        // region stack is empty (most-recently-applied operation undoes first).
+        if (!canvasRef.current?.undoRegionFill()) {
+          dispatch({ type: "UNDO" });
+        }
       }
       if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
         e.preventDefault();
@@ -241,6 +253,12 @@ export default function DesignViewer({
   }
 
   function handleYarnPick(yarn: YarnOption) {
+    if (recolorMode === "region") {
+      // In region mode, picking a yarn sets it as the active fill color.
+      // Canvas clicks will then flood-fill the clicked region with this yarn.
+      setSelectedFillYarn(yarn);
+      return;
+    }
     if (!selectedHex) return;
     dispatch({ type: "ASSIGN", hex: selectedHex, yarn });
     // Keep selectedHex — picker stays "hot" so user can swap yarns without re-selecting
@@ -286,15 +304,25 @@ export default function DesignViewer({
         selectedHex={canvasPick?.hex ?? selectedHex}
         onColorPick={handleCanvasColorPick}
         canvasRef={canvasRef}
-        onUndo={() => dispatch({ type: "UNDO" })}
+        onUndo={() => {
+          if (!canvasRef.current?.undoRegionFill()) {
+            dispatch({ type: "UNDO" });
+          }
+        }}
         onRedo={() => dispatch({ type: "REDO" })}
-        onReset={() => dispatch({ type: "RESET" })}
+        onReset={() => {
+          dispatch({ type: "RESET" });
+          canvasRef.current?.clearRegionFills();
+        }}
         canUndo={!!recolor.past.length}
         canRedo={!!recolor.future.length}
         hasChanges={hasChanges}
         onSave={canSave ? handleSave : undefined}
         textureEnabled={textureEnabled}
         onToggleTexture={() => setTextureEnabled((v) => !v)}
+        mode={recolorMode}
+        onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
+        selectedFillYarn={selectedFillYarn}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -314,12 +342,22 @@ export default function DesignViewer({
         />
       </div>
 
-      {/* Zone D — inline yarn picker, desktop only */}
+      {/* Zone D — inline yarn picker, desktop only.
+          In region mode: shows all yarns for fill-color selection; currentYarn is the
+          active fill yarn.  In global mode: shows closest matches for selectedHex. */}
       <div className="flex flex-col shrink-0 w-[16%] min-w-[200px] border-l border-stone-200 bg-white overflow-hidden">
         <InlineYarnPicker
           yarns={yarns}
-          targetEntry={selectedHex ? (design.palette.find((e) => e.hex === selectedHex) ?? null) : null}
-          currentYarn={selectedHex ? (recolor.current[selectedHex] ?? null) : null}
+          targetEntry={
+            recolorMode === "region"
+              ? null // no palette-color context in region mode
+              : (selectedHex ? (design.palette.find((e) => e.hex === selectedHex) ?? null) : null)
+          }
+          currentYarn={
+            recolorMode === "region"
+              ? selectedFillYarn
+              : (selectedHex ? (recolor.current[selectedHex] ?? null) : null)
+          }
           onPick={handleYarnPick}
           tierInfo={tierInfo}
           yarnLibraryName={yarnLibraryName}

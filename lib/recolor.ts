@@ -61,13 +61,20 @@ export function buildColorLookup(
  * `originalPixels` is the raw RGBA data from the source image — never mutated.
  * Returns a new ImageData with yarn colors substituted in.
  *
- * Uses integer-keyed Map to avoid per-pixel string allocation.
+ * Override layer (per-pixel) takes priority over the global lookup:
+ *   1. If overrideLayer has an entry for this pixel index → use that packed RGB.
+ *   2. Else if lookup has an entry for this pixel's color → use that.
+ *   3. Else → use the original color.
+ *
+ * `overrideLayer` keys are pixel indices (y * width + x); values are packed
+ * 24-bit RGB integers ((r << 16) | (g << 8) | b) from rgbToInt().
  */
 export function applyRecolor(
   originalPixels: Uint8ClampedArray,
   width: number,
   height: number,
-  lookup: Map<number, RGB>
+  lookup: Map<number, RGB>,
+  overrideLayer?: Map<number, number>,
 ): ImageData {
   const output = new ImageData(width, height);
   const data = output.data;
@@ -76,12 +83,24 @@ export function applyRecolor(
     const r = originalPixels[i];
     const g = originalPixels[i + 1];
     const b = originalPixels[i + 2];
+    const a = originalPixels[i + 3];
 
-    const replacement = lookup.get((r << 16) | (g << 8) | b);
-    data[i]     = replacement ? replacement.r : r;
-    data[i + 1] = replacement ? replacement.g : g;
-    data[i + 2] = replacement ? replacement.b : b;
-    data[i + 3] = originalPixels[i + 3];
+    const pixelIdx = i >> 2; // i / 4
+    const override = overrideLayer?.get(pixelIdx);
+
+    if (override !== undefined) {
+      // Per-pixel region-fill override takes priority
+      data[i]     = (override >> 16) & 0xFF;
+      data[i + 1] = (override >> 8) & 0xFF;
+      data[i + 2] = override & 0xFF;
+      data[i + 3] = a;
+    } else {
+      const replacement = lookup.get((r << 16) | (g << 8) | b);
+      data[i]     = replacement ? replacement.r : r;
+      data[i + 1] = replacement ? replacement.g : g;
+      data[i + 2] = replacement ? replacement.b : b;
+      data[i + 3] = a;
+    }
   }
 
   return output;

@@ -200,7 +200,13 @@ class TextureShader {
    *   • `| 0` for float→int truncation instead of Math.floor
    *   • Uint8ClampedArray auto-clamps writes — no explicit Math.min/max
    *
-   * @param lookup  Map from packed-int RGB → replacement {r,g,b}, from buildColorLookup()
+   * @param lookup        Map from packed-int RGB → replacement {r,g,b}, from buildColorLookup()
+   * @param overrideLayer Per-pixel region-fill overrides in NATIVE-resolution pixel-index
+   *                      space (y * nativeWidth + x → packed RGB).  The ss pass maps each
+   *                      supersampled pixel back to its native-res origin to look up the
+   *                      override.  Pass undefined when there are no region fills.
+   * @param nativeWidth   Native (pre-supersampled) design width.  Required when
+   *                      overrideLayer is provided so the ss→native index mapping is correct.
    */
   applyRecolorAndTexture(
     originalPixels: Uint8ClampedArray,
@@ -209,20 +215,38 @@ class TextureShader {
     lookup: Map<number, { r: number; g: number; b: number }>,
     tileScaleX: number,
     tileScaleY: number,
-    strength = 0.6
+    strength = 0.6,
+    overrideLayer?: Map<number, number>,
+    nativeWidth?: number,
   ): ImageData {
     const output = new ImageData(width, height);
     const out = output.data;
 
+    // Pre-compute the native width used for override index mapping.
+    // When overrideLayer is provided nativeWidth must be supplied; if somehow
+    // omitted we fall back to half the ss width (valid only for SUPERSAMPLE_FACTOR=2).
+    const nw = nativeWidth ?? (width >> 1);
+
     if (!this.detailMap) {
       // Texture not loaded — recolor only (shouldn't happen if load() was awaited first)
       for (let i = 0; i < originalPixels.length; i += 4) {
-        const r = originalPixels[i], g = originalPixels[i + 1], b = originalPixels[i + 2];
-        const rep = lookup.get(rgbToInt(r, g, b));
-        out[i]     = rep ? rep.r : r;
-        out[i + 1] = rep ? rep.g : g;
-        out[i + 2] = rep ? rep.b : b;
-        out[i + 3] = originalPixels[i + 3];
+        const a = originalPixels[i + 3];
+        if (a === 0) { out[i + 3] = 0; continue; }
+        const pixelIdx = i >> 2;
+        const override = overrideLayer?.get((((pixelIdx / width) | 0) >> 1) * nw + ((pixelIdx % width) >> 1));
+        if (override !== undefined) {
+          out[i]     = (override >> 16) & 0xFF;
+          out[i + 1] = (override >> 8) & 0xFF;
+          out[i + 2] = override & 0xFF;
+          out[i + 3] = a;
+        } else {
+          const r = originalPixels[i], g = originalPixels[i + 1], b = originalPixels[i + 2];
+          const rep = lookup.get(rgbToInt(r, g, b));
+          out[i]     = rep ? rep.r : r;
+          out[i + 1] = rep ? rep.g : g;
+          out[i + 2] = rep ? rep.b : b;
+          out[i + 3] = a;
+        }
       }
       return output;
     }
@@ -236,20 +260,32 @@ class TextureShader {
       const texY = ((y * tileScaleY) | 0) & thMask;
       const texRowOff = texY * tw;   // pre-computed row offset into detail map
       const rowOff = y * width;
+      // Native-resolution row for override lookup (SUPERSAMPLE_FACTOR = 2)
+      const nativeRowOff = (y >> 1) * nw;
 
       for (let x = 0; x < width; x++) {
         const pi = (rowOff + x) << 2; // * 4
         const a = originalPixels[pi + 3];
         if (a === 0) continue; // out is already zero-initialised
 
-        // ── Color substitution (integer key — no string allocation) ──────────
-        const r0 = originalPixels[pi];
-        const g0 = originalPixels[pi + 1];
-        const b0 = originalPixels[pi + 2];
-        const rep = lookup.get(rgbToInt(r0, g0, b0));
-        const r = rep ? rep.r : r0;
-        const g = rep ? rep.g : g0;
-        const b = rep ? rep.b : b0;
+        // ── Override layer (region fills) — highest priority ──────────────────
+        const override = overrideLayer?.get(nativeRowOff + (x >> 1));
+
+        let r: number, g: number, b: number;
+        if (override !== undefined) {
+          r = (override >> 16) & 0xFF;
+          g = (override >> 8) & 0xFF;
+          b = override & 0xFF;
+        } else {
+          // ── Global color substitution (integer key — no string allocation) ──
+          const r0 = originalPixels[pi];
+          const g0 = originalPixels[pi + 1];
+          const b0 = originalPixels[pi + 2];
+          const rep = lookup.get(rgbToInt(r0, g0, b0));
+          r = rep ? rep.r : r0;
+          g = rep ? rep.g : g0;
+          b = rep ? rep.b : b0;
+        }
 
         // ── Texture grain factor ─────────────────────────────────────────────
         const texX = ((x * tileScaleX) | 0) & twMask;

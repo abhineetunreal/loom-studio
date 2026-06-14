@@ -15,14 +15,20 @@
  * The originalPixels Uint8ClampedArray is stored in a ref and never mutated.
  * Every recolor is a fresh pass over that buffer — no cumulative drift.
  *
- * Click/touch handling maps CSS coordinates → canvas pixel coordinates,
- * reads from originalPixels (not the current recolored display), and calls
- * onColorPick with the hex at that point.
+ * Two recolor modes:
+ *   "global"  — existing behavior; click picks a palette color for global replacement.
+ *   "region"  — flood-fill paint-bucket; click runs BFS on originalPixels and stores
+ *               per-pixel overrides in overrideLayerRef.  The override layer takes
+ *               priority over the global colorMap in the render pipeline.
+ *
+ * Override layer: Map<pixelIndex, packedRGB>  (lives in a ref, survives re-renders)
+ * Region undo:    stack of {pixelIndices, previousColors, newColor}  (max 20 ops)
  */
 
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
 import { applyRecolor, buildColorLookup, rgbToHex } from "@/lib/recolor"; // rgbToHex used by pickColorAt
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
+import { floodFill } from "@/lib/flood-fill";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 // ─── Module-level pixel cache ─────────────────────────────────────────────────
@@ -47,6 +53,16 @@ function cachePixels(url: string, native: Uint8ClampedArray, supersampled: Uint8
   pixelCacheOrder.push(url);
 }
 
+// ─── Region undo entry ────────────────────────────────────────────────────────
+
+type RegionUndoEntry = {
+  pixelIndices: number[];
+  previousColors: Map<number, number>; // pixelIdx → packed RGB that was there before
+  newColor: number;                    // packed RGB that was applied
+};
+
+const MAX_REGION_UNDO = 20;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export type RecolorCanvasHandle = {
@@ -54,6 +70,19 @@ export type RecolorCanvasHandle = {
   getSnapshot: (maxWidth?: number) => string | null;
   /** Pick the palette color at the given viewport coordinates (forwarded from CanvasZone). */
   pickColorAt: (clientX: number, clientY: number) => void;
+  /**
+   * Region-fill mode: run a flood fill at the given viewport coordinates and
+   * paint the connected region with `fillYarnRgb`.  No-op if no fill yarn is set
+   * or if the clicked pixel is outside the design bounds / transparent.
+   */
+  regionFillAt: (clientX: number, clientY: number) => void;
+  /**
+   * Undo the last region-fill operation.
+   * Returns true if an operation was undone, false if the stack was empty.
+   */
+  undoRegionFill: () => boolean;
+  /** Clear all region-fill overrides and the undo stack. */
+  clearRegionFills: () => void;
 };
 
 type Props = {
@@ -70,10 +99,21 @@ type Props = {
   textureStrength?: number;
   /** Called once the first full render (recolor + texture) is painted to the canvas. */
   onRenderComplete?: () => void;
+  /** Current interaction mode. */
+  mode: "global" | "region";
+  /**
+   * Packed 24-bit RGB ((r<<16)|(g<<8)|b) of the yarn to use for region fills.
+   * Only relevant in "region" mode.
+   */
+  fillYarnRgb?: number;
 };
 
 const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCanvas(
-  { imageUrl, width, height, palette, colorMap, selectedHex, onColorPick, textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5, onRenderComplete },
+  {
+    imageUrl, width, height, palette, colorMap, selectedHex, onColorPick,
+    textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5,
+    onRenderComplete, mode, fillYarnRgb,
+  },
   ref
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,16 +124,23 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // Reused across renders — avoids GC pressure from allocating a new OffscreenCanvas each time
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   // Bumped when the image finishes loading so the render effect re-fires with real pixels.
-  // Refs don't trigger effects — without this counter the textured render would never happen
-  // on initial load (the render effect fires on mount before pixels arrive, returns early,
-  // then has nothing to wake it up when onload sets the refs).
   const [pixelsVersion, setPixelsVersion] = useState(0);
   // Set of valid palette hex values for fast lookup on click
   const paletteHexSet = useRef<Set<string>>(new Set(palette.map((e) => e.hex)));
   // Guard: only call onRenderComplete once per design load
   const renderCompleteFired = useRef(false);
 
-  // ── Expose getSnapshot() and pickColorAt() to parent ────────────────────────
+  // ── Region-fill state (internal — not exposed via props) ─────────────────────
+  // Override layer: per-pixel color overrides that take priority over colorMap.
+  // Map<pixelIndex, packedRGB>.  Stored as a ref so mutations don't cause
+  // React re-renders — instead we bump overrideVersion to trigger the effect.
+  const overrideLayerRef = useRef<Map<number, number>>(new Map());
+  // Region fill undo stack — capped at MAX_REGION_UNDO entries
+  const regionUndoStackRef = useRef<RegionUndoEntry[]>([]);
+  // Bumped after each region fill / undo to trigger a re-render
+  const [overrideVersion, setOverrideVersion] = useState(0);
+
+  // ── Expose handle methods to parent ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
     getSnapshot(maxWidth = 800) {
       const canvas = canvasRef.current;
@@ -109,6 +156,31 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     },
     pickColorAt(clientX: number, clientY: number) {
       pickColorAt(clientX, clientY);
+    },
+    regionFillAt(clientX: number, clientY: number) {
+      doRegionFill(clientX, clientY);
+    },
+    undoRegionFill(): boolean {
+      const stack = regionUndoStackRef.current;
+      if (stack.length === 0) return false;
+      const entry = stack.pop()!;
+      const layer = overrideLayerRef.current;
+      // Restore previous state for each affected pixel
+      for (const idx of entry.pixelIndices) {
+        const prev = entry.previousColors.get(idx);
+        if (prev !== undefined) {
+          layer.set(idx, prev);
+        } else {
+          layer.delete(idx);
+        }
+      }
+      setOverrideVersion((v) => v + 1);
+      return true;
+    },
+    clearRegionFills() {
+      overrideLayerRef.current.clear();
+      regionUndoStackRef.current = [];
+      setOverrideVersion((v) => v + 1);
     },
   }));
 
@@ -192,7 +264,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     img.src = imageUrl;
   }, [imageUrl, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Re-render when colorMap or texture toggle changes ───────────────────────
+  // ── Re-render when colorMap, override layer, or texture toggle changes ───────
   //
   // Two-phase render for instant perceived feedback:
   //
@@ -208,6 +280,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   //   • lookup uses integer keys (r<<16|g<<8|b) — no per-pixel string allocation
   //   • OffscreenCanvas is reused across renders (offscreenRef)
   //   • Row offsets pre-computed; bitwise ops replace Math.floor / %
+  //   • overrideVersion dep ensures region fills re-render without stale closure
   useEffect(() => {
     let cancelled = false;
 
@@ -220,10 +293,15 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (!ctx) return;
 
       const lookup = buildColorLookup(colorMap);
+      const overrideLayer = overrideLayerRef.current;
+      const hasOverrides = overrideLayer.size > 0;
 
       // ── Phase 1: flat recolor at native resolution — fast path ─────────────
       const t0 = performance.now();
-      const flatData = applyRecolor(pixels, width, height, lookup);
+      const flatData = applyRecolor(
+        pixels, width, height, lookup,
+        hasOverrides ? overrideLayer : undefined,
+      );
       ctx.putImageData(flatData, 0, 0);
       console.log(`[Canvas] phase 1 flat (${width}×${height}): ${(performance.now() - t0).toFixed(0)}ms`);
 
@@ -249,7 +327,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
-        ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY, textureStrength
+        ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY, textureStrength,
+        hasOverrides ? overrideLayer : undefined,
+        width, // native width (nativeWidth param)
       );
       if (cancelled) return;
       console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}): ${(performance.now() - t1).toFixed(0)}ms`);
@@ -265,9 +345,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     render();
     return () => { cancelled = true; };
-  // pixelsVersion is the trigger that fires this effect after image load completes.
+  // pixelsVersion triggers this effect after image load; overrideVersion after region fills.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, pixelsVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, pixelsVersion, overrideVersion]);
 
   // ── Click/touch: pick color from original pixel data ────────────────────────
   function pickColorAt(clientX: number, clientY: number) {
@@ -296,13 +376,65 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     }
   }
 
+  // ── Region fill ──────────────────────────────────────────────────────────────
+  function doRegionFill(clientX: number, clientY: number) {
+    const canvas = canvasRef.current;
+    const pixels = originalPixels.current;
+    if (!canvas || !pixels || fillYarnRgb === undefined) return;
+
+    // Map CSS coordinates → native pixel coordinates
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const x = Math.floor((clientX - rect.left) * scaleX);
+    const y = Math.floor((clientY - rect.top) * scaleY);
+
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+
+    const t0 = performance.now();
+    const indices = floodFill(pixels, x, y, width, height);
+    console.log(`[Canvas] flood fill: ${indices.length} pixels in ${(performance.now() - t0).toFixed(0)}ms`);
+    if (indices.length === 0) return;
+
+    // Capture current state of affected pixels for undo
+    const layer = overrideLayerRef.current;
+    const previousColors = new Map<number, number>();
+    for (const idx of indices) {
+      const prev = layer.get(idx);
+      if (prev !== undefined) previousColors.set(idx, prev);
+    }
+
+    // Apply override
+    for (const idx of indices) {
+      layer.set(idx, fillYarnRgb);
+    }
+
+    // Push to undo stack (FIFO eviction at max size)
+    const stack = regionUndoStackRef.current;
+    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb });
+    if (stack.length > MAX_REGION_UNDO) stack.shift();
+
+    setOverrideVersion((v) => v + 1);
+  }
+
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
-    pickColorAt(e.clientX, e.clientY);
+    // Handled by CanvasZone pointer overlay; this fires only when the canvas
+    // itself receives a click (e.g. from a direct programmatic dispatch).
+    if (mode === "region") {
+      doRegionFill(e.clientX, e.clientY);
+    } else {
+      pickColorAt(e.clientX, e.clientY);
+    }
   }
 
   function handleTouchEnd(e: React.TouchEvent<HTMLCanvasElement>) {
     const touch = e.changedTouches[0];
-    if (touch) pickColorAt(touch.clientX, touch.clientY);
+    if (!touch) return;
+    if (mode === "region") {
+      doRegionFill(touch.clientX, touch.clientY);
+    } else {
+      pickColorAt(touch.clientX, touch.clientY);
+    }
   }
 
   return (
@@ -316,8 +448,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         className="w-full h-full rounded-xl border border-stone-200 cursor-crosshair touch-none"
         aria-label="Rug design — click a color region to select it"
       />
-      {/* Highlight ring on the selected color region is handled in PalettePanel,
-          not on the canvas, to keep the render pipeline simple. */}
     </div>
   );
 });

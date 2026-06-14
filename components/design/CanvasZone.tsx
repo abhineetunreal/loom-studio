@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import RecolorCanvas, { type RecolorCanvasHandle } from "./RecolorCanvas";
 import { textureShader } from "@/lib/texture-shader";
+import { rgbToInt, hexToRgb } from "@/lib/recolor";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 type Props = {
@@ -21,6 +22,11 @@ type Props = {
   onSave?: () => Promise<void>;
   textureEnabled: boolean;
   onToggleTexture: () => void;
+  /** Current recolor mode — "global" or "region" (flood fill). */
+  mode: "global" | "region";
+  onToggleMode: () => void;
+  /** Yarn selected as the region-fill paint color. */
+  selectedFillYarn: YarnOption | null;
 };
 
 function clampPan(
@@ -59,6 +65,9 @@ export default function CanvasZone({
   onSave,
   textureEnabled,
   onToggleTexture,
+  mode,
+  onToggleMode,
+  selectedFillYarn,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -67,6 +76,11 @@ export default function CanvasZone({
   // True from mount until the first full render (recolor + texture) is painted.
   // Drives the loading overlay — hides the blank canvas while pixels are loading.
   const [isLoading, setIsLoading] = useState(true);
+
+  // Packed 24-bit RGB of the selected fill yarn — stable as long as the yarn doesn't change
+  const fillYarnRgb = selectedFillYarn
+    ? (() => { const { r, g, b } = hexToRgb(selectedFillYarn.hex); return rgbToInt(r, g, b); })()
+    : undefined;
 
   // Texture tuning controls — knot size is inverted (slider right = larger knots = lower multiplier)
   // knotSlider range 0.25–1.0; tileMultiplier = 1.25 - knotSlider → range 0.25×–1.0×; default 0.60 → 0.65×
@@ -284,8 +298,12 @@ export default function CanvasZone({
 
   function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
     if (!isDraggingRef.current) {
-      // It's a tap — pick color
-      canvasRef.current?.pickColorAt(e.clientX, e.clientY);
+      // It's a tap — dispatch to the correct handler based on mode
+      if (mode === "region") {
+        canvasRef.current?.regionFillAt(e.clientX, e.clientY);
+      } else {
+        canvasRef.current?.pickColorAt(e.clientX, e.clientY);
+      }
     }
     pointerStartRef.current = null;
     isDraggingRef.current = false;
@@ -314,8 +332,10 @@ export default function CanvasZone({
     setIsDragging(false);
   }
 
+  // In region mode always show crosshair (paint-bucket intent);
+  // in global mode show grab when zoomed in for panning affordance.
   const cursor =
-    zoom === 1 ? "crosshair" : isDragging ? "grabbing" : "grab";
+    mode === "region" || zoom === 1 ? "crosshair" : isDragging ? "grabbing" : "grab";
 
   function handleZoomSlider(value: number) {
     const newZoom = value;
@@ -357,6 +377,8 @@ export default function CanvasZone({
                 tileMultiplier={tileMultiplier}
                 textureStrength={textureStrength}
                 onRenderComplete={() => setIsLoading(false)}
+                mode={mode}
+                fillYarnRgb={fillYarnRgb}
               />
             </div>
 
@@ -409,6 +431,28 @@ export default function CanvasZone({
             Reset
           </button>
         </div>
+
+        {/* Centre: Mode toggle (Global / Region fill) */}
+        <ModeToggle mode={mode} onToggle={onToggleMode} />
+
+        {/* Fill yarn indicator — visible in region mode */}
+        {mode === "region" && (
+          <div className="flex items-center gap-1 pl-1 border-l border-stone-200 shrink-0">
+            {selectedFillYarn ? (
+              <>
+                <span
+                  className="w-3 h-3 rounded-full border border-stone-200 shrink-0"
+                  style={{ background: selectedFillYarn.hex }}
+                />
+                <span className="text-xs text-stone-600 max-w-[80px] truncate" title={selectedFillYarn.name}>
+                  {selectedFillYarn.code}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-stone-400 italic">Pick a yarn →</span>
+            )}
+          </div>
+        )}
 
         {/* Centre: Flat/Textured toggle + tuning sliders.
             Sliders are always in the DOM so toggling never shifts other toolbar items.
@@ -485,6 +529,46 @@ export default function CanvasZone({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── ModeToggle ───────────────────────────────────────────────────────────────
+
+function ModeToggle({ mode, onToggle }: { mode: "global" | "region"; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={
+        mode === "region"
+          ? "Region fill active — click a region to paint it. Switch to Global to replace colors everywhere."
+          : "Switch to Region fill — paint individual connected areas with the paint-bucket tool."
+      }
+      className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
+        mode === "region"
+          ? "border-amber-400 bg-amber-50 text-amber-700 hover:bg-amber-100"
+          : "border-stone-200 text-stone-600 hover:bg-stone-100"
+      }`}
+    >
+      {mode === "region" ? <PaintBucketIcon /> : <GlobeIcon />}
+      {mode === "region" ? "Region" : "Global"}
+    </button>
+  );
+}
+
+function PaintBucketIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a2 2 0 110 4 2 2 0 010-4zM3.5 3.5l13 13M5 5l-.5.5A9.965 9.965 0 003 12c0 1.6.378 3.11 1.05 4.45M9 3l6 6" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <circle cx="12" cy="12" r="9" />
+      <path strokeLinecap="round" d="M3 12h18M12 3a15.3 15.3 0 010 18M12 3a15.3 15.3 0 000 18" />
+    </svg>
   );
 }
 
