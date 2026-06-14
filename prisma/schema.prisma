@@ -136,6 +136,8 @@ model YarnColor {
   material       String?
   pileType       String?
   swatchImageUrl String? // reserved for v1.5 — falls back to hex swatch when null
+  renderType     String  @default("shader")  // "shader" | "photo"
+  textureKpsi    Int?
   sortOrder      Int      @default(0)
   isActive       Boolean  @default(true)
 

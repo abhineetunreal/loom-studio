@@ -13,6 +13,13 @@
 
 import { rgbToInt } from "@/lib/recolor";
 
+/** Pre-loaded pixel data for a photo-swatch yarn. */
+export type PhotoSwatchData = {
+  data: Uint8ClampedArray;
+  w: number;
+  h: number;
+};
+
 // ─── Rug dimension parsing ────────────────────────────────────────────────────
 
 const FALLBACK_FEET = { widthFeet: 8, heightFeet: 10 };
@@ -218,6 +225,11 @@ class TextureShader {
     strength = 0.6,
     overrideLayer?: Map<number, number>,
     nativeWidth?: number,
+    // Photo-swatch additions:
+    photoLookup?: Map<number, PhotoSwatchData>,       // packedInt → swatch (global map)
+    photoOverrideLayer?: Map<number, PhotoSwatchData>, // nativePixelIndex → swatch (region fills)
+    photoTileSizeX = 180,   // tile size in supersampled pixels, X axis
+    photoTileSizeY = 180,   // tile size in supersampled pixels, Y axis
   ): ImageData {
     const output = new ImageData(width, height);
     const out = output.data;
@@ -228,24 +240,51 @@ class TextureShader {
     const nw = nativeWidth ?? (width >> 1);
 
     if (!this.detailMap) {
-      // Texture not loaded — recolor only (shouldn't happen if load() was awaited first)
-      for (let i = 0; i < originalPixels.length; i += 4) {
-        const a = originalPixels[i + 3];
-        if (a === 0) { out[i + 3] = 0; continue; }
-        const pixelIdx = i >> 2;
-        const override = overrideLayer?.get((((pixelIdx / width) | 0) >> 1) * nw + ((pixelIdx % width) >> 1));
-        if (override !== undefined) {
-          out[i]     = (override >> 16) & 0xFF;
-          out[i + 1] = (override >> 8) & 0xFF;
-          out[i + 2] = override & 0xFF;
-          out[i + 3] = a;
-        } else {
-          const r = originalPixels[i], g = originalPixels[i + 1], b = originalPixels[i + 2];
-          const rep = lookup.get(rgbToInt(r, g, b));
-          out[i]     = rep ? rep.r : r;
-          out[i + 1] = rep ? rep.g : g;
-          out[i + 2] = rep ? rep.b : b;
-          out[i + 3] = a;
+      // No detail map yet — recolor + photo, no shader grain
+      for (let y = 0; y < height; y++) {
+        const nativeRow = (y >> 1) * nw;
+        for (let x = 0; x < width; x++) {
+          const pi = (y * width + x) << 2;
+          const a = originalPixels[pi + 3];
+          if (a === 0) { out[pi + 3] = 0; continue; }
+          const nativeIdx = nativeRow + (x >> 1);
+
+          // Photo override
+          const photoOverride = photoOverrideLayer?.get(nativeIdx);
+          if (photoOverride !== undefined) {
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+            const si = (ty * photoOverride.w + tx) * 4;
+            out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
+            out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
+            continue;
+          }
+
+          // Shader override
+          const override = overrideLayer?.get(nativeIdx);
+          if (override !== undefined) {
+            out[pi] = (override >> 16) & 0xFF; out[pi+1] = (override >> 8) & 0xFF;
+            out[pi+2] = override & 0xFF; out[pi+3] = a;
+            continue;
+          }
+
+          const r0 = originalPixels[pi], g0 = originalPixels[pi+1], b0 = originalPixels[pi+2];
+
+          // Photo global map
+          const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
+          if (photoEntry !== undefined) {
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const si = (ty * photoEntry.w + tx) * 4;
+            out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
+            out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
+            continue;
+          }
+
+          // Shader global map (flat, no grain)
+          const rep = lookup.get(rgbToInt(r0, g0, b0));
+          out[pi] = rep ? rep.r : r0; out[pi+1] = rep ? rep.g : g0;
+          out[pi+2] = rep ? rep.b : b0; out[pi+3] = a;
         }
       }
       return output;
@@ -267,27 +306,50 @@ class TextureShader {
         const pi = (rowOff + x) << 2; // * 4
         const a = originalPixels[pi + 3];
         if (a === 0) continue; // out is already zero-initialised
+        const nativeIdx = nativeRowOff + (x >> 1);
 
-        // ── Override layer (region fills) — highest priority ──────────────────
-        const override = overrideLayer?.get(nativeRowOff + (x >> 1));
+        // ── Photo override layer (region fills using photo swatches) ──────────
+        const photoOverride = photoOverrideLayer?.get(nativeIdx);
+        if (photoOverride !== undefined) {
+          const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
+          const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+          const si = (ty * photoOverride.w + tx) * 4;
+          out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
+          out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
+          continue;
+        }
+
+        // ── Shader override layer (region fills with shader colors) ───────────
+        const override = overrideLayer?.get(nativeIdx);
 
         let r: number, g: number, b: number;
+
         if (override !== undefined) {
           r = (override >> 16) & 0xFF;
           g = (override >> 8) & 0xFF;
           b = override & 0xFF;
         } else {
-          // ── Global color substitution (integer key — no string allocation) ──
-          const r0 = originalPixels[pi];
-          const g0 = originalPixels[pi + 1];
-          const b0 = originalPixels[pi + 2];
+          const r0 = originalPixels[pi], g0 = originalPixels[pi+1], b0 = originalPixels[pi+2];
+
+          // ── Photo global map ─────────────────────────────────────────────────
+          const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
+          if (photoEntry !== undefined) {
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const si = (ty * photoEntry.w + tx) * 4;
+            out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
+            out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
+            continue;
+          }
+
+          // ── Shader global map ─────────────────────────────────────────────────
           const rep = lookup.get(rgbToInt(r0, g0, b0));
           r = rep ? rep.r : r0;
           g = rep ? rep.g : g0;
           b = rep ? rep.b : b0;
         }
 
-        // ── Texture grain factor ─────────────────────────────────────────────
+        // ── Shader grain ──────────────────────────────────────────────────────
         const texX = ((x * tileScaleX) | 0) & twMask;
         const d = dPx[(texRowOff + texX) << 2]; // R channel of detail map
         const factor = 1 + strength * ((d - 128) / 128);

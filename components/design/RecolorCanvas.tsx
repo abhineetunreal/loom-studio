@@ -28,6 +28,8 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
 import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
+import type { PhotoSwatchData } from "@/lib/texture-shader";
+import { computePhotoTileSizesSS } from "@/lib/texture-scale";
 import { floodFill } from "@/lib/flood-fill";
 import type { PaletteEntry, YarnOption } from "@/types";
 
@@ -42,6 +44,9 @@ const pixelCache = new Map<string, {
   native: Uint8ClampedArray;
   supersampled: Uint8ClampedArray;
 }>();
+
+// Photo swatch pixel cache — keyed by textureUrl, survives component unmounts
+const swatchCache = new Map<string, PhotoSwatchData>();
 
 function cachePixels(url: string, native: Uint8ClampedArray, supersampled: Uint8ClampedArray) {
   if (pixelCache.has(url)) return; // already cached (concurrent loads)
@@ -58,6 +63,7 @@ function cachePixels(url: string, native: Uint8ClampedArray, supersampled: Uint8
 type RegionUndoEntry = {
   pixelIndices: number[];
   previousColors: Map<number, number>; // pixelIdx → packed RGB that was there before
+  previousPhotoUrls: Map<number, string>; // pixelIndex → textureUrl of previous state
   newColor: number;                    // packed RGB that was applied
   originalHex: string;                 // original design palette hex at the fill start
   yarn: YarnOption;                    // yarn used for this fill
@@ -171,10 +177,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // Map<pixelIndex, packedRGB>.  Stored as a ref so mutations don't cause
   // React re-renders — instead we bump overrideVersion to trigger the effect.
   const overrideLayerRef = useRef<Map<number, number>>(new Map());
+  // Maps pixelIndex → textureUrl for photo-type region fills
+  const photoUrlOverrideLayerRef = useRef<Map<number, string>>(new Map());
   // Region fill undo stack — capped at MAX_REGION_UNDO entries
   const regionUndoStackRef = useRef<RegionUndoEntry[]>([]);
   // Bumped after each region fill / undo to trigger a re-render
   const [overrideVersion, setOverrideVersion] = useState(0);
+  const [swatchVersion, setSwatchVersion] = useState(0);
 
   // ── Expose handle methods to parent ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
@@ -211,11 +220,19 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const layer = overrideLayerRef.current;
       // Restore previous state for each affected pixel
       for (const idx of entry.pixelIndices) {
+        // Restore shader override layer
         const prev = entry.previousColors.get(idx);
         if (prev !== undefined) {
           layer.set(idx, prev);
         } else {
           layer.delete(idx);
+        }
+        // Restore photo URL override layer
+        const prevPhoto = entry.previousPhotoUrls.get(idx);
+        if (prevPhoto !== undefined) {
+          photoUrlOverrideLayerRef.current.set(idx, prevPhoto);
+        } else {
+          photoUrlOverrideLayerRef.current.delete(idx);
         }
       }
       onRegionUndoDelta?.({
@@ -229,6 +246,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     },
     clearRegionFills() {
       overrideLayerRef.current.clear();
+      photoUrlOverrideLayerRef.current.clear();
       regionUndoStackRef.current = [];
       onRegionClear?.();
       setOverrideVersion((v) => v + 1);
@@ -315,6 +333,49 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     img.src = imageUrl;
   }, [imageUrl, width, height]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Lazy-load photo swatch images ────────────────────────────────────────────
+  // Only loads swatches for photo yarns ACTUALLY IN USE in the current colorMap.
+  // Caches globally (module-level swatchCache) so navigating back is instant.
+  useEffect(() => {
+    const toLoad: string[] = [];
+    for (const yarn of Object.values(colorMap)) {
+      if (yarn?.renderType === "photo" && yarn.swatchImageUrl && !swatchCache.has(yarn.swatchImageUrl)) {
+        toLoad.push(yarn.swatchImageUrl);
+      }
+    }
+    if (toLoad.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      await Promise.all(toLoad.map(async (url) => {
+        if (swatchCache.has(url)) return;
+        try {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          await new Promise<void>((res, rej) => {
+            img.onload = () => res();
+            img.onerror = () => rej(new Error(`Failed to load swatch: ${url}`));
+            img.src = url;
+          });
+          if (cancelled) return;
+          const w = img.naturalWidth || 256;
+          const h = img.naturalHeight || 256;
+          const oc = new OffscreenCanvas(w, h);
+          const ctx = oc.getContext("2d")!;
+          ctx.drawImage(img, 0, 0);
+          const d = ctx.getImageData(0, 0, w, h);
+          swatchCache.set(url, { data: d.data.slice() as Uint8ClampedArray, w, h });
+          console.log(`[Canvas] swatch loaded: ${url.split("/").pop()} (${w}×${h})`);
+        } catch (err) {
+          console.warn("[Canvas] Failed to load swatch:", err);
+        }
+      }));
+      if (!cancelled) setSwatchVersion((v) => v + 1);
+    })();
+
+    return () => { cancelled = true; };
+  }, [colorMap]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Re-render when colorMap, override layer, or texture toggle changes ───────
   //
   // Two-phase render for instant perceived feedback:
@@ -347,6 +408,27 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const overrideLayer = overrideLayerRef.current;
       const hasOverrides = overrideLayer.size > 0;
 
+      // ── Build photo lookup from color map ───────────────────────────────────
+      const photoLookup = new Map<number, PhotoSwatchData>();
+      for (const [hex, yarn] of Object.entries(colorMap)) {
+        if (yarn?.renderType === "photo" && yarn.swatchImageUrl) {
+          const swatch = swatchCache.get(yarn.swatchImageUrl);
+          if (swatch) {
+            const { r, g, b } = hexToRgb(hex);
+            photoLookup.set(rgbToInt(r, g, b), swatch);
+          }
+        }
+      }
+
+      // ── Build photo override layer (resolve URLs → swatch data) ─────────────
+      const photoSwatchLayer = new Map<number, PhotoSwatchData>();
+      for (const [idx, url] of photoUrlOverrideLayerRef.current) {
+        const swatch = swatchCache.get(url);
+        if (swatch) photoSwatchLayer.set(Number(idx), swatch);
+      }
+
+      const hasPhotoColors = photoLookup.size > 0 || photoSwatchLayer.size > 0;
+
       // ── Phase 1: flat recolor at native resolution — fast path ─────────────
       const t0 = performance.now();
       const flatData = applyRecolor(
@@ -361,7 +443,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         onRenderComplete?.();
       }
 
-      if (!textureEnabled || !ssPixels || cancelled) return;
+      // Run texture pass if shader texturing is on OR if any photo colors are in use
+      // (photo colors always show their photograph, even when textureEnabled=false)
+      if ((!textureEnabled && !hasPhotoColors) || !ssPixels || cancelled) return;
 
       // ── Yield to browser so phase 1 is composited before phase 2 blocks ────
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -376,11 +460,19 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
+      const { tileSizeX: photoTileSizeX, tileSizeY: photoTileSizeY } = computePhotoTileSizesSS(
+        width, height, designName ?? "", tileMultiplier
+      );
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
-        ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY, textureStrength,
+        ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,
+        textureEnabled ? textureStrength : 0, // strength=0 → flat shader colors in photo-only mode
         hasOverrides ? overrideLayer : undefined,
         width, // native width (nativeWidth param)
+        photoLookup.size > 0 ? photoLookup : undefined,
+        photoSwatchLayer.size > 0 ? photoSwatchLayer : undefined,
+        photoTileSizeX,
+        photoTileSizeY,
       );
       if (cancelled) return;
       console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}): ${(performance.now() - t1).toFixed(0)}ms`);
@@ -396,9 +488,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     render();
     return () => { cancelled = true; };
-  // pixelsVersion triggers this effect after image load; overrideVersion after region fills.
+  // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, pixelsVersion, overrideVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, pixelsVersion, overrideVersion, swatchVersion]);
 
   // ── Click/touch: pick color from original pixel data ────────────────────────
   function pickColorAt(clientX: number, clientY: number) {
@@ -450,22 +542,34 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     console.log(`[Canvas] flood fill: ${indices.length} pixels in ${(performance.now() - t0).toFixed(0)}ms`);
     if (indices.length === 0) return;
 
+    const isPhotoFill = yarn.renderType === "photo" && !!yarn.swatchImageUrl;
+
     // Capture current state of affected pixels for undo
     const layer = overrideLayerRef.current;
+    const photoLayer = photoUrlOverrideLayerRef.current;
     const previousColors = new Map<number, number>();
+    const previousPhotoUrls = new Map<number, string>();
     for (const idx of indices) {
       const prev = layer.get(idx);
       if (prev !== undefined) previousColors.set(idx, prev);
+      const prevPhoto = photoLayer.get(idx);
+      if (prevPhoto !== undefined) previousPhotoUrls.set(idx, prevPhoto);
     }
 
     // Apply override
     for (const idx of indices) {
       layer.set(idx, fillYarnRgb);
+      if (isPhotoFill) {
+        photoLayer.set(idx, yarn.swatchImageUrl!);
+      } else {
+        // Shader fill clears any previous photo override for these pixels
+        photoLayer.delete(idx);
+      }
     }
 
     // Push to undo stack (FIFO eviction at max size)
     const stack = regionUndoStackRef.current;
-    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb, originalHex, yarn, seedX: x, seedY: y });
+    stack.push({ pixelIndices: indices, previousColors, previousPhotoUrls, newColor: fillYarnRgb, originalHex, yarn, seedX: x, seedY: y });
     if (stack.length > MAX_REGION_UNDO) stack.shift();
 
     onRegionFillDelta?.({

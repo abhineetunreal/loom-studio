@@ -99,13 +99,23 @@ export default function InlineYarnPicker({
                     title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
-                    className={`w-6 h-6 rounded-sm border-2 transition-colors ${
+                    className={`w-6 h-6 rounded-sm border-2 transition-colors overflow-hidden ${
                       isCurrent
                         ? "border-stone-800 ring-1 ring-stone-800 ring-offset-[1px]"
                         : "border-transparent hover:border-stone-400"
                     }`}
-                    style={{ backgroundColor: yarn.hex }}
-                  />
+                    style={yarn.renderType !== "photo" || !yarn.swatchImageUrl ? { backgroundColor: yarn.hex } : undefined}
+                  >
+                    {yarn.renderType === "photo" && yarn.swatchImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={yarn.swatchImageUrl}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover pointer-events-none"
+                      />
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -165,13 +175,23 @@ export default function InlineYarnPicker({
                   title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                   aria-label={yarn.name}
                   aria-pressed={isCurrent}
-                  className={`aspect-square rounded-[2px] border-2 transition-colors ${
+                  className={`aspect-square rounded-[2px] border-2 transition-colors overflow-hidden ${
                     isCurrent
                       ? "border-stone-800 ring-1 ring-stone-800 ring-offset-[1px]"
                       : "border-transparent hover:border-stone-400"
                   }`}
-                  style={{ backgroundColor: yarn.hex }}
-                />
+                  style={yarn.renderType !== "photo" || !yarn.swatchImageUrl ? { backgroundColor: yarn.hex } : undefined}
+                >
+                  {yarn.renderType === "photo" && yarn.swatchImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={yarn.swatchImageUrl}
+                      alt=""
+                      loading="lazy"
+                      className="w-full h-full object-cover pointer-events-none"
+                    />
+                  )}
+                </button>
               );
             })}
           </div>

@@ -35,6 +35,8 @@ export type YarnOption = {
   library: string | null;  // "OneLoom" | "ARS 1400" | "ARS 1200" — mapped from DB `material`
   pileType: string | null; // e.g. "Standard", "Loop" — null for most XML-imported yarns
   swatchImageUrl: string | null;
+  renderType: "shader" | "photo";
+  textureKpsi: number | null;
 };
 
 // ─── Design ───────────────────────────────────────────────────────────────────

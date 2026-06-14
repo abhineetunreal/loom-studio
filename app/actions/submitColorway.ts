@@ -79,12 +79,22 @@ export async function submitColorway(
         db.design.findUnique({ where: { id: designId }, select: { name: true } }),
         db.yarnColor.findMany({
           where: { id: { in: colorMappings.map((m) => m.yarnId) } },
-          select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
+          select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true, renderType: true, textureKpsi: true },
         }),
       ]);
 
       const yarnById = new Map(
-        yarns.map(({ material, ...y }) => [y.id, { ...y, library: material }])
+        yarns.map((y) => [y.id, {
+          id: y.id,
+          code: y.code,
+          name: y.name,
+          hex: y.hex,
+          library: y.material,
+          pileType: y.pileType,
+          swatchImageUrl: y.swatchImageUrl,
+          renderType: (y.renderType ?? "shader") as "shader" | "photo",
+          textureKpsi: y.textureKpsi ?? null,
+        }])
       );
 
       await sendColorwayRequestNotification({

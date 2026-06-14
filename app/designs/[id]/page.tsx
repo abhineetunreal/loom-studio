@@ -66,7 +66,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
     }),
     db.yarnColor.findMany({
       where: { isActive: true, tenantId: tenant?.id },
-      select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true },
+      select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true, renderType: true, textureKpsi: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getDefaultTierInfo(),
@@ -79,9 +79,16 @@ export default async function DesignPage({ params, searchParams }: Props) {
   const imageUrl = await resolveDesignImageUrl(design);
 
   // Map DB `material` → `library` for the UI type
-  const yarns: YarnOption[] = rawYarns.map(({ material, ...y }) => ({
-    ...y,
-    library: material,
+  const yarns: YarnOption[] = rawYarns.map((y) => ({
+    id: y.id,
+    code: y.code,
+    name: y.name,
+    hex: y.hex,
+    library: y.material,
+    pileType: y.pileType,
+    swatchImageUrl: y.swatchImageUrl,
+    renderType: (y.renderType ?? "shader") as "shader" | "photo",
+    textureKpsi: y.textureKpsi ?? null,
   }));
 
   const palette = design.palette as PaletteEntry[];
