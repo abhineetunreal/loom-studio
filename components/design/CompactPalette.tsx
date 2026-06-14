@@ -37,7 +37,10 @@ export default function CompactPalette({
   mode,
   onToggleMode,
 }: Props) {
-  const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
+  // Exclude entries that are effectively invisible (rounds to "0.0%")
+  const sorted = [...palette]
+    .filter((e) => e.percentage >= 0.05)
+    .sort((a, b) => b.percentage - a.percentage);
   const isDemo = tierInfo.tier === "demo";
 
   return (
@@ -110,10 +113,15 @@ export default function CompactPalette({
           //   user upload, yarn assigned    → yarn.code (e.g. "ARS-472" or "108")
           //   catalog design, no yarn       → raw hex
           //   catalog design, yarn assigned → yarn.code
+          //
+          // Some yarn libraries store codes as "LibraryName:N_Code" (e.g. "OneLoom:5_BM-813").
+          // Strip the library prefix and grid position so only the bare code is shown.
           const isRegionFillEntry = entry.index === -1;
-          const displayCode = !isRegionFillEntry && (isDemo || (isUserUpload && !assignedYarn))
+          const rawCode = !isRegionFillEntry && (isDemo || (isUserUpload && !assignedYarn))
             ? `Color ${i + 1}`
             : (assignedYarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase());
+          // Strip "Library:N_" prefix if present (e.g. "OneLoom:5_BM-813" → "BM-813")
+          const displayCode = rawCode.replace(/^[^:]+:\d+_/, "");
 
           const entryKey = isRegionFillEntry ? `region-${entry.hex}` : entry.hex;
 
