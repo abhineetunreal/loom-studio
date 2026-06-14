@@ -103,6 +103,7 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, c
         <LeftPanel
           designs={designs}
           canUpload={canUpload}
+          isSignedIn={!!user}
           collapsed={collapsed}
           onToggleCollapse={() => setCollapsed((v) => !v)}
           mobileOpen={mobileOpen}

@@ -55,28 +55,34 @@ export async function saveColorwayAction(
     }
   }
 
-  // Upsert SavedColorway — one row per (designId, userId)
+  // Find existing row (first match for this user+design) or create new one
   try {
-    await db.savedColorway.upsert({
-      where: {
-        designId_userId: { designId: input.designId, userId: tenantUser.id },
-      },
-      create: {
-        designId: input.designId,
-        userId: tenantUser.id,
-        tenantId: tenant.id,
-        colorMapping: input.colorMapping,
-        snapshotUrl,
-      },
-      update: {
-        colorMapping: input.colorMapping,
-        // Only overwrite snapshotUrl when we successfully captured a new one
-        ...(snapshotUrl !== null ? { snapshotUrl } : {}),
-      },
+    const existing = await db.savedColorway.findFirst({
+      where: { designId: input.designId, userId: tenantUser.id },
+      select: { id: true },
     });
+    if (existing) {
+      await db.savedColorway.update({
+        where: { id: existing.id },
+        data: {
+          colorMapping: input.colorMapping,
+          ...(snapshotUrl !== null ? { snapshotUrl } : {}),
+        },
+      });
+    } else {
+      await db.savedColorway.create({
+        data: {
+          designId: input.designId,
+          userId: tenantUser.id,
+          tenantId: tenant.id,
+          colorMapping: input.colorMapping,
+          snapshotUrl,
+        },
+      });
+    }
     return { ok: true };
   } catch (err) {
-    console.error("SavedColorway upsert error:", err);
+    console.error("SavedColorway save error:", err);
     return { ok: false, error: "Failed to save colorway" };
   }
 }

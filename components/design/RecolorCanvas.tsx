@@ -61,6 +61,8 @@ type RegionUndoEntry = {
   newColor: number;                    // packed RGB that was applied
   originalHex: string;                 // original design palette hex at the fill start
   yarn: YarnOption;                    // yarn used for this fill
+  seedX: number;                       // native pixel x coordinate of seed point
+  seedY: number;                       // native pixel y coordinate of seed point
 };
 
 const MAX_REGION_UNDO = 20;
@@ -72,6 +74,9 @@ export type RegionFillDelta = {
   previousColors: Map<number, number>; // pixelIdx → packed RGB previously there (region overrides only)
   newRgb: number;
   yarn: YarnOption;
+  /** Native-resolution pixel coordinates of the flood-fill seed point. */
+  seedX: number;
+  seedY: number;
 };
 
 /** Passed to onRegionUndoDelta after each region fill undo. */
@@ -95,6 +100,11 @@ export type RecolorCanvasHandle = {
    * or if the clicked pixel is outside the design bounds / transparent.
    */
   regionFillAt: (clientX: number, clientY: number) => void;
+  /**
+   * Replay a saved region fill using native pixel coordinates and a specific yarn.
+   * Used when restoring a saved colorway.  Adds to the undo stack.
+   */
+  replayRegionFill: (seedX: number, seedY: number, yarn: YarnOption) => void;
   /**
    * Undo the last region-fill operation.
    * Returns true if an operation was undone, false if the stack was empty.
@@ -185,6 +195,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     },
     regionFillAt(clientX: number, clientY: number) {
       doRegionFill(clientX, clientY);
+    },
+    replayRegionFill(seedX: number, seedY: number, yarn: YarnOption) {
+      doRegionFillNative(seedX, seedY, yarn);
     },
     undoRegionFill(): boolean {
       const stack = regionUndoStackRef.current;
@@ -410,23 +423,17 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   }
 
   // ── Region fill ──────────────────────────────────────────────────────────────
-  function doRegionFill(clientX: number, clientY: number) {
-    const canvas = canvasRef.current;
+
+  /** Core flood-fill logic operating on native pixel coordinates. */
+  function doRegionFillNative(x: number, y: number, yarn: YarnOption) {
     const pixels = originalPixels.current;
-    if (!canvas || !pixels || !fillYarn) return;
-
-    // Derive packed RGB from the fill yarn's hex color
-    const { r: fr, g: fg, b: fb } = hexToRgb(fillYarn.hex);
-    const fillYarnRgb = rgbToInt(fr, fg, fb);
-
-    // Map CSS coordinates → native pixel coordinates
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = width / rect.width;
-    const scaleY = height / rect.height;
-    const x = Math.floor((clientX - rect.left) * scaleX);
-    const y = Math.floor((clientY - rect.top) * scaleY);
+    if (!pixels) return;
 
     if (x < 0 || y < 0 || x >= width || y >= height) return;
+
+    // Derive packed RGB from the fill yarn's hex color
+    const { r: fr, g: fg, b: fb } = hexToRgb(yarn.hex);
+    const fillYarnRgb = rgbToInt(fr, fg, fb);
 
     // Capture the original palette hex at the start pixel
     const si = (y * width + x) * 4;
@@ -453,7 +460,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     // Push to undo stack (FIFO eviction at max size)
     const stack = regionUndoStackRef.current;
-    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb, originalHex, yarn: fillYarn });
+    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb, originalHex, yarn, seedX: x, seedY: y });
     if (stack.length > MAX_REGION_UNDO) stack.shift();
 
     onRegionFillDelta?.({
@@ -461,10 +468,26 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       pixelCount: indices.length,
       previousColors,
       newRgb: fillYarnRgb,
-      yarn: fillYarn,
+      yarn,
+      seedX: x,
+      seedY: y,
     });
 
     setOverrideVersion((v) => v + 1);
+  }
+
+  function doRegionFill(clientX: number, clientY: number) {
+    const canvas = canvasRef.current;
+    if (!canvas || !fillYarn) return;
+
+    // Map CSS coordinates → native pixel coordinates
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const x = Math.floor((clientX - rect.left) * scaleX);
+    const y = Math.floor((clientY - rect.top) * scaleY);
+
+    doRegionFillNative(x, y, fillYarn);
   }
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {

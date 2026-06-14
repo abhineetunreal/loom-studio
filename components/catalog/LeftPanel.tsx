@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { DesignSummary } from "@/types";
 import UploadsTab from "./UploadsTab";
+import SavedColorwaysTab from "./SavedColorwaysTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ type Tab = "designs" | "visualizations" | "favorites" | "uploads";
 type Props = {
   designs: DesignSummary[];
   canUpload: boolean;
+  isSignedIn: boolean;
   collapsed: boolean;
   onToggleCollapse: () => void;
   mobileOpen: boolean;
@@ -25,6 +27,7 @@ type Props = {
 export default function LeftPanel({
   designs,
   canUpload,
+  isSignedIn,
   collapsed,
   onToggleCollapse,
   mobileOpen,
@@ -46,9 +49,7 @@ export default function LeftPanel({
     try {
       const saved = localStorage.getItem("loom-favorites");
       if (saved) setFavorites(new Set(JSON.parse(saved) as string[]));
-    } catch {
-      // ignore parse errors
-    }
+    } catch { /* ignore */ }
   }, []);
 
   // Active design ID extracted from pathname like /designs/[id]
@@ -97,10 +98,6 @@ export default function LeftPanel({
     return map;
   }, [designs, search]);
 
-  const favoriteDesigns = useMemo(
-    () => designs.filter((d) => favorites.has(d.id)),
-    [designs, favorites]
-  );
 
   // ── Shared panel content ───────────────────────────────────────────────────
 
@@ -113,7 +110,7 @@ export default function LeftPanel({
             [
               "designs",
               "visualizations",
-              "favorites",
+              ...(isSignedIn ? (["favorites"] as Tab[]) : []),
               ...(canUpload ? (["uploads"] as Tab[]) : []),
             ] as Tab[]
           ).map((tab) => (
@@ -207,35 +204,9 @@ export default function LeftPanel({
           </div>
         )}
 
-        {/* ── Favorites tab ── */}
+        {/* ── Saved colorways tab ── */}
         {activeTab === "favorites" && (
-          <div className="p-2">
-            {favoriteDesigns.length === 0 ? (
-              <div className="py-10 text-center px-4">
-                <HeartIcon
-                  filled={false}
-                  className="w-8 h-8 text-stone-300 mx-auto mb-3"
-                />
-                <p className="text-xs font-medium text-stone-500">No favorites yet</p>
-                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
-                  Tap the heart on any design thumbnail to save it here.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-1">
-                {favoriteDesigns.map((d) => (
-                  <DesignThumb
-                    key={d.id}
-                    design={d}
-                    isActive={d.id === activeDesignId}
-                    isFavorite={true}
-                    onFavoriteToggle={toggleFavorite}
-                    onNavigate={onMobileClose}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <SavedColorwaysTab onNavigate={onMobileClose} />
         )}
 
         {/* ── Rooms / Visualizations tab ── */}

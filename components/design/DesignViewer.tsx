@@ -9,8 +9,24 @@ import InlineYarnPicker from "./InlineYarnPicker";
 import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
-import { saveColorwayAction } from "@/app/actions/saveColorway";
+import SaveModal from "./SaveModal";
 import type { DesignDetail, PaletteEntry, TierInfo, YarnOption } from "@/types";
+
+// ─── Operations JSON types ────────────────────────────────────────────────────
+
+export type RegionFillOperation = {
+  seedX: number;
+  seedY: number;
+  originalColor: string;
+  newHex: string;
+  newYarnCode: string;
+  newYarnId: string;
+};
+
+export type ColorwayOperations = {
+  globalMap: Record<string, { hex: string; yarnCode: string; yarnId: string }>;
+  regionFills: RegionFillOperation[];
+};
 
 // ─── Recolor state + reducer ──────────────────────────────────────────────────
 
@@ -129,6 +145,7 @@ export default function DesignViewer({
   // Set when the floating popover should be shown (canvas click, before picker opens)
   const [canvasPick, setCanvasPick] = useState<CanvasPickState>(null);
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [textureEnabled, setTextureEnabled] = useState(true);
   // Toast: shown briefly when a saved colorway was restored on page load
   const [showRestoredToast, setShowRestoredToast] = useState(false);
@@ -155,6 +172,11 @@ export default function DesignViewer({
   const overrideOriginalCountRef = useRef<Map<string, number>>(new Map());
   const overrideDisplayCountRef  = useRef<Map<number, number>>(new Map());
   const overrideYarnByRgbRef     = useRef<Map<number, YarnOption>>(new Map());
+
+  // ── Region-fill history for operations JSON ──────────────────────────────────
+  // Ordered list of region fill operations applied so far.  Mirrors the undo stack
+  // in RecolorCanvas (push on fill, pop on undo, clear on reset).
+  const regionFillHistoryRef = useRef<RegionFillOperation[]>([]);
 
   // The palette list shown in CompactPalette — rebuilt after every region fill delta
   const [effectivePalette, setEffectivePalette] = useState(design.palette);
@@ -231,6 +253,16 @@ export default function DesignViewer({
     overrideDisplayCount.set(delta.newRgb, (overrideDisplayCount.get(delta.newRgb) ?? 0) + delta.pixelCount);
     overrideYarnByRgbMap.set(delta.newRgb, delta.yarn);
 
+    // Track operation for operations JSON
+    regionFillHistoryRef.current.push({
+      seedX: delta.seedX,
+      seedY: delta.seedY,
+      originalColor: delta.originalHex,
+      newHex: delta.yarn.hex,
+      newYarnCode: delta.yarn.code,
+      newYarnId: delta.yarn.id,
+    });
+
     rebuildEffectivePalette();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -255,6 +287,9 @@ export default function DesignViewer({
       overrideDisplayCount.set(prevRgb, (overrideDisplayCount.get(prevRgb) ?? 0) + 1);
     }
 
+    // Pop the last operation from history
+    regionFillHistoryRef.current.pop();
+
     rebuildEffectivePalette();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -264,6 +299,7 @@ export default function DesignViewer({
     overrideOriginalCountRef.current.clear();
     overrideDisplayCountRef.current.clear();
     overrideYarnByRgbRef.current.clear();
+    regionFillHistoryRef.current = [];
     setEffectivePalette(design.palette);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [design.palette]);
@@ -300,57 +336,63 @@ export default function DesignViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally only on mount
 
-  // ── Save handler ─────────────────────────────────────────────────────────────
-  // Converts the hex-keyed recolor state to the palette-index-keyed format
-  // the DB expects, then calls the server action.
-  const handleSave = useCallback(async () => {
-    const snapshot = canvasRef.current?.getSnapshot() ?? null;
-
-    // Build index-keyed mapping — only slots with an assigned yarn
-    const colorMapping: Record<string, { yarnId: string; yarnCode: string; hex: string; library: string | null }> = {};
-    for (const entry of design.palette) {
-      const yarn = recolor.current[entry.hex];
+  // ── Build current operations JSON ─────────────────────────────────────────────
+  const buildOperations = useCallback((): ColorwayOperations => {
+    const globalMap: ColorwayOperations["globalMap"] = {};
+    for (const [hex, yarn] of Object.entries(recolor.current)) {
       if (!yarn) continue;
-      colorMapping[String(entry.index)] = {
-        yarnId: yarn.id,
-        yarnCode: yarn.code,
-        hex: yarn.hex,
-        library: yarn.library,
-      };
+      globalMap[hex] = { hex: yarn.hex, yarnCode: yarn.code, yarnId: yarn.id };
+    }
+    return { globalMap, regionFills: [...regionFillHistoryRef.current] };
+  }, [recolor]);
+
+  // ── Load a saved colorway ─────────────────────────────────────────────────────
+  // Apply globalMap to recolor state and replay region fills on the canvas.
+  const loadColorway = useCallback(async (ops: ColorwayOperations, yarns: YarnOption[]) => {
+    const yarnById = new Map(yarns.map((y) => [y.id, y]));
+
+    // Apply global map
+    const newColorMap: Record<string, YarnOption | null> = {};
+    for (const [hex, entry] of Object.entries(ops.globalMap)) {
+      const yarn = yarnById.get(entry.yarnId);
+      if (yarn) newColorMap[hex] = yarn;
+    }
+    // Reset to the loaded global map via RESET then individual ASSIGNs
+    dispatch({ type: "RESET" });
+    for (const [hex, yarn] of Object.entries(newColorMap)) {
+      if (yarn) dispatch({ type: "ASSIGN", hex, yarn });
     }
 
-    const result = await saveColorwayAction({
-      designId: design.id,
-      colorMapping,
-      snapshotDataUrl: snapshot,
+    // Clear existing region fills then replay
+    canvasRef.current?.clearRegionFills();
+    for (const fill of ops.regionFills) {
+      const yarn = yarnById.get(fill.newYarnId);
+      if (!yarn) continue;
+      canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Save handler (called from SaveModal) ──────────────────────────────────────
+  const handleSaveSubmit = useCallback(async (name: string, folderId: string | null) => {
+    const snapshot = canvasRef.current?.getSnapshot() ?? null;
+    const operations = buildOperations();
+
+    const res = await fetch("/api/colorways", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        designId: design.id,
+        name,
+        operations,
+        folderId,
+        snapshotDataUrl: snapshot,
+      }),
     });
-
-    if (!result.ok) throw new Error(result.error);
-  }, [design.id, design.palette, recolor]);
-
-  // ── 30-second auto-save ──────────────────────────────────────────────────────
-  // Debounced: timer restarts on every recolor change. Fires 30s after the last
-  // change — so a user actively editing won't trigger mid-edit saves.
-  useEffect(() => {
-    if (!isUserUpload || tierInfo.tier === "demo") return;
-    if (Object.keys(recolor.current).length === 0) return;
-    const t = setTimeout(() => {
-      handleSave().catch((err) => console.error("Auto-save failed:", err));
-    }, 30_000);
-    return () => clearTimeout(t);
-  }, [recolor.current, isUserUpload, tierInfo.tier, handleSave]);
-
-  // ── beforeunload warning ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isUserUpload) return;
-    function handler(e: BeforeUnloadEvent) {
-      if (Object.keys(recolor.current).length > 0) {
-        e.preventDefault();
-      }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error ?? "Save failed");
     }
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isUserUpload, recolor.current]);
+  }, [design.id, buildOperations]);
 
   // ── Rebuild effective palette when global colorMap changes ───────────────────
   // This covers: initial load (savedColorMap / initialColorMap), every ASSIGN/UNDO/REDO/RESET.
@@ -409,10 +451,12 @@ export default function DesignViewer({
     return canvasRef.current?.getSnapshot() ?? null;
   }, []);
 
-  const hasChanges = Object.keys(recolor.current).length > 0;
+  const hasChanges =
+    Object.keys(recolor.current).length > 0 ||
+    regionFillHistoryRef.current.length > 0;
 
-  // Show save button for user uploads when the user can actually save
-  const canSave = isUserUpload && tierInfo.tier !== "demo";
+  // Show save button for any signed-in non-demo user (catalog or upload)
+  const canSave = tierInfo.tier !== "demo";
 
   return (
     <div className="relative flex h-full overflow-hidden">
@@ -447,7 +491,7 @@ export default function DesignViewer({
         canUndo={!!recolor.past.length}
         canRedo={!!recolor.future.length}
         hasChanges={hasChanges}
-        onSave={canSave ? handleSave : undefined}
+        onSave={canSave && hasChanges ? async () => { setShowSaveModal(true); } : undefined}
         textureEnabled={textureEnabled}
         onToggleTexture={() => setTextureEnabled((v) => !v)}
         mode={recolorMode}
@@ -548,6 +592,14 @@ export default function DesignViewer({
           colorMap={recolor.current}
           getSnapshot={getSnapshot}
           onClose={() => setShowSubmissionForm(false)}
+        />
+      )}
+
+      {/* Save modal */}
+      {showSaveModal && (
+        <SaveModal
+          onSave={handleSaveSubmit}
+          onClose={() => setShowSaveModal(false)}
         />
       )}
     </div>

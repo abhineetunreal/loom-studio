@@ -15,6 +15,7 @@ import { CollectionsTab } from "./CollectionsTab";
 import { UserUploadsTab } from "./UserUploadsTab";
 import { CatalogTab } from "./CatalogTab";
 import { ColorMappingTab } from "./ColorMappingTab";
+import { SavedColorwaysAdminTab } from "./SavedColorwaysAdminTab";
 import type { CollectionSummary, DesignBrief } from "./CollectionsTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ type Props = {
   userAccess: Array<{ tenantUserId: string; collectionId: string }>;
 };
 
-type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors";
+type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors" | "colorways";
 
 // ─── AdminPanel ───────────────────────────────────────────────────────────────
 
@@ -137,6 +138,12 @@ export function AdminPanel({
           >
             Color Mapping
           </TabButton>
+          <TabButton
+            active={tab === "colorways"}
+            onClick={() => setTab("colorways")}
+          >
+            Saved Colorways
+          </TabButton>
         </div>
 
         {tab === "pending" && (
@@ -163,6 +170,7 @@ export function AdminPanel({
         {tab === "uploads" && <UserUploadsTab />}
         {tab === "catalog" && <CatalogTab collections={collections} />}
         {tab === "colors" && <ColorMappingTab />}
+        {tab === "colorways" && <SavedColorwaysAdminTab />}
       </div>
 
       {/* User access modal */}

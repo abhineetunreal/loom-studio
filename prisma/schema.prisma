@@ -29,13 +29,14 @@ model Tenant {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  designs        Design[]
-  yarns          YarnColor[]
-  users          TenantUser[]
-  submissions    ColorwaySubmission[]
-  collections    Collection[]
-  savedColorways SavedColorway[]
-  colorLookups   ColorLookup[]
+  designs          Design[]
+  yarns            YarnColor[]
+  users            TenantUser[]
+  submissions      ColorwaySubmission[]
+  collections      Collection[]
+  savedColorways   SavedColorway[]
+  colorwayFolders  ColorwayFolder[]
+  colorLookups     ColorLookup[]
 }
 
 model TenantUser {
@@ -53,6 +54,7 @@ model TenantUser {
   collectionAccess CollectionAccess[]
   uploadedDesigns  Design[]
   savedColorways   SavedColorway[]
+  colorwayFolders  ColorwayFolder[]
 
   @@unique([tenantId, email])
 }
@@ -184,20 +186,39 @@ model ColorLookup {
   @@unique([tenantId, renderedHex])
 }
 
-// A user's saved colorway for a design — one per user per design
+// A user's saved colorway for a design — multiple saves per user per design allowed
 model SavedColorway {
-  id           String     @id @default(cuid())
+  id           String          @id @default(cuid())
   designId     String
-  design       Design     @relation(fields: [designId], references: [id])
+  design       Design          @relation(fields: [designId], references: [id])
   userId       String
-  user         TenantUser @relation(fields: [userId], references: [id])
+  user         TenantUser      @relation(fields: [userId], references: [id])
   tenantId     String
-  tenant       Tenant     @relation(fields: [tenantId], references: [id])
-  // { [paletteIndex]: { yarnId, yarnCode, yarnHex, libraryName } }
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  name         String          @default("Untitled")
+  userEmail    String?         // denormalized for admin queries
+  // Legacy: { [paletteIndex]: { yarnId, yarnCode, yarnHex, libraryName } }
   colorMapping Json
-  snapshotUrl  String? // Supabase storage URL for canvas PNG export
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  // New format: { globalMap: Record<hex, {hex,yarnCode,yarnId}>, regionFills: [{seedX,seedY,originalColor,newHex,newYarnCode,newYarnId}] }
+  operations   Json?
+  folderId     String?
+  folder       ColorwayFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  snapshotUrl  String?         // Supabase storage URL for canvas PNG export
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
 
-  @@unique([designId, userId])
+// Folder for organizing saved colorways (per user, per tenant)
+model ColorwayFolder {
+  id        String          @id @default(cuid())
+  tenantId  String
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      TenantUser      @relation(fields: [userId], references: [id])
+  name      String
+  createdAt DateTime        @default(now())
+
+  colorways SavedColorway[]
+
+  @@unique([userId, name])
 }

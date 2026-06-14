@@ -106,9 +106,10 @@ export default async function DesignPage({ params }: Props) {
         select: { id: true },
       });
       if (tenantUser) {
-        const saved = await db.savedColorway.findUnique({
-          where: { designId_userId: { designId: design.id, userId: tenantUser.id } },
+        const saved = await db.savedColorway.findFirst({
+          where: { designId: design.id, userId: tenantUser.id },
           select: { colorMapping: true },
+          orderBy: { updatedAt: "desc" },
         });
         if (saved?.colorMapping) {
           // colorMapping is index-keyed: { "0": { yarnId, yarnCode, hex, library }, … }
