@@ -534,8 +534,13 @@ export default function DesignViewer({
         }}
         onRedo={() => dispatch({ type: "REDO" })}
         onReset={() => {
+          regionFillHistoryRef.current = [];
+          overrideOriginalCountRef.current = new Map();
+          overrideDisplayCountRef.current = new Map();
+          overrideYarnByRgbRef.current = new Map();
           dispatch({ type: "RESET" });
           canvasRef.current?.clearRegionFills();
+          setEffectivePalette(design.palette);
         }}
         canUndo={!!recolor.past.length}
         canRedo={!!recolor.future.length}

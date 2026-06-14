@@ -114,17 +114,14 @@ export default async function DesignPage({ params, searchParams }: Props) {
     });
 
     if (tenantUser) {
-      // Load the specific colorway by ID (from ?colorway= param), or the most recent one
+      // Only load a saved colorway when explicitly requested via ?colorway= param.
+      // Navigating to a design without that param always shows the original colors.
       const saved = colorwayId
         ? await db.savedColorway.findFirst({
             where: { id: colorwayId, designId: design.id, userId: tenantUser.id },
             select: { colorMapping: true, operations: true },
           })
-        : await db.savedColorway.findFirst({
-            where: { designId: design.id, userId: tenantUser.id },
-            select: { colorMapping: true, operations: true },
-            orderBy: { updatedAt: "desc" },
-          });
+        : null;
 
       if (saved) {
         const yarnById = new Map(yarns.map((y) => [y.id, y]));
