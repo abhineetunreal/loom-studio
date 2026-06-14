@@ -20,8 +20,6 @@ type Props = {
   /** Current fill mode — global replaces everywhere, region flood-fills one area. */
   mode: "global" | "region";
   onToggleMode: () => void;
-  /** Active fill yarn for region mode (shown as a color swatch indicator). */
-  selectedFillYarn: YarnOption | null;
 };
 
 export default function CompactPalette({
@@ -38,7 +36,6 @@ export default function CompactPalette({
   viewProductUrl,
   mode,
   onToggleMode,
-  selectedFillYarn,
 }: Props) {
   const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
   const isDemo = tierInfo.tier === "demo";
@@ -94,28 +91,6 @@ export default function CompactPalette({
           >
             <RegionFillIcon />
           </button>
-          {/* Fill yarn swatch — shown in region mode */}
-          {mode === "region" && (
-            <div className="flex items-center gap-1.5 ml-1 min-w-0">
-              {selectedFillYarn ? (
-                <>
-                  <span
-                    className="w-4 h-4 rounded-sm border border-black/10 shrink-0"
-                    style={{ background: selectedFillYarn.hex }}
-                    aria-hidden
-                  />
-                  <span
-                    className="text-[11px] text-stone-600 truncate"
-                    title={selectedFillYarn.name}
-                  >
-                    {selectedFillYarn.code}
-                  </span>
-                </>
-              ) : (
-                <span className="text-[10px] text-stone-400 italic">pick yarn →</span>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -128,18 +103,22 @@ export default function CompactPalette({
           const isChanged = (assignedYarn?.id ?? null) !== (initialYarn?.id ?? null);
           const swatchHex = assignedYarn?.hex ?? entry.hex;
 
-          // Label priority:
+          // Region-fill-only entries (index === -1) always show their yarn code.
+          // Label priority for original palette entries:
           //   demo tier         → "Color N" (no codes ever revealed)
           //   user upload, no yarn assigned → "Color N" (no raw hex shown; raw palette has no library meaning)
           //   user upload, yarn assigned    → yarn.code (e.g. "ARS-472" or "108")
           //   catalog design, no yarn       → raw hex
           //   catalog design, yarn assigned → yarn.code
-          const displayCode = isDemo || (isUserUpload && !assignedYarn)
+          const isRegionFillEntry = entry.index === -1;
+          const displayCode = !isRegionFillEntry && (isDemo || (isUserUpload && !assignedYarn))
             ? `Color ${i + 1}`
             : (assignedYarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase());
 
+          const entryKey = isRegionFillEntry ? `region-${entry.hex}` : entry.hex;
+
           return (
-            <li key={entry.hex} className="relative">
+            <li key={entryKey} className="relative">
               <button
                 onClick={() => onSelectColor(entry.hex)}
                 className={`w-full px-1.5 py-1.5 flex items-center gap-2 text-left rounded transition-colors ${

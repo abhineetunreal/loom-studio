@@ -1,9 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import RecolorCanvas, { type RecolorCanvasHandle } from "./RecolorCanvas";
+import RecolorCanvas, { type RecolorCanvasHandle, type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import { textureShader } from "@/lib/texture-shader";
-import { rgbToInt, hexToRgb } from "@/lib/recolor";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 type Props = {
@@ -27,6 +26,9 @@ type Props = {
   onToggleMode: () => void;
   /** Yarn selected as the region-fill paint color. */
   selectedFillYarn: YarnOption | null;
+  onRegionFillDelta?: (delta: RegionFillDelta) => void;
+  onRegionUndoDelta?: (delta: RegionUndoDelta) => void;
+  onRegionClear?: () => void;
 };
 
 function clampPan(
@@ -68,6 +70,9 @@ export default function CanvasZone({
   mode,
   onToggleMode,
   selectedFillYarn,
+  onRegionFillDelta,
+  onRegionUndoDelta,
+  onRegionClear,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -76,11 +81,6 @@ export default function CanvasZone({
   // True from mount until the first full render (recolor + texture) is painted.
   // Drives the loading overlay — hides the blank canvas while pixels are loading.
   const [isLoading, setIsLoading] = useState(true);
-
-  // Packed 24-bit RGB of the selected fill yarn — stable as long as the yarn doesn't change
-  const fillYarnRgb = selectedFillYarn
-    ? (() => { const { r, g, b } = hexToRgb(selectedFillYarn.hex); return rgbToInt(r, g, b); })()
-    : undefined;
 
   // Texture tuning controls — knot size is inverted (slider right = larger knots = lower multiplier)
   // knotSlider range 0.25–1.0; tileMultiplier = 1.25 - knotSlider → range 0.25×–1.0×; default 0.60 → 0.65×
@@ -378,7 +378,10 @@ export default function CanvasZone({
                 textureStrength={textureStrength}
                 onRenderComplete={() => setIsLoading(false)}
                 mode={mode}
-                fillYarnRgb={fillYarnRgb}
+                fillYarn={selectedFillYarn ?? undefined}
+                onRegionFillDelta={onRegionFillDelta}
+                onRegionUndoDelta={onRegionUndoDelta}
+                onRegionClear={onRegionClear}
               />
             </div>
 

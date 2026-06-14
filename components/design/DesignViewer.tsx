@@ -2,6 +2,7 @@
 
 import { useReducer, useState, useRef, useCallback, useEffect } from "react";
 import type { RecolorCanvasHandle } from "./RecolorCanvas";
+import { type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import CanvasZone from "./CanvasZone";
 import CompactPalette from "./CompactPalette";
 import InlineYarnPicker from "./InlineYarnPicker";
@@ -144,6 +145,129 @@ export default function DesignViewer({
   // Palette sorted by coverage — used to derive 1-based rank for the popover
   const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);
 
+  // ── Region-fill palette sync ─────────────────────────────────────────────────
+  // Running counts that let us rebuild the effective palette incrementally
+  // without scanning all pixels.  Updated by delta callbacks from RecolorCanvas.
+  //
+  //   overrideOriginalCount: originalHex → # of those pixels currently overridden
+  //   overrideDisplayCount:  packedRgb   → net # of pixels currently showing that color via override
+  //   overrideYarnByRgb:     packedRgb   → YarnOption used (for code display)
+  const overrideOriginalCountRef = useRef<Map<string, number>>(new Map());
+  const overrideDisplayCountRef  = useRef<Map<number, number>>(new Map());
+  const overrideYarnByRgbRef     = useRef<Map<number, YarnOption>>(new Map());
+
+  // The palette list shown in CompactPalette — rebuilt after every region fill delta
+  const [effectivePalette, setEffectivePalette] = useState(design.palette);
+
+  const totalPixels = design.palette.reduce((s, e) => s + e.pixelCount, 0);
+
+  /** Convert a packed 24-bit RGB int to "#rrggbb". */
+  function packedToHex(packed: number): string {
+    const r = (packed >> 16) & 0xFF;
+    const g = (packed >> 8)  & 0xFF;
+    const b =  packed        & 0xFF;
+    return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+  }
+
+  /** Rebuild effectivePalette from current recolor.current + override refs. */
+  function rebuildEffectivePalette() {
+    const overrideOriginalCount = overrideOriginalCountRef.current;
+    const overrideDisplayCount  = overrideDisplayCountRef.current;
+    const overrideYarnByRgb     = overrideYarnByRgbRef.current;
+
+    const entries: PaletteEntry[] = [];
+
+    // 1. Original palette entries — adjusted for region overrides
+    for (const entry of design.palette) {
+      const overridden = overrideOriginalCount.get(entry.hex) ?? 0;
+      const visible = Math.max(0, entry.pixelCount - overridden);
+      if (visible === 0) continue;
+      entries.push({
+        ...entry,
+        pixelCount: visible,
+        percentage: totalPixels > 0 ? (visible / totalPixels) * 100 : 0,
+      });
+    }
+
+    // 2. Region-fill-only colors (not present in original design palette)
+    const originalHexSet = new Set(design.palette.map((e) => e.hex));
+    for (const [packedRgb, count] of overrideDisplayCount) {
+      if (count <= 0) continue;
+      const displayHex = packedToHex(packedRgb);
+      if (originalHexSet.has(displayHex)) continue; // merged into original entry via adjusted count
+      const yarn = overrideYarnByRgb.get(packedRgb);
+      entries.push({
+        index: -1,
+        hex: displayHex,
+        pixelCount: count,
+        percentage: totalPixels > 0 ? (count / totalPixels) * 100 : 0,
+        matchedYarnCode: yarn?.code,
+      });
+    }
+
+    entries.sort((a, b) => b.percentage - a.percentage);
+    setEffectivePalette(entries);
+  }
+
+  /** Handle a region fill delta: update running counts and rebuild palette. */
+  const handleRegionFillDelta = useCallback((delta: RegionFillDelta) => {
+    const overrideOriginalCount = overrideOriginalCountRef.current;
+    const overrideDisplayCount  = overrideDisplayCountRef.current;
+    const overrideYarnByRgbMap  = overrideYarnByRgbRef.current;
+
+    // Pixels newly taken from the original (not previously overridden)
+    const newlyOverridden = delta.pixelCount - delta.previousColors.size;
+    overrideOriginalCount.set(
+      delta.originalHex,
+      (overrideOriginalCount.get(delta.originalHex) ?? 0) + newlyOverridden
+    );
+
+    // Previous overrides being replaced: subtract their old display contribution
+    for (const prevRgb of delta.previousColors.values()) {
+      overrideDisplayCount.set(prevRgb, (overrideDisplayCount.get(prevRgb) ?? 0) - 1);
+    }
+
+    // All affected pixels now display newRgb
+    overrideDisplayCount.set(delta.newRgb, (overrideDisplayCount.get(delta.newRgb) ?? 0) + delta.pixelCount);
+    overrideYarnByRgbMap.set(delta.newRgb, delta.yarn);
+
+    rebuildEffectivePalette();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Handle a region fill undo delta: reverse the running counts and rebuild. */
+  const handleRegionUndoDelta = useCallback((delta: RegionUndoDelta) => {
+    const overrideOriginalCount = overrideOriginalCountRef.current;
+    const overrideDisplayCount  = overrideDisplayCountRef.current;
+
+    // Remove the undone color's contribution
+    overrideDisplayCount.set(delta.removedRgb, (overrideDisplayCount.get(delta.removedRgb) ?? 0) - delta.pixelCount);
+
+    // Pixels restored to original (those not in previousColors)
+    const restoredToOriginal = delta.pixelCount - delta.previousColors.size;
+    overrideOriginalCount.set(
+      delta.originalHex,
+      Math.max(0, (overrideOriginalCount.get(delta.originalHex) ?? 0) - restoredToOriginal)
+    );
+
+    // Pixels restored to their previous override color
+    for (const prevRgb of delta.previousColors.values()) {
+      overrideDisplayCount.set(prevRgb, (overrideDisplayCount.get(prevRgb) ?? 0) + 1);
+    }
+
+    rebuildEffectivePalette();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Clear all override tracking and reset effective palette to design.palette. */
+  const handleRegionClear = useCallback(() => {
+    overrideOriginalCountRef.current.clear();
+    overrideDisplayCountRef.current.clear();
+    overrideYarnByRgbRef.current.clear();
+    setEffectivePalette(design.palette);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design.palette]);
+
   // ── Keyboard shortcuts ───────────────────────────────────────────────────────
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -227,6 +351,12 @@ export default function DesignViewer({
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isUserUpload, recolor.current]);
+
+  // ── Rebuild effective palette when global colorMap changes ───────────────────
+  // This covers: initial load (savedColorMap / initialColorMap), every ASSIGN/UNDO/REDO/RESET.
+  // Region-fill-driven rebuilds happen via the delta callbacks, not here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { rebuildEffectivePalette(); }, [recolor.current]);
 
   // ── Color pick handlers ──────────────────────────────────────────────────────
 
@@ -323,13 +453,16 @@ export default function DesignViewer({
         mode={recolorMode}
         onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
         selectedFillYarn={selectedFillYarn}
+        onRegionFillDelta={handleRegionFillDelta}
+        onRegionUndoDelta={handleRegionUndoDelta}
+        onRegionClear={handleRegionClear}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
       <div className="shrink-0 w-[13%] min-w-[160px] flex flex-col border-l border-stone-200 bg-white overflow-hidden">
         <CompactPalette
           designName={design.name}
-          palette={design.palette}
+          palette={effectivePalette}
           colorMap={recolor.current}
           initialColorMap={initialColorMap ?? {}}
           selectedHex={canvasPick?.hex ?? selectedHex}
@@ -341,7 +474,6 @@ export default function DesignViewer({
           viewProductUrl={viewProductUrl}
           mode={recolorMode}
           onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
-          selectedFillYarn={selectedFillYarn}
         />
       </div>
 

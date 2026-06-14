@@ -26,7 +26,7 @@
  */
 
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
-import { applyRecolor, buildColorLookup, rgbToHex } from "@/lib/recolor"; // rgbToHex used by pickColorAt
+import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
 import { floodFill } from "@/lib/flood-fill";
 import type { PaletteEntry, YarnOption } from "@/types";
@@ -53,15 +53,34 @@ function cachePixels(url: string, native: Uint8ClampedArray, supersampled: Uint8
   pixelCacheOrder.push(url);
 }
 
-// ─── Region undo entry ────────────────────────────────────────────────────────
+// ─── Region undo entry + exported delta types ─────────────────────────────────
 
 type RegionUndoEntry = {
   pixelIndices: number[];
   previousColors: Map<number, number>; // pixelIdx → packed RGB that was there before
   newColor: number;                    // packed RGB that was applied
+  originalHex: string;                 // original design palette hex at the fill start
+  yarn: YarnOption;                    // yarn used for this fill
 };
 
 const MAX_REGION_UNDO = 20;
+
+/** Passed to onRegionFillDelta after each successful region fill. */
+export type RegionFillDelta = {
+  originalHex: string;
+  pixelCount: number;
+  previousColors: Map<number, number>; // pixelIdx → packed RGB previously there (region overrides only)
+  newRgb: number;
+  yarn: YarnOption;
+};
+
+/** Passed to onRegionUndoDelta after each region fill undo. */
+export type RegionUndoDelta = {
+  originalHex: string;
+  pixelCount: number;
+  previousColors: Map<number, number>; // the state restored to (same map as in fill delta)
+  removedRgb: number;
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -102,17 +121,24 @@ type Props = {
   /** Current interaction mode. */
   mode: "global" | "region";
   /**
-   * Packed 24-bit RGB ((r<<16)|(g<<8)|b) of the yarn to use for region fills.
-   * Only relevant in "region" mode.
+   * Yarn to use for region fills.  Only relevant in "region" mode.
+   * Packed RGB is derived internally so the caller doesn't need to convert.
    */
-  fillYarnRgb?: number;
+  fillYarn?: YarnOption;
+  /** Called after each region fill with pixel-level delta information. */
+  onRegionFillDelta?: (delta: RegionFillDelta) => void;
+  /** Called after each region fill undo with pixel-level delta information. */
+  onRegionUndoDelta?: (delta: RegionUndoDelta) => void;
+  /** Called when all region fills are cleared (reset). */
+  onRegionClear?: () => void;
 };
 
 const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCanvas(
   {
     imageUrl, width, height, palette, colorMap, selectedHex, onColorPick,
     textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5,
-    onRenderComplete, mode, fillYarnRgb,
+    onRenderComplete, mode, fillYarn,
+    onRegionFillDelta, onRegionUndoDelta, onRegionClear,
   },
   ref
 ) {
@@ -174,12 +200,19 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
           layer.delete(idx);
         }
       }
+      onRegionUndoDelta?.({
+        originalHex: entry.originalHex,
+        pixelCount: entry.pixelIndices.length,
+        previousColors: entry.previousColors,
+        removedRgb: entry.newColor,
+      });
       setOverrideVersion((v) => v + 1);
       return true;
     },
     clearRegionFills() {
       overrideLayerRef.current.clear();
       regionUndoStackRef.current = [];
+      onRegionClear?.();
       setOverrideVersion((v) => v + 1);
     },
   }));
@@ -380,7 +413,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   function doRegionFill(clientX: number, clientY: number) {
     const canvas = canvasRef.current;
     const pixels = originalPixels.current;
-    if (!canvas || !pixels || fillYarnRgb === undefined) return;
+    if (!canvas || !pixels || !fillYarn) return;
+
+    // Derive packed RGB from the fill yarn's hex color
+    const { r: fr, g: fg, b: fb } = hexToRgb(fillYarn.hex);
+    const fillYarnRgb = rgbToInt(fr, fg, fb);
 
     // Map CSS coordinates → native pixel coordinates
     const rect = canvas.getBoundingClientRect();
@@ -390,6 +427,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     const y = Math.floor((clientY - rect.top) * scaleY);
 
     if (x < 0 || y < 0 || x >= width || y >= height) return;
+
+    // Capture the original palette hex at the start pixel
+    const si = (y * width + x) * 4;
+    if (pixels[si + 3] === 0) return; // transparent — ignore
+    const originalHex = rgbToHex(pixels[si], pixels[si + 1], pixels[si + 2]);
 
     const t0 = performance.now();
     const indices = floodFill(pixels, x, y, width, height);
@@ -411,8 +453,16 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     // Push to undo stack (FIFO eviction at max size)
     const stack = regionUndoStackRef.current;
-    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb });
+    stack.push({ pixelIndices: indices, previousColors, newColor: fillYarnRgb, originalHex, yarn: fillYarn });
     if (stack.length > MAX_REGION_UNDO) stack.shift();
+
+    onRegionFillDelta?.({
+      originalHex,
+      pixelCount: indices.length,
+      previousColors,
+      newRgb: fillYarnRgb,
+      yarn: fillYarn,
+    });
 
     setOverrideVersion((v) => v + 1);
   }
