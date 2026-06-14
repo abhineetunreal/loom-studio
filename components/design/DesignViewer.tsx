@@ -339,6 +339,9 @@ export default function DesignViewer({
           tierInfo={tierInfo}
           isUserUpload={isUserUpload}
           viewProductUrl={viewProductUrl}
+          mode={recolorMode}
+          onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
+          selectedFillYarn={selectedFillYarn}
         />
       </div>
 

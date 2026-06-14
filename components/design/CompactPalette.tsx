@@ -17,6 +17,11 @@ type Props = {
   isUserUpload: boolean;
   /** Full URL to the product page on the brand's website. Only shown when set. */
   viewProductUrl?: string;
+  /** Current fill mode — global replaces everywhere, region flood-fills one area. */
+  mode: "global" | "region";
+  onToggleMode: () => void;
+  /** Active fill yarn for region mode (shown as a color swatch indicator). */
+  selectedFillYarn: YarnOption | null;
 };
 
 export default function CompactPalette({
@@ -31,6 +36,9 @@ export default function CompactPalette({
   tierInfo,
   isUserUpload,
   viewProductUrl,
+  mode,
+  onToggleMode,
+  selectedFillYarn,
 }: Props) {
   const sorted = [...palette].sort((a, b) => b.percentage - a.percentage);
   const isDemo = tierInfo.tier === "demo";
@@ -55,6 +63,58 @@ export default function CompactPalette({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
+          )}
+        </div>
+      </div>
+
+      {/* Fill mode toggle */}
+      <div className="shrink-0 px-2 py-1.5 border-b border-stone-200">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => mode !== "global" && onToggleMode()}
+            title="Global Fill — changes this color everywhere in the rug"
+            aria-pressed={mode === "global"}
+            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${
+              mode === "global"
+                ? "bg-stone-800 text-white"
+                : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+            }`}
+          >
+            <GlobalFillIcon />
+          </button>
+          <button
+            onClick={() => mode !== "region" && onToggleMode()}
+            title="Region Fill — changes only the clicked area"
+            aria-pressed={mode === "region"}
+            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${
+              mode === "region"
+                ? "bg-stone-800 text-white"
+                : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+            }`}
+          >
+            <RegionFillIcon />
+          </button>
+          {/* Fill yarn swatch — shown in region mode */}
+          {mode === "region" && (
+            <div className="flex items-center gap-1.5 ml-1 min-w-0">
+              {selectedFillYarn ? (
+                <>
+                  <span
+                    className="w-4 h-4 rounded-sm border border-black/10 shrink-0"
+                    style={{ background: selectedFillYarn.hex }}
+                    aria-hidden
+                  />
+                  <span
+                    className="text-[11px] text-stone-600 truncate"
+                    title={selectedFillYarn.name}
+                  >
+                    {selectedFillYarn.code}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[10px] text-stone-400 italic">pick yarn →</span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -162,6 +222,38 @@ function RevertIcon() {
   return (
     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+    </svg>
+  );
+}
+
+/** Paint bucket — fills the entire color region everywhere in the rug. */
+function GlobalFillIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      {/* brush stroke (diagonal handle) */}
+      <path d="M2.5 13 7 8.5" />
+      {/* brush head */}
+      <path d="M7 8.5l3.5-3.5 1.5 1.5L8.5 10 7 8.5z" />
+      {/* paint droplet */}
+      <path d="M13.5 12.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5C10.5 11.3 12 9.5 12 9.5s1.5 1.8 1.5 3z" />
+      {/* base line — full coverage */}
+      <path d="M1 14.5h5.5" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+/** Paint bucket confined within a dashed selection — fills only the clicked region. */
+function RegionFillIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      {/* dashed selection box */}
+      <rect x="1" y="1" width="10" height="10" rx="1.2" strokeDasharray="2 1.5" />
+      {/* mini brush stroke inside */}
+      <path d="M3 8.5l2.5-2.5" />
+      {/* mini brush head */}
+      <path d="M5.5 6l2-2 1 1-2 2-1-1z" />
+      {/* mini droplet */}
+      <path d="M9.5 9.5c0 .55-.45 1-1 1s-1-.45-1-1c0-.7 1-1.8 1-1.8s1 1.1 1 1.8z" />
     </svg>
   );
 }
