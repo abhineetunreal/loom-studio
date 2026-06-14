@@ -1,28 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
 import { createAdminClient } from "@/lib/supabase";
 
 const SNAPSHOTS_BUCKET = process.env.SUPABASE_SNAPSHOTS_BUCKET ?? "snapshots";
 
-// ─── GET /api/colorways ───────────────────────────────────────────────────────
-// List the current user's saved colorways (optionally filtered by folderId).
-export async function GET(request: NextRequest) {
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// ─── Shared auth helper ───────────────────────────────────────────────────────
+// Returns { tenantUser, email } or a NextResponse error to return immediately.
+async function resolveUser() {
+  const session = await getSession();
+  if (!session?.user.email) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  const email = session.user.email;
 
   const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  if (!tenant) {
+    return { error: NextResponse.json({ error: "Tenant not found" }, { status: 404 }) };
+  }
 
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true },
+  const tenantUser = await db.tenantUser.findUnique({
+    where: { tenantId_email: { tenantId: tenant.id, email } },
+    select: { id: true, email: true, role: true },
   });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  if (!tenantUser) {
+    return { error: NextResponse.json({ error: "User not found" }, { status: 404 }) };
+  }
+
+  // Only APPROVED, ADMIN, and OWNER roles may save colorways
+  if (tenantUser.role === "PENDING" || tenantUser.role === "DEMO") {
+    return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
+  }
+
+  return { tenantUser, tenant, email };
+}
+
+// ─── GET /api/colorways ───────────────────────────────────────────────────────
+export async function GET(request: NextRequest) {
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser, tenant } = auth;
 
   const { searchParams } = new URL(request.url);
-  const folderId = searchParams.get("folderId") ?? undefined;
+  const folderId = searchParams.get("folderId");
 
   const colorways = await db.savedColorway.findMany({
     where: {
@@ -46,19 +68,10 @@ export async function GET(request: NextRequest) {
 }
 
 // ─── POST /api/colorways ──────────────────────────────────────────────────────
-// Save a new colorway.
 export async function POST(request: NextRequest) {
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true, email: true },
-  });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser, tenant, email } = auth;
 
   const body = await request.json();
   const { designId, name, operations, folderId, snapshotDataUrl } = body as {
@@ -95,8 +108,8 @@ export async function POST(request: NextRequest) {
       userId: tenantUser.id,
       tenantId: tenant.id,
       name: name.trim(),
-      userEmail: tenantUser.email,
-      operations: operations as never ?? {},
+      userEmail: email,
+      operations: (operations ?? {}) as never,
       colorMapping: {},
       folderId: folderId ?? null,
     },
@@ -123,14 +136,14 @@ async function uploadSnapshot(
   const admin = createAdminClient();
   const base64 = dataUrl.replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64, "base64");
-  const path = `colorways/${tenantId}/${userId}/${colorwayId}.png`;
+  const storagePath = `colorways/${tenantId}/${userId}/${colorwayId}.png`;
 
   const { error } = await admin.storage
     .from(SNAPSHOTS_BUCKET)
-    .upload(path, buffer, { contentType: "image/png", upsert: true });
+    .upload(storagePath, buffer, { contentType: "image/png", upsert: true });
 
   if (error) throw new Error(`Snapshot upload failed: ${error.message}`);
 
-  const { data } = admin.storage.from(SNAPSHOTS_BUCKET).getPublicUrl(path);
+  const { data } = admin.storage.from(SNAPSHOTS_BUCKET).getPublicUrl(storagePath);
   return data.publicUrl;
 }

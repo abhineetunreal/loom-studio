@@ -1,22 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
 
-// ─── GET /api/colorways/folders ───────────────────────────────────────────────
-// List the current user's colorway folders.
-export async function GET() {
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// ─── Shared auth helper ───────────────────────────────────────────────────────
+async function resolveUser() {
+  const session = await getSession();
+  if (!session?.user.email) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
 
   const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  if (!tenant) {
+    return { error: NextResponse.json({ error: "Tenant not found" }, { status: 404 }) };
+  }
 
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true },
+  const tenantUser = await db.tenantUser.findUnique({
+    where: { tenantId_email: { tenantId: tenant.id, email: session.user.email } },
+    select: { id: true, role: true },
   });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  if (!tenantUser) {
+    return { error: NextResponse.json({ error: "User not found" }, { status: 404 }) };
+  }
+
+  if (tenantUser.role === "PENDING" || tenantUser.role === "DEMO") {
+    return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
+  }
+
+  return { tenantUser, tenant };
+}
+
+// ─── GET /api/colorways/folders ───────────────────────────────────────────────
+export async function GET() {
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser, tenant } = auth;
 
   const folders = await db.colorwayFolder.findMany({
     where: { tenantId: tenant.id, userId: tenantUser.id },
@@ -33,19 +52,10 @@ export async function GET() {
 }
 
 // ─── POST /api/colorways/folders ──────────────────────────────────────────────
-// Create a new folder.
 export async function POST(request: NextRequest) {
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true },
-  });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser, tenant } = auth;
 
   const body = await request.json();
   const name: string = (body.name ?? "").trim();

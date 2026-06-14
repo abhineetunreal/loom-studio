@@ -1,26 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
 
+// ─── Shared auth helper ───────────────────────────────────────────────────────
+async function resolveUser() {
+  const session = await getSession();
+  if (!session?.user.email) {
+    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return { error: NextResponse.json({ error: "Tenant not found" }, { status: 404 }) };
+  }
+
+  const tenantUser = await db.tenantUser.findUnique({
+    where: { tenantId_email: { tenantId: tenant.id, email: session.user.email } },
+    select: { id: true, role: true },
+  });
+
+  if (!tenantUser) {
+    return { error: NextResponse.json({ error: "User not found" }, { status: 404 }) };
+  }
+
+  if (tenantUser.role === "PENDING" || tenantUser.role === "DEMO") {
+    return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
+  }
+
+  return { tenantUser, tenant };
+}
+
 // ─── PUT /api/colorways/folders/[id] ─────────────────────────────────────────
-// Rename a folder (owner only).
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true },
-  });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser } = auth;
 
   const folder = await db.colorwayFolder.findFirst({
     where: { id, userId: tenantUser.id },
@@ -41,23 +60,14 @@ export async function PUT(
 }
 
 // ─── DELETE /api/colorways/folders/[id] ──────────────────────────────────────
-// Delete a folder. Colorways inside are moved to "no folder" (folderId → null).
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const authUser = await getUser();
-  if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const tenant = await getCurrentTenant();
-  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
-    select: { id: true },
-  });
-  if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const auth = await resolveUser();
+  if ("error" in auth) return auth.error;
+  const { tenantUser } = auth;
 
   const folder = await db.colorwayFolder.findFirst({
     where: { id, userId: tenantUser.id },
@@ -65,7 +75,7 @@ export async function DELETE(
   });
   if (!folder) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // The FK onDelete: SetNull handles moving colorways to root automatically
+  // onDelete: SetNull on the FK moves colorways to root automatically
   await db.colorwayFolder.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
