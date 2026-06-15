@@ -481,11 +481,15 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
+      // knotSizeMultiplier (tileMultiplier) intentionally excluded — it affects only the shader
+      // detail map, not photo swatch tiles. Photo tile size = physical size × swatchScale only.
       const { tileSizeX: basePhotoTileX, tileSizeY: basePhotoTileY } = computePhotoTileSizes(
-        width, height, designName ?? "", tileMultiplier
+        width, height, designName ?? "", 1.0
       );
-      const photoTileSizeX = basePhotoTileX * swatchScale;
-      const photoTileSizeY = basePhotoTileY * swatchScale;
+      // Scale to SS pixel space: the shader now samples using SS coords (x, y) directly,
+      // so tile sizes must also be in SS pixels to produce the correct UV mapping.
+      const photoTileSizeX = basePhotoTileX * swatchScale * SUPERSAMPLE_FACTOR;
+      const photoTileSizeY = basePhotoTileY * swatchScale * SUPERSAMPLE_FACTOR;
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
         ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,

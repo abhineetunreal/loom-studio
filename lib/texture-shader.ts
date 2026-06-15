@@ -228,8 +228,8 @@ class TextureShader {
     // Photo-swatch additions:
     photoLookup?: Map<number, PhotoSwatchData>,       // packedInt → swatch (global map)
     photoOverrideLayer?: Map<number, PhotoSwatchData>, // nativePixelIndex → swatch (region fills)
-    photoTileSizeX = 90,   // tile size in NATIVE pixels, X axis
-    photoTileSizeY = 90,   // tile size in NATIVE pixels, Y axis
+    photoTileSizeX = 180,  // tile size in SUPERSAMPLED pixels, X axis
+    photoTileSizeY = 180,  // tile size in SUPERSAMPLED pixels, Y axis
   ): ImageData {
     const output = new ImageData(width, height);
     const out = output.data;
@@ -251,11 +251,11 @@ class TextureShader {
           const nativeX = x >> 1;
           const nativeIdx = nativeRow + nativeX;
 
-          // Photo override — UV in native pixel space so all 4 SS pixels hit the same texel
+          // Photo override — UV in SS pixel space: each SS pixel samples a unique texel
           const photoOverride = photoOverrideLayer?.get(nativeIdx);
           if (photoOverride !== undefined) {
-            const tx = Math.floor(((nativeX % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
-            const ty = Math.floor(((nativeY % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
             const si = (ty * photoOverride.w + tx) * 4;
             out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
             out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
@@ -272,11 +272,11 @@ class TextureShader {
 
           const r0 = originalPixels[pi], g0 = originalPixels[pi+1], b0 = originalPixels[pi+2];
 
-          // Photo global map — UV in native pixel space
+          // Photo global map — UV in SS pixel space
           const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
           if (photoEntry !== undefined) {
-            const tx = Math.floor(((nativeX % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
-            const ty = Math.floor(((nativeY % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
@@ -313,11 +313,11 @@ class TextureShader {
         const nativeIdx = nativeRowOff + nativeX;
 
         // ── Photo override layer (region fills using photo swatches) ──────────
-        // UV in native pixel space so all 4 SS pixels in a 2×2 block hit the same texel → sharp
+        // UV in SS pixel space: each of the 4 SS pixels in a 2×2 block samples a unique texel
         const photoOverride = photoOverrideLayer?.get(nativeIdx);
         if (photoOverride !== undefined) {
-          const tx = Math.floor(((nativeX % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
-          const ty = Math.floor(((nativeY % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+          const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
+          const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
           const si = (ty * photoOverride.w + tx) * 4;
           out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
           out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
@@ -336,11 +336,11 @@ class TextureShader {
         } else {
           const r0 = originalPixels[pi], g0 = originalPixels[pi+1], b0 = originalPixels[pi+2];
 
-          // ── Photo global map — UV in native pixel space ───────────────────────
+          // ── Photo global map — UV in SS pixel space ───────────────────────────
           const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
           if (photoEntry !== undefined) {
-            const tx = Math.floor(((nativeX % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
-            const ty = Math.floor(((nativeY % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
