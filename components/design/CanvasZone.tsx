@@ -107,6 +107,8 @@ export default function CanvasZone({
   // Photo-swatch scale: multiplicative factor on the physically-calculated tile size.
   // Separate from tileMultiplier — only affects photo-type colors.
   const [swatchScale, setSwatchScale] = useState(1.0);
+  // Unsharp-mask sharpening strength for photo-swatch pixels (0 = off)
+  const [sharpenStrength, setSharpenStrength] = useState(0.6);
   // Toast shown after "Save Scale" completes
   const [saveScaleToast, setSaveScaleToast] = useState<string | null>(null);
 
@@ -446,6 +448,7 @@ export default function CanvasZone({
                 tileMultiplier={tileMultiplier}
                 textureStrength={textureStrength}
                 swatchScale={swatchScale}
+                sharpenStrength={sharpenStrength}
                 onRenderComplete={() => { setIsLoading(false); onRenderComplete?.(); }}
                 mode={mode}
                 fillYarn={selectedFillYarn ?? undefined}
@@ -479,6 +482,17 @@ export default function CanvasZone({
         {/* Floating action buttons — bottom-right of canvas area, above pointer overlay */}
         {!isLoading && !colorwayLoading && (
           <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2 items-end pointer-events-none">
+            {/* Save Scale — admin/owner only, visible when photo swatches are in use */}
+            {tierInfo.tier === "admin" && hasPhotoColors && (
+              <button
+                onClick={handleSaveScale}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 transition-colors whitespace-nowrap"
+                title="Save current scale as the calibrated default for these photo yarns"
+              >
+                Save Scale
+              </button>
+            )}
+
             {/* Request colorway (primary) */}
             {tierInfo.pendingApproval ? (
               <p className="pointer-events-auto text-xs px-3 py-2 text-amber-700 bg-amber-50/95 rounded-lg border border-amber-200 shadow whitespace-nowrap">
@@ -582,45 +596,68 @@ export default function CanvasZone({
           </span>
         </div>
         {hasPhotoColors && (
-          <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
-            <span className="text-xs text-stone-500 whitespace-nowrap">Swatch Scale</span>
-            <input
-              type="range"
-              min={0.1}
-              max={3.0}
-              step={0.05}
-              value={swatchScale}
-              onChange={(e) => setSwatchScale(parseFloat(e.target.value))}
-              className="w-20 accent-stone-700"
-              aria-label="Swatch scale"
-            />
-            <input
-              type="number"
-              min={0.1}
-              max={3.0}
-              step={0.05}
-              value={swatchScale}
-              onChange={(e) => setSwatchScale(e.target.value === "" ? swatchScale : parseFloat(e.target.value))}
-              onBlur={(e) => {
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v)) setSwatchScale(Math.min(3.0, Math.max(0.1, v)));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              }}
-              className="w-14 text-xs text-stone-700 tabular-nums border border-stone-200 rounded px-1 py-0.5 text-right"
-              aria-label="Swatch scale value"
-            />
-            {tierInfo.tier === "admin" && (
-              <button
-                onClick={handleSaveScale}
-                className="text-xs px-2 py-1 rounded border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-700 whitespace-nowrap transition-colors"
-                title="Save current scale as the calibrated default for these photo yarns"
-              >
-                Save Scale
-              </button>
-            )}
-          </div>
+          <>
+            <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
+              <span className="text-xs text-stone-500 whitespace-nowrap">Swatch Scale</span>
+              <input
+                type="range"
+                min={0.1}
+                max={3.0}
+                step={0.05}
+                value={swatchScale}
+                onChange={(e) => setSwatchScale(parseFloat(e.target.value))}
+                className="w-20 accent-stone-700"
+                aria-label="Swatch scale"
+              />
+              <input
+                type="number"
+                min={0.1}
+                max={3.0}
+                step={0.05}
+                value={swatchScale}
+                onChange={(e) => setSwatchScale(e.target.value === "" ? swatchScale : parseFloat(e.target.value))}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v)) setSwatchScale(Math.min(3.0, Math.max(0.1, v)));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                className="w-14 text-xs text-stone-700 tabular-nums border border-stone-200 rounded px-1 py-0.5 text-right"
+                aria-label="Swatch scale value"
+              />
+            </div>
+            <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
+              <span className="text-xs text-stone-500 whitespace-nowrap">Sharpness</span>
+              <input
+                type="range"
+                min={0}
+                max={1.5}
+                step={0.05}
+                value={sharpenStrength}
+                onChange={(e) => setSharpenStrength(parseFloat(e.target.value))}
+                className="w-20 accent-stone-700"
+                aria-label="Sharpness"
+              />
+              <input
+                type="number"
+                min={0}
+                max={1.5}
+                step={0.05}
+                value={sharpenStrength}
+                onChange={(e) => setSharpenStrength(e.target.value === "" ? sharpenStrength : parseFloat(e.target.value))}
+                onBlur={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v)) setSharpenStrength(Math.min(1.5, Math.max(0, v)));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                className="w-14 text-xs text-stone-700 tabular-nums border border-stone-200 rounded px-1 py-0.5 text-right"
+                aria-label="Sharpness value"
+              />
+            </div>
+          </>
         )}
 
         {/* Right: Zoom controls */}

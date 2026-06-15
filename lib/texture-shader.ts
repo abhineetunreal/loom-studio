@@ -239,6 +239,9 @@ class TextureShader {
     // Photo-swatch additions — each entry carries its own tile sizes (per-yarn calibrated scale):
     photoLookup?: Map<number, PhotoSwatchEntry>,       // packedInt → swatch entry (global map)
     photoOverrideLayer?: Map<number, PhotoSwatchEntry>, // nativePixelIndex → swatch entry (region fills)
+    // Optional output mask — if provided, set to 1 at every pixel rendered from a photo swatch.
+    // Used by the unsharp-mask sharpening pass to restrict sharpening to photo-swatch areas only.
+    photoMaskOut?: Uint8Array,
   ): ImageData {
     const output = new ImageData(width, height);
     const out = output.data;
@@ -268,6 +271,7 @@ class TextureShader {
             const si = (ty * photoOverride.w + tx) * 4;
             out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
             out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
+            if (photoMaskOut) photoMaskOut[pi >> 2] = 1;
             continue;
           }
 
@@ -289,6 +293,7 @@ class TextureShader {
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
+            if (photoMaskOut) photoMaskOut[pi >> 2] = 1;
             continue;
           }
 
@@ -330,6 +335,7 @@ class TextureShader {
           const si = (ty * photoOverride.w + tx) * 4;
           out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
           out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
+          if (photoMaskOut) photoMaskOut[pi >> 2] = 1;
           continue;
         }
 
@@ -353,6 +359,7 @@ class TextureShader {
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
+            if (photoMaskOut) photoMaskOut[pi >> 2] = 1;
             continue;
           }
 
@@ -381,3 +388,79 @@ class TextureShader {
 }
 
 export const textureShader = new TextureShader();
+
+// ─── Unsharp mask ─────────────────────────────────────────────────────────────
+
+/**
+ * Apply an unsharp-mask sharpening pass to a Uint8ClampedArray pixel buffer,
+ * restricted to pixels where photoMask === 1.
+ *
+ * Algorithm:
+ *   blurred  = Gaussian3x3(original)          (kernel [1,2,1;2,4,2;1,2,1] / 16)
+ *   sharpened = original + (original − blurred) × strength
+ *
+ * Sharpening is computed from the original pixel values (a full copy is taken
+ * before any writes) so neighbour lookups are always pristine.  Uint8ClampedArray
+ * auto-clamps writes to 0–255.
+ *
+ * Passing strength = 0 is a no-op (early-return).
+ *
+ * @param data      RGBA pixel buffer (mutated in place)
+ * @param width     Buffer width in pixels
+ * @param height    Buffer height in pixels
+ * @param photoMask One byte per pixel; 1 = sharpen, 0 = skip
+ * @param strength  Sharpening amount (0 = none, 0.6 = default, 1.5 = strong)
+ */
+export function applyUnsharpMask(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  photoMask: Uint8Array,
+  strength: number,
+): void {
+  if (strength <= 0) return;
+
+  // Take a pristine copy so neighbour reads are always from the unmodified render.
+  const orig = new Uint8ClampedArray(data);
+
+  // 3×3 Gaussian kernel weights (row-major, [dy+1][dx+1]):
+  //   [1,2,1]
+  //   [2,4,2]   / 16
+  //   [1,2,1]
+  // Precomputed as flat array indexed by (dy+1)*3 + (dx+1):
+  const GAUSS = [1, 2, 1, 2, 4, 2, 1, 2, 1]; // sum = 16
+
+  for (let y = 0; y < height; y++) {
+    const rowBase = y * width;
+    for (let x = 0; x < width; x++) {
+      const idx = rowBase + x;
+      if (photoMask[idx] !== 1) continue;
+
+      const pi = idx << 2;
+      if (orig[pi + 3] === 0) continue; // transparent — skip
+
+      // 3×3 Gaussian blur centred on (x, y)
+      let bR = 0, bG = 0, bB = 0;
+      let ki = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const ny = Math.max(0, Math.min(height - 1, y + dy));
+        const nRow = ny * width;
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = Math.max(0, Math.min(width - 1, x + dx));
+          const ni = (nRow + nx) << 2;
+          const kw = GAUSS[ki++];
+          bR += orig[ni]     * kw;
+          bG += orig[ni + 1] * kw;
+          bB += orig[ni + 2] * kw;
+        }
+      }
+      bR /= 16; bG /= 16; bB /= 16;
+
+      // Unsharp mask: sharpened = orig + (orig − blur) × strength
+      // Uint8ClampedArray auto-clamps to 0–255
+      data[pi]     = orig[pi]     + (orig[pi]     - bR) * strength;
+      data[pi + 1] = orig[pi + 1] + (orig[pi + 1] - bG) * strength;
+      data[pi + 2] = orig[pi + 2] + (orig[pi + 2] - bB) * strength;
+    }
+  }
+}

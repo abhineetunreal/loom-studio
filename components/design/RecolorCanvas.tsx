@@ -27,7 +27,7 @@
 
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
 import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
-import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
+import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR, applyUnsharpMask } from "@/lib/texture-shader";
 import type { PhotoSwatchData, PhotoSwatchEntry } from "@/lib/texture-shader";
 import { computePhotoTileSizes } from "@/lib/texture-scale";
 import { floodFill } from "@/lib/flood-fill";
@@ -139,6 +139,8 @@ type Props = {
   textureStrength?: number;
   /** Multiplicative scale on the physically-calculated photo tile size. Default 1.0. */
   swatchScale?: number;
+  /** Unsharp-mask sharpening strength applied to photo-swatch pixels only. 0 = off, default 0.6. */
+  sharpenStrength?: number;
   /** Called once the first full render (recolor + texture) is painted to the canvas. */
   onRenderComplete?: () => void;
   /** Current interaction mode. */
@@ -160,6 +162,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   {
     imageUrl, width, height, palette, colorMap, selectedHex, onColorPick,
     textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5, swatchScale = 1.0,
+    sharpenStrength = 0.6,
     onRenderComplete, mode, fillYarn,
     onRegionFillDelta, onRegionUndoDelta, onRegionClear,
   },
@@ -542,6 +545,12 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         }
       }
 
+      const hasPhotoInMaps = photoLookup.size > 0 || photoSwatchLayer.size > 0;
+      // Allocate mask only when there are photo pixels to sharpen
+      const photoMask = (hasPhotoInMaps && sharpenStrength > 0)
+        ? new Uint8Array(ssW * ssH)
+        : undefined;
+
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
         ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,
@@ -550,8 +559,15 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         width, // native width (nativeWidth param)
         photoLookup.size > 0 ? photoLookup : undefined,
         photoSwatchLayer.size > 0 ? photoSwatchLayer : undefined,
+        photoMask,
       );
       if (cancelled) return;
+
+      // ── Phase 2b: unsharp-mask sharpening on photo-swatch pixels ─────────────
+      if (photoMask && sharpenStrength > 0) {
+        applyUnsharpMask(texturedData.data, ssW, ssH, photoMask, sharpenStrength);
+      }
+
       console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}→${canvasW}×${canvasH}): ${(performance.now() - t1).toFixed(0)}ms`);
 
       // Reuse OffscreenCanvas — allocate only when SS size changes
@@ -569,7 +585,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     return () => { cancelled = true; };
   // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, pixelsVersion, overrideVersion, swatchVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
 
   // ── Click/touch: pick color from original pixel data ────────────────────────
   function pickColorAt(clientX: number, clientY: number) {
