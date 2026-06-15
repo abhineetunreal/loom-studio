@@ -37,6 +37,8 @@ export type YarnOption = {
   swatchImageUrl: string | null;
   renderType: "shader" | "photo";
   textureKpsi: number | null;
+  /** Calibrated tile-size multiplier for photo swatches. 1.0 = uncalibrated (use global slider). */
+  swatchScale: number;
 };
 
 // ─── Design ───────────────────────────────────────────────────────────────────

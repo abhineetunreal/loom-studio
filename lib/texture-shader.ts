@@ -20,6 +20,17 @@ export type PhotoSwatchData = {
   h: number;
 };
 
+/**
+ * PhotoSwatchData plus per-yarn tile dimensions (in supersampled pixels).
+ * Each yarn can have a different calibrated tile size (via swatchScale).
+ * Pass this in the photoLookup / photoOverrideLayer maps so the shader
+ * uses the correct tiling period for each yarn independently.
+ */
+export type PhotoSwatchEntry = PhotoSwatchData & {
+  tileSizeX: number;  // tile period in SS pixels, X axis
+  tileSizeY: number;  // tile period in SS pixels, Y axis
+};
+
 // ─── Rug dimension parsing ────────────────────────────────────────────────────
 
 const FALLBACK_FEET = { widthFeet: 8, heightFeet: 10 };
@@ -225,11 +236,9 @@ class TextureShader {
     strength = 0.6,
     overrideLayer?: Map<number, number>,
     nativeWidth?: number,
-    // Photo-swatch additions:
-    photoLookup?: Map<number, PhotoSwatchData>,       // packedInt → swatch (global map)
-    photoOverrideLayer?: Map<number, PhotoSwatchData>, // nativePixelIndex → swatch (region fills)
-    photoTileSizeX = 180,  // tile size in SUPERSAMPLED pixels, X axis
-    photoTileSizeY = 180,  // tile size in SUPERSAMPLED pixels, Y axis
+    // Photo-swatch additions — each entry carries its own tile sizes (per-yarn calibrated scale):
+    photoLookup?: Map<number, PhotoSwatchEntry>,       // packedInt → swatch entry (global map)
+    photoOverrideLayer?: Map<number, PhotoSwatchEntry>, // nativePixelIndex → swatch entry (region fills)
   ): ImageData {
     const output = new ImageData(width, height);
     const out = output.data;
@@ -254,8 +263,8 @@ class TextureShader {
           // Photo override — UV in SS pixel space: each SS pixel samples a unique texel
           const photoOverride = photoOverrideLayer?.get(nativeIdx);
           if (photoOverride !== undefined) {
-            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
-            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+            const tx = Math.floor(((x % photoOverride.tileSizeX) / photoOverride.tileSizeX) * photoOverride.w);
+            const ty = Math.floor(((y % photoOverride.tileSizeY) / photoOverride.tileSizeY) * photoOverride.h);
             const si = (ty * photoOverride.w + tx) * 4;
             out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
             out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
@@ -275,8 +284,8 @@ class TextureShader {
           // Photo global map — UV in SS pixel space
           const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
           if (photoEntry !== undefined) {
-            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
-            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const tx = Math.floor(((x % photoEntry.tileSizeX) / photoEntry.tileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoEntry.tileSizeY) / photoEntry.tileSizeY) * photoEntry.h);
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;
@@ -316,8 +325,8 @@ class TextureShader {
         // UV in SS pixel space: each of the 4 SS pixels in a 2×2 block samples a unique texel
         const photoOverride = photoOverrideLayer?.get(nativeIdx);
         if (photoOverride !== undefined) {
-          const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoOverride.w);
-          const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoOverride.h);
+          const tx = Math.floor(((x % photoOverride.tileSizeX) / photoOverride.tileSizeX) * photoOverride.w);
+          const ty = Math.floor(((y % photoOverride.tileSizeY) / photoOverride.tileSizeY) * photoOverride.h);
           const si = (ty * photoOverride.w + tx) * 4;
           out[pi] = photoOverride.data[si]; out[pi+1] = photoOverride.data[si+1];
           out[pi+2] = photoOverride.data[si+2]; out[pi+3] = a;
@@ -339,8 +348,8 @@ class TextureShader {
           // ── Photo global map — UV in SS pixel space ───────────────────────────
           const photoEntry = photoLookup?.get(rgbToInt(r0, g0, b0));
           if (photoEntry !== undefined) {
-            const tx = Math.floor(((x % photoTileSizeX) / photoTileSizeX) * photoEntry.w);
-            const ty = Math.floor(((y % photoTileSizeY) / photoTileSizeY) * photoEntry.h);
+            const tx = Math.floor(((x % photoEntry.tileSizeX) / photoEntry.tileSizeX) * photoEntry.w);
+            const ty = Math.floor(((y % photoEntry.tileSizeY) / photoEntry.tileSizeY) * photoEntry.h);
             const si = (ty * photoEntry.w + tx) * 4;
             out[pi] = photoEntry.data[si]; out[pi+1] = photoEntry.data[si+1];
             out[pi+2] = photoEntry.data[si+2]; out[pi+3] = a;

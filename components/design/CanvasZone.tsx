@@ -107,6 +107,8 @@ export default function CanvasZone({
   // Photo-swatch scale: multiplicative factor on the physically-calculated tile size.
   // Separate from tileMultiplier — only affects photo-type colors.
   const [swatchScale, setSwatchScale] = useState(1.0);
+  // Toast shown after "Save Scale" completes
+  const [saveScaleToast, setSaveScaleToast] = useState<string | null>(null);
 
   // True when any yarn in the current colorMap (or the active fill yarn) is a photo swatch.
   // Controls visibility of the Swatch Scale slider.
@@ -363,6 +365,34 @@ export default function CanvasZone({
   const cursor =
     mode === "region" || zoom === 1 ? "crosshair" : isDragging ? "grabbing" : "grab";
 
+  async function handleSaveScale() {
+    // Collect unique photo yarns from global colorMap + active region fills
+    const photoYarns = new Map<string, YarnOption>(); // id → yarn
+    for (const yarn of Object.values(colorMap)) {
+      if (yarn?.renderType === "photo" && yarn.swatchImageUrl) {
+        photoYarns.set(yarn.id, yarn);
+      }
+    }
+    for (const yarn of canvasRef.current?.getActivePhotoYarns() ?? []) {
+      photoYarns.set(yarn.id, yarn);
+    }
+    if (photoYarns.size === 0) return;
+
+    await Promise.all(
+      [...photoYarns.values()].map((yarn) =>
+        fetch(`/api/admin/yarns/${yarn.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ swatchScale }),
+        })
+      )
+    );
+
+    const codes = [...photoYarns.values()].map((y) => y.code).join(", ");
+    setSaveScaleToast(`Scale saved for: ${codes}`);
+    setTimeout(() => setSaveScaleToast(null), 3500);
+  }
+
   function handleZoomSlider(value: number) {
     const newZoom = value;
     const clamped = clampPan(pan.x, pan.y, newZoom, fitW, fitH, zoneW, zoneH);
@@ -374,6 +404,19 @@ export default function CanvasZone({
 
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-[#e8e5dd]">
+      {/* Save Scale toast */}
+      {saveScaleToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+        >
+          <div className="animate-fade-in bg-stone-800 text-white text-xs px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
+            {saveScaleToast}
+          </div>
+        </div>
+      )}
+
       {/* Canvas area */}
       <div ref={canvasAreaRef} className="flex-1 relative overflow-hidden">
         {zoneW > 0 && (
@@ -568,6 +611,15 @@ export default function CanvasZone({
               className="w-14 text-xs text-stone-700 tabular-nums border border-stone-200 rounded px-1 py-0.5 text-right"
               aria-label="Swatch scale value"
             />
+            {tierInfo.tier === "admin" && (
+              <button
+                onClick={handleSaveScale}
+                className="text-xs px-2 py-1 rounded border border-stone-300 bg-stone-50 hover:bg-stone-100 text-stone-700 whitespace-nowrap transition-colors"
+                title="Save current scale as the calibrated default for these photo yarns"
+              >
+                Save Scale
+              </button>
+            )}
           </div>
         )}
 

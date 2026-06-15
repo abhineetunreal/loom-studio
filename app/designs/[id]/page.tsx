@@ -66,7 +66,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
     }),
     db.yarnColor.findMany({
       where: { isActive: true, tenantId: tenant?.id },
-      select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true, renderType: true, textureKpsi: true },
+      select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true, renderType: true, textureKpsi: true, swatchScale: true },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     }),
     getDefaultTierInfo(),
@@ -89,6 +89,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
     swatchImageUrl: y.swatchImageUrl,
     renderType: (y.renderType ?? "shader") as "shader" | "photo",
     textureKpsi: y.textureKpsi ?? null,
+    swatchScale: y.swatchScale ?? 1.0,
   }));
 
   const palette = design.palette as PaletteEntry[];

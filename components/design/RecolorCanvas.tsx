@@ -28,7 +28,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
 import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR } from "@/lib/texture-shader";
-import type { PhotoSwatchData } from "@/lib/texture-shader";
+import type { PhotoSwatchData, PhotoSwatchEntry } from "@/lib/texture-shader";
 import { computePhotoTileSizes } from "@/lib/texture-scale";
 import { floodFill } from "@/lib/flood-fill";
 import type { PaletteEntry, YarnOption } from "@/types";
@@ -100,6 +100,11 @@ export type RecolorCanvasHandle = {
   getSnapshot: (maxWidth?: number) => string | null;
   /** Pick the palette color at the given viewport coordinates (forwarded from CanvasZone). */
   pickColorAt: (clientX: number, clientY: number) => void;
+  /**
+   * Returns the unique photo-swatch yarns that are currently active in the region
+   * override layer.  Used by the "Save Scale" button to determine which yarns to update.
+   */
+  getActivePhotoYarns: () => YarnOption[];
   /**
    * Region-fill mode: run a flood fill at the given viewport coordinates and
    * paint the connected region with `fillYarnRgb`.  No-op if no fill yarn is set
@@ -181,6 +186,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   const overrideLayerRef = useRef<Map<number, number>>(new Map());
   // Maps pixelIndex → textureUrl for photo-type region fills
   const photoUrlOverrideLayerRef = useRef<Map<number, string>>(new Map());
+  // Maps swatchImageUrl → YarnOption — populated on every photo region fill so we can
+  // look up yarn metadata (including swatchScale) from an active photo URL.
+  const photoUrlToYarnRef = useRef<Map<string, YarnOption>>(new Map());
   // Region fill undo stack — capped at MAX_REGION_UNDO entries
   const regionUndoStackRef = useRef<RegionUndoEntry[]>([]);
   // Bumped after each region fill / undo to trigger a re-render
@@ -205,6 +213,20 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         // Canvas tainted by CORS — snapshot unavailable
         return null;
       }
+    },
+    getActivePhotoYarns(): YarnOption[] {
+      // Collect unique swatchImageUrls that are active in the region override layer
+      const activeUrls = new Set(photoUrlOverrideLayerRef.current.values());
+      const seen = new Set<string>();
+      const result: YarnOption[] = [];
+      for (const url of activeUrls) {
+        if (!seen.has(url)) {
+          seen.add(url);
+          const yarn = photoUrlToYarnRef.current.get(url);
+          if (yarn) result.push(yarn);
+        }
+      }
+      return result;
     },
     pickColorAt(clientX: number, clientY: number) {
       pickColorAt(clientX, clientY);
@@ -425,30 +447,26 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
+      // ── DPR-aware canvas sizing ───────────────────────────────────────────────
+      // Set the canvas pixel buffer to match its CSS display size × devicePixelRatio.
+      // This eliminates the browser's bilinear upscale of the canvas element, which
+      // was the primary cause of perceived blurriness in photo-swatch areas.
+      const rect = canvas.getBoundingClientRect();
+      const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+      const canvasW = rect.width > 0 ? Math.round(rect.width * dpr) : width;
+      const canvasH = rect.height > 0 ? Math.round(rect.height * dpr) : height;
+      // Only resize when dimensions actually change — resizing clears the canvas buffer.
+      if (canvas.width !== canvasW) canvas.width = canvasW;
+      if (canvas.height !== canvasH) canvas.height = canvasH;
+
       const lookup = buildColorLookup(colorMap);
       const overrideLayer = overrideLayerRef.current;
       const hasOverrides = overrideLayer.size > 0;
 
-      // ── Build photo lookup from color map ───────────────────────────────────
-      const photoLookup = new Map<number, PhotoSwatchData>();
-      for (const [hex, yarn] of Object.entries(colorMap)) {
-        if (yarn?.renderType === "photo" && yarn.swatchImageUrl) {
-          const swatch = swatchCache.get(yarn.swatchImageUrl);
-          if (swatch) {
-            const { r, g, b } = hexToRgb(hex);
-            photoLookup.set(rgbToInt(r, g, b), swatch);
-          }
-        }
-      }
-
-      // ── Build photo override layer (resolve URLs → swatch data) ─────────────
-      const photoSwatchLayer = new Map<number, PhotoSwatchData>();
-      for (const [idx, url] of photoUrlOverrideLayerRef.current) {
-        const swatch = swatchCache.get(url);
-        if (swatch) photoSwatchLayer.set(Number(idx), swatch);
-      }
-
-      const hasPhotoColors = photoLookup.size > 0 || photoSwatchLayer.size > 0;
+      // Quick check for photo colors without building the full maps yet
+      const hasPhotoColors =
+        Object.values(colorMap).some((y) => y?.renderType === "photo" && y?.swatchImageUrl) ||
+        photoUrlOverrideLayerRef.current.size > 0;
 
       // ── Phase 1: flat recolor at native resolution — fast path ─────────────
       const t0 = performance.now();
@@ -456,8 +474,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         pixels, width, height, lookup,
         hasOverrides ? overrideLayer : undefined,
       );
-      ctx.putImageData(flatData, 0, 0);
-      console.log(`[Canvas] phase 1 flat (${width}×${height}): ${(performance.now() - t0).toFixed(0)}ms`);
+      // DPR canvas: putImageData writes at native size; scale up to fill the DPR buffer.
+      const flatOffscreen = new OffscreenCanvas(width, height);
+      flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
+      ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
+      console.log(`[Canvas] phase 1 flat (${width}×${height}→${canvasW}×${canvasH}): ${(performance.now() - t0).toFixed(0)}ms`);
 
       if (!cancelled && !renderCompleteFired.current) {
         renderCompleteFired.current = true;
@@ -481,15 +502,46 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
-      // knotSizeMultiplier (tileMultiplier) intentionally excluded — it affects only the shader
-      // detail map, not photo swatch tiles. Photo tile size = physical size × swatchScale only.
+
+      // knotSizeMultiplier (tileMultiplier) excluded — it affects only the shader detail map.
+      // Photo tile size = physical size × per-yarn calibrated scale (or global slider if uncalibrated).
       const { tileSizeX: basePhotoTileX, tileSizeY: basePhotoTileY } = computePhotoTileSizes(
         width, height, designName ?? "", 1.0
       );
-      // Scale to SS pixel space: the shader now samples using SS coords (x, y) directly,
-      // so tile sizes must also be in SS pixels to produce the correct UV mapping.
-      const photoTileSizeX = basePhotoTileX * swatchScale * SUPERSAMPLE_FACTOR;
-      const photoTileSizeY = basePhotoTileY * swatchScale * SUPERSAMPLE_FACTOR;
+
+      // ── Build photo lookup from color map — per-yarn calibrated tile sizes ──
+      const photoLookup = new Map<number, PhotoSwatchEntry>();
+      for (const [hex, yarn] of Object.entries(colorMap)) {
+        if (yarn?.renderType === "photo" && yarn.swatchImageUrl) {
+          const swatch = swatchCache.get(yarn.swatchImageUrl);
+          if (swatch) {
+            // Use yarn's saved swatchScale if calibrated; fall back to global slider
+            const effectiveScale = yarn.swatchScale !== 1.0 ? yarn.swatchScale : swatchScale;
+            const { r, g, b } = hexToRgb(hex);
+            photoLookup.set(rgbToInt(r, g, b), {
+              ...swatch,
+              tileSizeX: basePhotoTileX * effectiveScale * SUPERSAMPLE_FACTOR,
+              tileSizeY: basePhotoTileY * effectiveScale * SUPERSAMPLE_FACTOR,
+            });
+          }
+        }
+      }
+
+      // ── Build photo override layer — per-yarn calibrated tile sizes ─────────
+      const photoSwatchLayer = new Map<number, PhotoSwatchEntry>();
+      for (const [idx, url] of photoUrlOverrideLayerRef.current) {
+        const swatch = swatchCache.get(url);
+        if (swatch) {
+          const yarn = photoUrlToYarnRef.current.get(url);
+          const effectiveScale = yarn && yarn.swatchScale !== 1.0 ? yarn.swatchScale : swatchScale;
+          photoSwatchLayer.set(Number(idx), {
+            ...swatch,
+            tileSizeX: basePhotoTileX * effectiveScale * SUPERSAMPLE_FACTOR,
+            tileSizeY: basePhotoTileY * effectiveScale * SUPERSAMPLE_FACTOR,
+          });
+        }
+      }
+
       const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
         ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,
@@ -498,19 +550,19 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         width, // native width (nativeWidth param)
         photoLookup.size > 0 ? photoLookup : undefined,
         photoSwatchLayer.size > 0 ? photoSwatchLayer : undefined,
-        photoTileSizeX,
-        photoTileSizeY,
       );
       if (cancelled) return;
-      console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}): ${(performance.now() - t1).toFixed(0)}ms`);
+      console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}→${canvasW}×${canvasH}): ${(performance.now() - t1).toFixed(0)}ms`);
 
-      // Reuse OffscreenCanvas — allocate only when size changes
+      // Reuse OffscreenCanvas — allocate only when SS size changes
       if (!offscreenRef.current || offscreenRef.current.width !== ssW || offscreenRef.current.height !== ssH) {
         offscreenRef.current = new OffscreenCanvas(ssW, ssH);
       }
       const offCtx = offscreenRef.current.getContext("2d")!;
       offCtx.putImageData(texturedData, 0, 0);
-      ctx.drawImage(offscreenRef.current, 0, 0, width, height);
+      // Draw SS render to DPR canvas — browser scales from SS to DPR dimensions in one pass,
+      // avoiding the previous double-scaling (SS→native→display) that blurred photo areas.
+      ctx.drawImage(offscreenRef.current, 0, 0, canvasW, canvasH);
     }
 
     render();
@@ -525,10 +577,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     const pixels = originalPixels.current;
     if (!canvas || !pixels) return;
 
-    // Map CSS coordinates → canvas pixel coordinates (handles scaling)
+    // Map CSS coordinates → native design pixel coordinates.
+    // Use design dimensions (not canvas.width) since the canvas buffer is now DPR-sized.
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
     const x = Math.floor((clientX - rect.left) * scaleX);
     const y = Math.floor((clientY - rect.top) * scaleY);
 
@@ -592,6 +645,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         // Shader fill clears any previous photo override for these pixels
         photoLayer.delete(idx);
       }
+    }
+
+    // Track URL → yarn so getActivePhotoYarns() can return full yarn objects
+    if (isPhotoFill) {
+      photoUrlToYarnRef.current.set(yarn.swatchImageUrl!, yarn);
     }
 
     // Push to undo stack (FIFO eviction at max size)

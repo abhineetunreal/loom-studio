@@ -138,6 +138,7 @@ model YarnColor {
   swatchImageUrl String? // reserved for v1.5 — falls back to hex swatch when null
   renderType     String  @default("shader")  // "shader" | "photo"
   textureKpsi    Int?
+  swatchScale    Float   @default(1.0)  // calibrated tile-size multiplier for photo swatches; 1.0 = uncalibrated
   sortOrder      Int      @default(0)
   isActive       Boolean  @default(true)
 
