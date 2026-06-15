@@ -139,6 +139,12 @@ type Props = {
   textureStrength?: number;
   /** Multiplicative scale on the physically-calculated photo tile size. Default 1.0. */
   swatchScale?: number;
+  /**
+   * Per-yarn scale overrides set by the admin after "Save Scale".
+   * Keys are yarn IDs; values override yarn.swatchScale for the current session
+   * without requiring a page reload.
+   */
+  yarnScaleOverrides?: Map<string, number>;
   /** Unsharp-mask sharpening strength applied to photo-swatch pixels only. 0 = off, default 0.6. */
   sharpenStrength?: number;
   /** Called once the first full render (recolor + texture) is painted to the canvas. */
@@ -162,6 +168,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   {
     imageUrl, width, height, palette, colorMap, selectedHex, onColorPick,
     textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5, swatchScale = 1.0,
+    yarnScaleOverrides,
     sharpenStrength = 0.6,
     onRenderComplete, mode, fillYarn,
     onRegionFillDelta, onRegionUndoDelta, onRegionClear,
@@ -518,8 +525,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         if (yarn?.renderType === "photo" && yarn.swatchImageUrl) {
           const swatch = swatchCache.get(yarn.swatchImageUrl);
           if (swatch) {
-            // Use yarn's saved swatchScale if calibrated; fall back to global slider
-            const effectiveScale = yarn.swatchScale !== 1.0 ? yarn.swatchScale : swatchScale;
+            // Use in-session override (set by Save Scale), then yarn's stored swatchScale, then global slider
+            const storedScale = yarnScaleOverrides?.get(yarn.id) ?? yarn.swatchScale;
+            const effectiveScale = storedScale !== 1.0 ? storedScale : swatchScale;
             const { r, g, b } = hexToRgb(hex);
             photoLookup.set(rgbToInt(r, g, b), {
               ...swatch,
@@ -536,7 +544,8 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         const swatch = swatchCache.get(url);
         if (swatch) {
           const yarn = photoUrlToYarnRef.current.get(url);
-          const effectiveScale = yarn && yarn.swatchScale !== 1.0 ? yarn.swatchScale : swatchScale;
+          const storedScale = yarn ? (yarnScaleOverrides?.get(yarn.id) ?? yarn.swatchScale) : 1.0;
+          const effectiveScale = storedScale !== 1.0 ? storedScale : swatchScale;
           photoSwatchLayer.set(Number(idx), {
             ...swatch,
             tileSizeX: basePhotoTileX * effectiveScale * SUPERSAMPLE_FACTOR,
@@ -585,7 +594,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     return () => { cancelled = true; };
   // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
 
   // ── Click/touch: pick color from original pixel data ────────────────────────
   function pickColorAt(clientX: number, clientY: number) {

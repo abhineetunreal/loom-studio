@@ -111,6 +111,9 @@ export default function CanvasZone({
   const [sharpenStrength, setSharpenStrength] = useState(0.6);
   // Toast shown after "Save Scale" completes
   const [saveScaleToast, setSaveScaleToast] = useState<string | null>(null);
+  // Per-yarn scale overrides set by Save Scale — lets calibrated values take effect
+  // immediately in the current session without a page reload.
+  const [savedYarnScales, setSavedYarnScales] = useState<Map<string, number>>(new Map());
 
   // True when any yarn in the current colorMap (or the active fill yarn) is a photo swatch.
   // Controls visibility of the Swatch Scale slider.
@@ -390,6 +393,13 @@ export default function CanvasZone({
       )
     );
 
+    // Update in-session overrides so calibrated scale takes effect immediately
+    setSavedYarnScales((prev) => {
+      const next = new Map(prev);
+      for (const yarn of photoYarns.values()) next.set(yarn.id, swatchScale);
+      return next;
+    });
+
     const codes = [...photoYarns.values()].map((y) => y.code).join(", ");
     setSaveScaleToast(`Scale saved for: ${codes}`);
     setTimeout(() => setSaveScaleToast(null), 3500);
@@ -448,6 +458,7 @@ export default function CanvasZone({
                 tileMultiplier={tileMultiplier}
                 textureStrength={textureStrength}
                 swatchScale={swatchScale}
+                yarnScaleOverrides={savedYarnScales}
                 sharpenStrength={sharpenStrength}
                 onRenderComplete={() => { setIsLoading(false); onRenderComplete?.(); }}
                 mode={mode}
