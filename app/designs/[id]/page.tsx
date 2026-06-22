@@ -47,7 +47,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
   // Resolve tenant first (cached after first call) so the yarn query can be scoped.
   const tenant = await getCurrentTenant();
 
-  const [design, rawYarns, tierInfo, session] = await Promise.all([
+  const [design, rawYarns, tierInfo, session, dbColorLookupRows] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -71,6 +71,12 @@ export default async function DesignPage({ params, searchParams }: Props) {
     }),
     getDefaultTierInfo(),
     getSession(),
+    tenant
+      ? db.colorLookup.findMany({
+          where: { tenantId: tenant.id },
+          select: { renderedHex: true, yarnCode: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   if (!design) notFound();
@@ -96,13 +102,17 @@ export default async function DesignPage({ params, searchParams }: Props) {
 
   // ── Build initial color map from the rendered-color lookup ─────────────────
   const renderedLookup = loadRenderedLookup();
+  const dbLookup = new Map(
+    dbColorLookupRows.map((r) => [r.renderedHex.toLowerCase(), r.yarnCode])
+  );
   const oneloomByCode = new Map<string, YarnOption>(
     yarns.filter((y) => y.library === "OneLoom").map((y) => [y.code, y])
   );
 
   const initialColorMap: Record<string, YarnOption> = {};
   for (const entry of palette) {
-    const code = renderedLookup.get(entry.hex) ?? entry.matchedYarnCode;
+    const hexLower = entry.hex.toLowerCase();
+    const code = renderedLookup.get(hexLower) ?? dbLookup.get(hexLower) ?? entry.matchedYarnCode;
     if (!code) continue;
     const yarn = oneloomByCode.get(code);
     if (yarn) initialColorMap[entry.hex] = yarn;
