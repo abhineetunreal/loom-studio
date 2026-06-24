@@ -184,6 +184,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
   return (
     <div className="h-full overflow-hidden">
       <DesignViewer
+        key={`${design.id}-${colorwayId ?? "original"}`}
         design={{ ...design, imageUrl, palette }}
         yarns={yarns}
         initialColorMap={initialColorMap}
