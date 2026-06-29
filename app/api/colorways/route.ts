@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
 import { createAdminClient } from "@/lib/supabase";
+import { generateColorwayExport } from "@/lib/colorway-export";
 
 const SNAPSHOTS_BUCKET = process.env.SUPABASE_SNAPSHOTS_BUCKET ?? "snapshots";
 
@@ -128,6 +129,18 @@ export async function POST(request: NextRequest) {
     uploadSnapshot(colorway.id, tenantUser.id, tenant.id, snapshotDataUrl)
       .then((url) => db.savedColorway.update({ where: { id: colorway.id }, data: { snapshotUrl: url } }))
       .catch((err) => console.error("Snapshot upload failed:", err));
+  }
+
+  // Generate export files async (BMP, CTF, yarn sheet — fire-and-forget)
+  if (operations && typeof operations === "object") {
+    generateColorwayExport({
+      colorwayId: colorway.id,
+      colorwayName: name.trim(),
+      designId,
+      tenantId: tenant.id,
+      userId: tenantUser.id,
+      operations: operations as { globalMap: Record<string, { hex: string; yarnCode: string; yarnId: string }> },
+    }).catch((err) => console.error(`[ColorwayExport] FAILED colorwayId=${colorway.id}`, err));
   }
 
   return NextResponse.json({ id: colorway.id }, { status: 201 });

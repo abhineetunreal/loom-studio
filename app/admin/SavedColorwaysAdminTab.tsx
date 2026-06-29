@@ -8,6 +8,9 @@ type AdminColorway = {
   name: string;
   userEmail: string | null;
   snapshotUrl: string | null;
+  bmpUrl: string | null;
+  ctfUrl: string | null;
+  yarnSheetUrl: string | null;
   createdAt: string;
   design: { id: string; name: string };
   folder: { id: string; name: string } | null;
@@ -99,6 +102,42 @@ function ColorwayAdminRow({
           {colorway.folder && <> · <span className="italic">{colorway.folder.name}</span></>}
           {" · "}{dateStr}
         </p>
+      </div>
+      {/* Downloads */}
+      <div className="flex items-center gap-1 shrink-0">
+        {colorway.bmpUrl && (
+          <a
+            href={colorway.bmpUrl}
+            download
+            className="px-2 py-1 text-[11px] text-stone-600 hover:bg-stone-100 rounded-md transition-colors"
+            title="Download BMP"
+          >
+            BMP
+          </a>
+        )}
+        {colorway.ctfUrl && (
+          <a
+            href={colorway.ctfUrl}
+            download
+            className="px-2 py-1 text-[11px] text-stone-600 hover:bg-stone-100 rounded-md transition-colors"
+            title="Download CTF"
+          >
+            CTF
+          </a>
+        )}
+        {colorway.yarnSheetUrl && (
+          <a
+            href={colorway.yarnSheetUrl}
+            download
+            className="px-2 py-1 text-[11px] text-stone-600 hover:bg-stone-100 rounded-md transition-colors"
+            title="Download Yarn Sheet"
+          >
+            Yarns
+          </a>
+        )}
+        {!colorway.bmpUrl && !colorway.ctfUrl && (
+          <span className="text-[10px] text-stone-300 italic">no exports</span>
+        )}
       </div>
       {/* Delete */}
       <button
