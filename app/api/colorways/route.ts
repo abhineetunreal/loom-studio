@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
       .catch((err) => console.error("Snapshot upload failed:", err));
   }
 
-  // Generate export files async (BMP, CTF, yarn sheet — fire-and-forget)
+  // Generate export files async (BMP, PDF, yarn sheet — fire-and-forget)
   if (operations && typeof operations === "object") {
     generateColorwayExport({
       colorwayId: colorway.id,
@@ -139,6 +139,8 @@ export async function POST(request: NextRequest) {
       designId,
       tenantId: tenant.id,
       userId: tenantUser.id,
+      userEmail: email,
+      folderId: folderId ?? null,
       operations: operations as { globalMap: Record<string, { hex: string; yarnCode: string; yarnId: string }> },
     }).catch((err) => console.error(`[ColorwayExport] FAILED colorwayId=${colorway.id}`, err));
   }

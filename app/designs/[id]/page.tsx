@@ -183,6 +183,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}
+        brandLogoUrl={tenant?.logoUrl ?? undefined}
         viewProductUrl={viewProductUrl}
       />
     </div>

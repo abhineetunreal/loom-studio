@@ -22,7 +22,7 @@ export async function GET() {
       userEmail: true,
       snapshotUrl: true,
       bmpUrl: true,
-      ctfUrl: true,
+      pdfUrl: true,
       yarnSheetUrl: true,
       createdAt: true,
       design: { select: { id: true, name: true } },

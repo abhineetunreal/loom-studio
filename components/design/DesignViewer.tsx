@@ -115,6 +115,8 @@ type Props = {
   tierInfo: TierInfo;
   /** Display name for the yarn library — derived from the tenant's displayName/name. */
   yarnLibraryName: string;
+  /** Brand logo URL for PDF order sheets. */
+  brandLogoUrl?: string;
   /** Full URL to the product page on the brand's website, if available. */
   viewProductUrl?: string;
 };
@@ -135,6 +137,7 @@ export default function DesignViewer({
   isUserUpload,
   tierInfo,
   yarnLibraryName,
+  brandLogoUrl,
   viewProductUrl,
 }: Props) {
   // Saved colorway takes precedence over the lookup-matched initial map.
@@ -441,6 +444,177 @@ export default function DesignViewer({
     setTimeout(() => setShowSavedToast(false), 2500);
   }, [design.id, buildOperations]);
 
+  // ── Order sheet download (client-side PDF) ──────────────────────────────────
+  const handleDownloadOrderSheet = useCallback(async () => {
+    const { default: jsPDF } = await import("jspdf");
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pw = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    const contentW = pw - margin * 2;
+    let y = margin;
+
+    // ── Header: logo + brand name ──
+    if (brandLogoUrl) {
+      try {
+        const logoImg = await loadImageAsDataUrl(brandLogoUrl);
+        if (logoImg) {
+          doc.addImage(logoImg, "PNG", margin, y, 20, 20);
+          doc.setFontSize(16);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(26, 22, 18);
+          doc.text(yarnLibraryName, margin + 24, y + 9);
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(136, 136, 136);
+          doc.text("Order Sheet", margin + 24, y + 14);
+          y += 24;
+        } else {
+          throw new Error("skip");
+        }
+      } catch {
+        // Logo failed — text-only header
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(26, 22, 18);
+        doc.text(yarnLibraryName, margin, y + 6);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(136, 136, 136);
+        doc.text("Order Sheet", margin, y + 11);
+        y += 15;
+      }
+    } else {
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(26, 22, 18);
+      doc.text(yarnLibraryName, margin, y + 6);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(136, 136, 136);
+      doc.text("Order Sheet", margin, y + 11);
+      y += 15;
+    }
+
+    // ── Divider ──
+    doc.setDrawColor(224, 224, 224);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, margin + contentW, y);
+    y += 5;
+
+    // ── Preview image ──
+    const snapshot = canvasRef.current?.getSnapshot(1200);
+    if (snapshot) {
+      const imgAspect = design.width / design.height;
+      const maxH = 90;
+      let imgW = contentW;
+      let imgH = imgW / imgAspect;
+      if (imgH > maxH) { imgH = maxH; imgW = imgH * imgAspect; }
+      const imgX = margin + (contentW - imgW) / 2;
+      doc.addImage(snapshot, "PNG", imgX, y, imgW, imgH);
+      y += imgH + 5;
+    }
+
+    // ── Metadata ──
+    const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const meta: [string, string][] = [
+      ["Design", design.name],
+      ["Size", `${design.width} x ${design.height} px`],
+      ["Date", dateStr],
+    ];
+
+    doc.setFontSize(9);
+    for (const [label, value] of meta) {
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(85, 85, 85);
+      doc.text(label, margin, y + 3);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(26, 22, 18);
+      doc.text(value, margin + 28, y + 3);
+      y += 5;
+    }
+    y += 4;
+
+    // ── Divider ──
+    doc.setDrawColor(224, 224, 224);
+    doc.line(margin, y, margin + contentW, y);
+    y += 5;
+
+    // ── Yarn color table ──
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(26, 22, 18);
+    doc.text("Yarn Colors", margin, y + 3);
+    y += 7;
+
+    // Table header
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(136, 136, 136);
+    doc.text("Swatch", margin, y + 3);
+    doc.text("Code", margin + 20, y + 3);
+    doc.text("Yarn Name", margin + 55, y + 3);
+    doc.text("%", margin + contentW - 5, y + 3, { align: "right" });
+    y += 5;
+
+    // Build table rows from effectivePalette + colorMap
+    const rows = effectivePalette
+      .filter((e) => e.percentage >= 0.05)
+      .sort((a, b) => b.percentage - a.percentage);
+
+    const pageH = doc.internal.pageSize.getHeight();
+    for (const entry of rows) {
+      if (y + 7 > pageH - margin) {
+        doc.addPage();
+        y = margin;
+      }
+
+      const yarn = recolor.current[entry.hex] ?? null;
+      const hex = yarn?.hex ?? entry.hex;
+      const code = yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
+      const name = yarn?.name ?? "";
+
+      // Swatch
+      const { r, g, b } = hexToRgbLocal(hex);
+      doc.setFillColor(r, g, b);
+      doc.rect(margin, y, 5, 5, "F");
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(margin, y, 5, 5, "S");
+
+      // Code
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(26, 22, 18);
+      doc.text(code, margin + 20, y + 3.5);
+
+      // Name
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(85, 85, 85);
+      doc.text(name, margin + 55, y + 3.5);
+
+      // Percentage
+      doc.setTextColor(136, 136, 136);
+      doc.text(`${entry.percentage.toFixed(1)}%`, margin + contentW - 5, y + 3.5, { align: "right" });
+
+      y += 7;
+    }
+
+    // ── Footer ──
+    const footY = pageH - 8;
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(170, 170, 170);
+    doc.text(
+      `Generated by Loom Studio on ${new Date().toISOString().split("T")[0]}`,
+      pw / 2, footY, { align: "center" }
+    );
+
+    // Download
+    const safeName = design.name.replace(/[^a-zA-Z0-9_\-. ]/g, "").replace(/\s+/g, "_");
+    const dateTag = new Date().toISOString().split("T")[0];
+    doc.save(`${safeName}_OrderSheet_${dateTag}.pdf`);
+  }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl]);
+
   // ── Rebuild effective palette when global colorMap changes ───────────────────
   // This covers: initial load (savedColorMap / initialColorMap), every ASSIGN/UNDO/REDO/RESET.
   // Region-fill-driven rebuilds happen via the delta callbacks, not here.
@@ -568,6 +742,7 @@ export default function DesignViewer({
         onRegionFillDelta={handleRegionFillDelta}
         onRegionUndoDelta={handleRegionUndoDelta}
         onRegionClear={handleRegionClear}
+        onDownloadOrderSheet={tierInfo.tier !== "demo" ? handleDownloadOrderSheet : undefined}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -671,4 +846,35 @@ export default function DesignViewer({
       )}
     </div>
   );
+}
+
+// ─── PDF helpers ──────────────────────────────────────────────────────────────
+
+function hexToRgbLocal(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.substring(0, 2), 16) || 0,
+    g: parseInt(h.substring(2, 4), 16) || 0,
+    b: parseInt(h.substring(4, 6), 16) || 0,
+  };
+}
+
+function loadImageAsDataUrl(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d")!.drawImage(img, 0, 0);
+      try {
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 }

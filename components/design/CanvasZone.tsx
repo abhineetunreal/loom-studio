@@ -41,6 +41,8 @@ type Props = {
   onRegionFillDelta?: (delta: RegionFillDelta) => void;
   onRegionUndoDelta?: (delta: RegionUndoDelta) => void;
   onRegionClear?: () => void;
+  /** Download a PDF order sheet of the current design state */
+  onDownloadOrderSheet?: () => void;
 };
 
 function clampPan(
@@ -90,6 +92,7 @@ export default function CanvasZone({
   onRegionFillDelta,
   onRegionUndoDelta,
   onRegionClear,
+  onDownloadOrderSheet,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -532,6 +535,16 @@ export default function CanvasZone({
                 className="pointer-events-auto text-xs px-4 py-2 rounded-lg border border-stone-800 bg-white/90 text-stone-900 shadow hover:bg-stone-50 transition-colors whitespace-nowrap"
               >
                 Save colorway
+              </button>
+            )}
+
+            {/* Download order sheet */}
+            {onDownloadOrderSheet && (
+              <button
+                onClick={onDownloadOrderSheet}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 transition-colors whitespace-nowrap"
+              >
+                Save Order Sheet
               </button>
             )}
           </div>

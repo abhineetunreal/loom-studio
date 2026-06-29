@@ -208,8 +208,9 @@ model SavedColorway {
   folder       ColorwayFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   snapshotUrl  String?         // Supabase storage URL for canvas PNG export
   bmpUrl       String?         // Indexed-color BMP for CAD software
-  ctfUrl       String?         // CTF format for Galaincha
+  ctfUrl       String?         // CTF format for Galaincha (deprecated)
   yarnSheetUrl String?         // Yarn-code mapping text file
+  pdfUrl       String?         // PDF production spec sheet
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 }

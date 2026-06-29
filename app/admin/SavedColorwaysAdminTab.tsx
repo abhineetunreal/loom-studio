@@ -9,7 +9,7 @@ type AdminColorway = {
   userEmail: string | null;
   snapshotUrl: string | null;
   bmpUrl: string | null;
-  ctfUrl: string | null;
+  pdfUrl: string | null;
   yarnSheetUrl: string | null;
   createdAt: string;
   design: { id: string; name: string };
@@ -115,14 +115,14 @@ function ColorwayAdminRow({
             BMP
           </a>
         )}
-        {colorway.ctfUrl && (
+        {colorway.pdfUrl && (
           <a
-            href={colorway.ctfUrl}
+            href={colorway.pdfUrl}
             download
             className="px-2 py-1 text-[11px] text-stone-600 hover:bg-stone-100 rounded-md transition-colors"
-            title="Download CTF"
+            title="Download PDF"
           >
-            CTF
+            PDF
           </a>
         )}
         {colorway.yarnSheetUrl && (
@@ -135,7 +135,7 @@ function ColorwayAdminRow({
             Yarns
           </a>
         )}
-        {!colorway.bmpUrl && !colorway.ctfUrl && (
+        {!colorway.bmpUrl && !colorway.pdfUrl && (
           <span className="text-[10px] text-stone-400 italic">no exports</span>
         )}
       </div>

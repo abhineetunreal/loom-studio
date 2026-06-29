@@ -1,7 +1,8 @@
-// Generates indexed-color BMP, CTF, and yarn-sheet files from a saved colorway.
+// Generates indexed-color BMP, PDF spec sheet, and yarn-sheet files from a saved colorway.
 // Server-side only — never import from client code.
 
 import { Jimp } from "jimp";
+import PDFDocument from "pdfkit";
 import { createAdminClient } from "@/lib/supabase";
 import { db } from "@/lib/db";
 
@@ -29,8 +30,8 @@ type PaletteEntry = {
 
 type ExportResult = {
   bmpUrl: string;
-  ctfUrl: string;
   yarnSheetUrl: string;
+  pdfUrl: string;
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -39,8 +40,8 @@ const SAVED_COLORWAYS_BUCKET =
   process.env.SUPABASE_SAVED_COLORWAYS_BUCKET ?? "saved-colorways";
 
 /**
- * Generates BMP, CTF, and yarn-sheet files for a saved colorway, uploads
- * them to Supabase Storage, and updates the SavedColorway record with URLs.
+ * Generates BMP, PDF spec sheet, and yarn-sheet files for a saved colorway,
+ * uploads them to Supabase Storage, and updates the SavedColorway record with URLs.
  *
  * Designed to be called fire-and-forget after the save response returns.
  */
@@ -50,48 +51,69 @@ export async function generateColorwayExport(params: {
   designId: string;
   tenantId: string;
   userId: string;
+  userEmail: string;
+  folderId?: string | null;
   operations: ColorwayOperations;
 }): Promise<ExportResult> {
-  const { colorwayId, colorwayName, designId, tenantId, userId, operations } =
-    params;
+  const {
+    colorwayId,
+    colorwayName,
+    designId,
+    tenantId,
+    userId,
+    userEmail,
+    folderId,
+    operations,
+  } = params;
 
-  // 1. Load the design's source image and palette
-  const design = await db.design.findUnique({
-    where: { id: designId },
-    select: {
-      imageUrl: true,
-      sourceBmpUrl: true,
-      uploadedById: true,
-      width: true,
-      height: true,
-      palette: true,
-    },
-  });
+  // 1. Load the design, tenant, and snapshot data
+  const [design, tenant, colorwayRecord, folder] = await Promise.all([
+    db.design.findUnique({
+      where: { id: designId },
+      select: {
+        name: true,
+        imageUrl: true,
+        sourceBmpUrl: true,
+        uploadedById: true,
+        width: true,
+        height: true,
+        palette: true,
+      },
+    }),
+    db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, displayName: true, logoUrl: true },
+    }),
+    db.savedColorway.findUnique({
+      where: { id: colorwayId },
+      select: { snapshotUrl: true, createdAt: true },
+    }),
+    folderId
+      ? db.colorwayFolder.findUnique({
+          where: { id: folderId },
+          select: { name: true },
+        })
+      : null,
+  ]);
+
   if (!design) throw new Error(`Design ${designId} not found`);
+  if (!tenant) throw new Error(`Tenant ${tenantId} not found`);
 
   const palette = design.palette as PaletteEntry[];
   const { width, height } = design;
 
-  // Fetch the PNG image (imageUrl) to get RGBA pixel data
-  const imageUrl = design.imageUrl;
-  const imgResponse = await fetch(imageUrl);
-  if (!imgResponse.ok) throw new Error(`Failed to fetch design image: ${imgResponse.status}`);
+  // Fetch the PNG image to get RGBA pixel data
+  const imgResponse = await fetch(design.imageUrl);
+  if (!imgResponse.ok)
+    throw new Error(`Failed to fetch design image: ${imgResponse.status}`);
   const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
 
   const img = await Jimp.read(imgBuffer);
   const { data: pixels } = img.bitmap;
 
   // 2. Build the recolored palette mapping
-  //    originalHex → { newR, newG, newB, yarnCode, yarnName }
   const globalMap = operations.globalMap ?? {};
 
-  // Build a map from original palette hex → palette index
-  const hexToOriginalIndex = new Map<string, number>();
-  for (const entry of palette) {
-    hexToOriginalIndex.set(entry.hex.toLowerCase(), entry.index);
-  }
-
-  // Build the recolored palette: for each original color, determine the new color
   type RecoloredPaletteEntry = {
     index: number;
     originalHex: string;
@@ -99,6 +121,7 @@ export async function generateColorwayExport(params: {
     g: number;
     b: number;
     yarnCode: string;
+    percentage: number;
   };
 
   const recoloredPalette: RecoloredPaletteEntry[] = [];
@@ -112,14 +135,12 @@ export async function generateColorwayExport(params: {
     let yarnCode: string;
 
     if (mapping) {
-      // This palette color was remapped to a yarn
       const parsed = parseHex(mapping.hex);
       r = parsed.r;
       g = parsed.g;
       b = parsed.b;
       yarnCode = mapping.yarnCode;
     } else {
-      // Keep the original color
       const parsed = parseHex(entry.hex);
       r = parsed.r;
       g = parsed.g;
@@ -134,41 +155,56 @@ export async function generateColorwayExport(params: {
       g,
       b,
       yarnCode,
+      percentage: entry.percentage,
     };
     recoloredPalette.push(recolored);
     originalHexToNewEntry.set(hexLower, recolored);
   }
 
-  // 3. Build indexed pixel data by mapping each pixel's original color to a palette index
-  //    Build a lookup from packed RGB → recolored palette index
-  const rgbToOriginalEntry = new Map<number, RecoloredPaletteEntry>();
-  for (const entry of palette) {
-    const { r, g, b } = parseHex(entry.hex);
-    const key = (r << 16) | (g << 8) | b;
-    const recolored = originalHexToNewEntry.get(entry.hex.toLowerCase());
-    if (recolored) rgbToOriginalEntry.set(key, recolored);
-  }
-
-  // Deduplicate the recolored palette (multiple original colors may map to the same yarn color)
-  // For BMP/CTF we need unique colors in the palette table
-  const uniqueColors = new Map<number, { index: number; r: number; g: number; b: number; yarnCode: string }>();
+  // 3. Deduplicate palette & build indexed pixel data
+  const uniqueColors = new Map<
+    number,
+    {
+      index: number;
+      r: number;
+      g: number;
+      b: number;
+      yarnCode: string;
+      percentage: number;
+    }
+  >();
   const entryToUniqueIndex = new Map<RecoloredPaletteEntry, number>();
 
   for (const entry of recoloredPalette) {
     const key = (entry.r << 16) | (entry.g << 8) | entry.b;
     if (!uniqueColors.has(key)) {
       const idx = uniqueColors.size;
-      uniqueColors.set(key, { index: idx, r: entry.r, g: entry.g, b: entry.b, yarnCode: entry.yarnCode });
+      uniqueColors.set(key, {
+        index: idx,
+        r: entry.r,
+        g: entry.g,
+        b: entry.b,
+        yarnCode: entry.yarnCode,
+        percentage: entry.percentage,
+      });
+    } else {
+      // Merge percentage for duplicate colors
+      const existing = uniqueColors.get(key)!;
+      existing.percentage += entry.percentage;
     }
     entryToUniqueIndex.set(entry, uniqueColors.get(key)!.index);
   }
 
-  const finalPalette = Array.from(uniqueColors.values()).sort((a, b) => a.index - b.index);
+  const finalPalette = Array.from(uniqueColors.values()).sort(
+    (a, b) => a.index - b.index
+  );
   if (finalPalette.length > 256) {
-    throw new Error(`Recolored palette has ${finalPalette.length} colors (max 256 for indexed BMP)`);
+    throw new Error(
+      `Recolored palette has ${finalPalette.length} colors (max 256 for indexed BMP)`
+    );
   }
 
-  // Build the pixel-to-unique-index fast lookup
+  // Build pixel-to-index lookup
   const rgbToFinalIndex = new Map<number, number>();
   for (const entry of recoloredPalette) {
     const origRgb = parseHex(entry.originalHex);
@@ -176,44 +212,88 @@ export async function generateColorwayExport(params: {
     rgbToFinalIndex.set(origKey, entryToUniqueIndex.get(entry)!);
   }
 
-  // Map every pixel to its palette index
   const indexedPixels = new Uint8Array(width * height);
   for (let i = 0; i < width * height; i++) {
     const off = i * 4;
-    const r = pixels[off];
-    const g = pixels[off + 1];
-    const b = pixels[off + 2];
-    const key = (r << 16) | (g << 8) | b;
+    const key = (pixels[off] << 16) | (pixels[off + 1] << 8) | pixels[off + 2];
     indexedPixels[i] = rgbToFinalIndex.get(key) ?? 0;
   }
 
   // 4. Generate files
   const safeName = sanitizeFilename(colorwayName);
-
   const bmpBuffer = buildIndexedBmp(width, height, finalPalette, indexedPixels);
-  const ctfBuffer = buildCtf(width, height, finalPalette, indexedPixels);
   const yarnSheet = buildYarnSheet(colorwayName, finalPalette);
+
+  // Fetch snapshot image for the PDF (if available)
+  let snapshotBuffer: Buffer | null = null;
+  if (colorwayRecord?.snapshotUrl) {
+    try {
+      const snapRes = await fetch(colorwayRecord.snapshotUrl);
+      if (snapRes.ok) snapshotBuffer = Buffer.from(await snapRes.arrayBuffer());
+    } catch {
+      // Snapshot fetch failed — PDF will use design image instead
+    }
+  }
+
+  // Look up yarn names for the PDF table
+  const yarnCodes = finalPalette
+    .map((p) => p.yarnCode)
+    .filter((c) => c !== "original");
+  const yarnRows = yarnCodes.length > 0
+    ? await db.yarnColor.findMany({
+        where: { code: { in: yarnCodes }, tenantId },
+        select: { code: true, name: true },
+      })
+    : [];
+  const yarnNameByCode = new Map(yarnRows.map((y) => [y.code, y.name]));
+
+  const pdfBuffer = await buildPdfSpecSheet({
+    tenantName: tenant.displayName ?? tenant.name,
+    logoUrl: tenant.logoUrl,
+    designName: design.name,
+    designWidth: width,
+    designHeight: height,
+    colorwayName,
+    folderName: folder?.name ?? null,
+    userEmail,
+    createdAt: colorwayRecord?.createdAt ?? new Date(),
+    previewImage: snapshotBuffer ?? imgBuffer,
+    palette: finalPalette,
+    yarnNameByCode,
+  });
 
   // 5. Upload to Supabase Storage
   const basePath = `${tenantId}/${userId}/${colorwayId}`;
   const admin = createAdminClient();
 
-  const uploads = await Promise.all([
+  const [bmpUrl, yarnSheetUrl, pdfUrl] = await Promise.all([
     uploadFile(admin, basePath, `${safeName}.bmp`, bmpBuffer, "image/bmp"),
-    uploadFile(admin, basePath, `${safeName}.ctf`, ctfBuffer, "application/octet-stream"),
-    uploadFile(admin, basePath, `${safeName}_yarns.txt`, Buffer.from(yarnSheet, "utf-8"), "text/plain"),
+    uploadFile(
+      admin,
+      basePath,
+      `${safeName}_yarns.txt`,
+      Buffer.from(yarnSheet, "utf-8"),
+      "text/plain"
+    ),
+    uploadFile(
+      admin,
+      basePath,
+      `${safeName}_spec.pdf`,
+      pdfBuffer,
+      "application/pdf"
+    ),
   ]);
-
-  const [bmpUrl, ctfUrl, yarnSheetUrl] = uploads;
 
   // 6. Update the SavedColorway record
   await db.savedColorway.update({
     where: { id: colorwayId },
-    data: { bmpUrl, ctfUrl, yarnSheetUrl },
+    data: { bmpUrl, yarnSheetUrl, pdfUrl },
   });
 
-  console.log(`[ColorwayExport] SUCCESS colorwayId=${colorwayId} files=${basePath}`);
-  return { bmpUrl, ctfUrl, yarnSheetUrl };
+  console.log(
+    `[ColorwayExport] SUCCESS colorwayId=${colorwayId} files=${basePath}`
+  );
+  return { bmpUrl, yarnSheetUrl, pdfUrl };
 }
 
 // ─── BMP Generation ──────────────────────────────────────────────────────────
@@ -233,8 +313,8 @@ function buildIndexedBmp(
   palette: Array<{ r: number; g: number; b: number }>,
   indexedPixels: Uint8Array
 ): Buffer {
-  const paletteSize = 256; // Always write 256 entries for compatibility
-  const rowStride = Math.ceil(width / 4) * 4; // Row padded to 4-byte boundary
+  const paletteSize = 256;
+  const rowStride = Math.ceil(width / 4) * 4;
   const pixelDataSize = rowStride * height;
   const headerSize = 14;
   const dibSize = 40;
@@ -244,26 +324,26 @@ function buildIndexedBmp(
 
   const buf = Buffer.alloc(fileSize);
 
-  // BITMAPFILEHEADER (14 bytes)
-  buf.write("BM", 0, "ascii"); // Signature
-  buf.writeUInt32LE(fileSize, 2); // File size
-  buf.writeUInt32LE(0, 6); // Reserved
-  buf.writeUInt32LE(dataOffset, 10); // Pixel data offset
+  // BITMAPFILEHEADER
+  buf.write("BM", 0, "ascii");
+  buf.writeUInt32LE(fileSize, 2);
+  buf.writeUInt32LE(0, 6);
+  buf.writeUInt32LE(dataOffset, 10);
 
-  // BITMAPINFOHEADER (40 bytes)
-  buf.writeUInt32LE(dibSize, 14); // DIB header size
-  buf.writeInt32LE(width, 18); // Width
-  buf.writeInt32LE(height, 22); // Height (positive = bottom-up)
-  buf.writeUInt16LE(1, 26); // Color planes
-  buf.writeUInt16LE(8, 28); // Bits per pixel
-  buf.writeUInt32LE(0, 30); // Compression (BI_RGB = none)
-  buf.writeUInt32LE(pixelDataSize, 34); // Image size
-  buf.writeInt32LE(2835, 38); // Horizontal resolution (72 DPI)
-  buf.writeInt32LE(2835, 42); // Vertical resolution (72 DPI)
-  buf.writeUInt32LE(palette.length, 46); // Colors used
-  buf.writeUInt32LE(palette.length, 50); // Important colors
+  // BITMAPINFOHEADER
+  buf.writeUInt32LE(dibSize, 14);
+  buf.writeInt32LE(width, 18);
+  buf.writeInt32LE(height, 22);
+  buf.writeUInt16LE(1, 26);
+  buf.writeUInt16LE(8, 28);
+  buf.writeUInt32LE(0, 30);
+  buf.writeUInt32LE(pixelDataSize, 34);
+  buf.writeInt32LE(2835, 38);
+  buf.writeInt32LE(2835, 42);
+  buf.writeUInt32LE(palette.length, 46);
+  buf.writeUInt32LE(palette.length, 50);
 
-  // Color table (B, G, R, 0x00 per entry)
+  // Color table (B, G, R, 0x00)
   for (let i = 0; i < paletteSize; i++) {
     const off = headerSize + dibSize + i * 4;
     if (i < palette.length) {
@@ -272,115 +352,281 @@ function buildIndexedBmp(
       buf[off + 2] = palette[i].r;
       buf[off + 3] = 0;
     }
-    // Remaining entries stay zero-filled
   }
 
   // Pixel data (bottom-up row order)
   for (let y = 0; y < height; y++) {
-    const srcRow = (height - 1 - y) * width; // BMP is bottom-up
+    const srcRow = (height - 1 - y) * width;
     const dstRow = dataOffset + y * rowStride;
     for (let x = 0; x < width; x++) {
       buf[dstRow + x] = indexedPixels[srcRow + x];
     }
-    // Padding bytes remain zero-filled
   }
 
   return buf;
 }
 
-// ─── CTF Generation ──────────────────────────────────────────────────────────
+// ─── PDF Spec Sheet ──────────────────────────────────────────────────────────
 
-/**
- * Builds a CTF file matching the format decoded by ctfToPng:
- *
- *   Offset  0–31  : 32-byte ASCII header "CTF Graphics File Version 01.001"
- *   Offset  32–33 : width  (uint16LE)
- *   Offset  34–35 : height (uint16LE)
- *   Offset  36–59 : reserved (zeroes)
- *   Offset  60–61 : numColors (uint16LE)
- *   Offset  62    : palette — numColors × 4 bytes (R, G, B, 0xFF)
- *   +8 bytes padding after palette
- *   RLE pixel data: pairs of (colorIndex, runLength)
- *
- * Row order: CTF row 0 = visual bottom (same as BMP).
- */
-function buildCtf(
-  width: number,
-  height: number,
-  palette: Array<{ r: number; g: number; b: number }>,
-  indexedPixels: Uint8Array
-): Buffer {
-  const numColors = palette.length;
-  const headerSize = 62; // Fixed header up to palette start
-  const paletteBytes = numColors * 4;
-  const paddingAfterPalette = 8;
-  const rleOffset = headerSize + paletteBytes + paddingAfterPalette;
+async function buildPdfSpecSheet(params: {
+  tenantName: string;
+  logoUrl: string | null;
+  designName: string;
+  designWidth: number;
+  designHeight: number;
+  colorwayName: string;
+  folderName: string | null;
+  userEmail: string;
+  createdAt: Date;
+  previewImage: Buffer;
+  palette: Array<{
+    index: number;
+    r: number;
+    g: number;
+    b: number;
+    yarnCode: string;
+    percentage: number;
+  }>;
+  yarnNameByCode: Map<string, string>;
+}): Promise<Buffer> {
+  const {
+    tenantName,
+    logoUrl,
+    designName,
+    designWidth,
+    designHeight,
+    colorwayName,
+    folderName,
+    userEmail,
+    createdAt,
+    previewImage,
+    palette,
+    yarnNameByCode,
+  } = params;
 
-  // First pass: generate RLE data
-  // Pixel order: row 0 = bottom of image (flip from top-down indexedPixels)
-  const rleChunks: number[] = [];
-  for (let ctfRow = 0; ctfRow < height; ctfRow++) {
-    const pngRow = height - 1 - ctfRow; // Flip: CTF row 0 = bottom = PNG row (height-1)
-    const rowStart = pngRow * width;
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
+  const chunks: Buffer[] = [];
 
-    let x = 0;
-    while (x < width) {
-      const colorIndex = indexedPixels[rowStart + x];
-      let runLength = 1;
-      while (
-        runLength < 255 &&
-        x + runLength < width &&
-        indexedPixels[rowStart + x + runLength] === colorIndex
-      ) {
-        runLength++;
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const finished = new Promise<Buffer>((resolve) =>
+    doc.on("end", () => resolve(Buffer.concat(chunks)))
+  );
+
+  const pageWidth = doc.page.width - 80; // 40px margins on each side
+
+  // ── Header: brand name + optional logo ──
+  let headerY = 40;
+
+  if (logoUrl) {
+    try {
+      const logoRes = await fetch(logoUrl);
+      if (logoRes.ok) {
+        const logoBuf = Buffer.from(await logoRes.arrayBuffer());
+        doc.image(logoBuf, 40, headerY, { height: 30 });
+        headerY += 35;
       }
-      rleChunks.push(colorIndex, runLength);
-      x += runLength;
+    } catch {
+      // Logo fetch failed — fall through to text header
     }
   }
 
-  const totalSize = rleOffset + rleChunks.length;
-  const buf = Buffer.alloc(totalSize);
+  doc
+    .fontSize(18)
+    .font("Helvetica-Bold")
+    .fillColor("#1a1612")
+    .text(tenantName, 40, headerY, { width: pageWidth });
+  headerY = doc.y + 4;
 
-  // Header
-  const headerStr = "CTF Graphics File Version 01.001";
-  buf.write(headerStr, 0, 32, "ascii");
-  buf.writeUInt16LE(width, 32);
-  buf.writeUInt16LE(height, 34);
-  // Bytes 36–59 are reserved/zeroes
-  buf.writeUInt16LE(numColors, 60);
+  doc
+    .fontSize(9)
+    .font("Helvetica")
+    .fillColor("#888888")
+    .text("Production Spec Sheet", 40, headerY, { width: pageWidth });
+  headerY = doc.y + 12;
 
-  // Palette (R, G, B, 0xFF per entry)
-  for (let i = 0; i < numColors; i++) {
-    const off = 62 + i * 4;
-    buf[off] = palette[i].r;
-    buf[off + 1] = palette[i].g;
-    buf[off + 2] = palette[i].b;
-    buf[off + 3] = 0xff;
+  // ── Divider ──
+  doc
+    .moveTo(40, headerY)
+    .lineTo(40 + pageWidth, headerY)
+    .strokeColor("#e0e0e0")
+    .lineWidth(0.5)
+    .stroke();
+  headerY += 12;
+
+  // ── Preview image ──
+  const maxImgWidth = pageWidth;
+  const maxImgHeight = 220;
+  const imgAspect = designWidth / designHeight;
+  let imgW = maxImgWidth;
+  let imgH = imgW / imgAspect;
+  if (imgH > maxImgHeight) {
+    imgH = maxImgHeight;
+    imgW = imgH * imgAspect;
+  }
+  const imgX = 40 + (pageWidth - imgW) / 2;
+
+  try {
+    doc.image(previewImage, imgX, headerY, { width: imgW, height: imgH });
+  } catch {
+    // Image rendering failed — skip
+  }
+  headerY += imgH + 14;
+
+  // ── Metadata block ──
+  const dateStr = createdAt.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const metaLines: [string, string][] = [
+    ["Design", designName],
+    [
+      "Size",
+      `${designWidth} x ${designHeight} px`,
+    ],
+    ["Colorway", colorwayName],
+  ];
+  if (folderName) metaLines.push(["Folder", folderName]);
+  metaLines.push(["Created by", userEmail]);
+  metaLines.push(["Date", dateStr]);
+
+  const labelCol = 80;
+  for (const [label, value] of metaLines) {
+    doc
+      .fontSize(9)
+      .font("Helvetica-Bold")
+      .fillColor("#555555")
+      .text(label, 40, headerY, { width: labelCol, continued: false });
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#1a1612")
+      .text(value, 40 + labelCol, headerY, { width: pageWidth - labelCol });
+    headerY = Math.max(doc.y, headerY + 13);
   }
 
-  // 8-byte padding after palette (zeroes, already alloc'd)
+  headerY += 6;
 
-  // RLE pixel data
-  for (let i = 0; i < rleChunks.length; i++) {
-    buf[rleOffset + i] = rleChunks[i];
+  // ── Divider ──
+  doc
+    .moveTo(40, headerY)
+    .lineTo(40 + pageWidth, headerY)
+    .strokeColor("#e0e0e0")
+    .lineWidth(0.5)
+    .stroke();
+  headerY += 10;
+
+  // ── Yarn Color Table ──
+  doc
+    .fontSize(11)
+    .font("Helvetica-Bold")
+    .fillColor("#1a1612")
+    .text("Yarn Colors", 40, headerY);
+  headerY = doc.y + 8;
+
+  // Table header
+  const colSwatch = 40;
+  const colCode = 75;
+  const colName = 170;
+  const colPct = 40 + pageWidth - 50;
+  const rowHeight = 20;
+
+  doc
+    .fontSize(8)
+    .font("Helvetica-Bold")
+    .fillColor("#888888");
+  doc.text("Swatch", colSwatch, headerY, { width: 35 });
+  doc.text("Code", colCode, headerY, { width: 90 });
+  doc.text("Yarn Name", colName, headerY, { width: 200 });
+  doc.text("%", colPct, headerY, { width: 45, align: "right" });
+  headerY += 14;
+
+  // Sort palette by percentage descending
+  const sortedPalette = [...palette].sort(
+    (a, b) => b.percentage - a.percentage
+  );
+
+  for (const entry of sortedPalette) {
+    // Check if we need a new page
+    if (headerY + rowHeight > doc.page.height - 40) {
+      doc.addPage();
+      headerY = 40;
+    }
+
+    const hex = `#${((entry.r << 16) | (entry.g << 8) | entry.b).toString(16).padStart(6, "0")}`;
+    const yarnName = yarnNameByCode.get(entry.yarnCode) ?? "";
+
+    // Color swatch rectangle
+    doc.rect(colSwatch, headerY + 2, 14, 14).fill(hex);
+    doc
+      .rect(colSwatch, headerY + 2, 14, 14)
+      .strokeColor("#cccccc")
+      .lineWidth(0.5)
+      .stroke();
+
+    // Yarn code
+    doc
+      .fontSize(9)
+      .font("Helvetica-Bold")
+      .fillColor("#1a1612")
+      .text(entry.yarnCode, colCode, headerY + 4, { width: 90 });
+
+    // Yarn name
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#555555")
+      .text(yarnName, colName, headerY + 4, { width: colPct - colName - 10 });
+
+    // Percentage
+    doc
+      .fontSize(9)
+      .font("Helvetica")
+      .fillColor("#888888")
+      .text(`${entry.percentage.toFixed(1)}%`, colPct, headerY + 4, {
+        width: 45,
+        align: "right",
+      });
+
+    headerY += rowHeight;
   }
 
-  return buf;
+  // ── Footer ──
+  const footerY = doc.page.height - 30;
+  doc
+    .fontSize(7)
+    .font("Helvetica")
+    .fillColor("#aaaaaa")
+    .text(
+      `Generated by Loom Studio on ${new Date().toISOString().split("T")[0]}`,
+      40,
+      footerY,
+      { width: pageWidth, align: "center" }
+    );
+
+  doc.end();
+  return finished;
 }
 
 // ─── Yarn Sheet ──────────────────────────────────────────────────────────────
 
 function buildYarnSheet(
   colorwayName: string,
-  palette: Array<{ index: number; r: number; g: number; b: number; yarnCode: string }>
+  palette: Array<{
+    index: number;
+    r: number;
+    g: number;
+    b: number;
+    yarnCode: string;
+  }>
 ): string {
   const lines: string[] = [];
   lines.push(`Colorway: ${colorwayName}`);
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push("");
   lines.push("Index\tYarn Code\tHex");
-  lines.push("─────\t─────────\t───────");
+  lines.push("-----\t---------\t-------");
   for (const entry of palette) {
     const hex = `#${((entry.r << 16) | (entry.g << 8) | entry.b).toString(16).padStart(6, "0")}`;
     lines.push(`${entry.index}\t${entry.yarnCode}\t${hex}`);
@@ -400,11 +646,12 @@ function parseHex(hex: string): { r: number; g: number; b: number } {
 }
 
 function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9_\-. ]/g, "")
-    .replace(/\s+/g, "_")
-    .substring(0, 80)
-    || "colorway";
+  return (
+    name
+      .replace(/[^a-zA-Z0-9_\-. ]/g, "")
+      .replace(/\s+/g, "_")
+      .substring(0, 80) || "colorway"
+  );
 }
 
 async function uploadFile(
@@ -419,7 +666,8 @@ async function uploadFile(
     .from(SAVED_COLORWAYS_BUCKET)
     .upload(storagePath, data, { contentType, upsert: true });
 
-  if (error) throw new Error(`Upload failed for ${storagePath}: ${error.message}`);
+  if (error)
+    throw new Error(`Upload failed for ${storagePath}: ${error.message}`);
 
   const { data: urlData } = admin.storage
     .from(SAVED_COLORWAYS_BUCKET)
