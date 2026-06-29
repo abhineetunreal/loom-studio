@@ -12,12 +12,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* App is always light-themed — no dark mode override.
+   Without this, OS-level dark mode would set --foreground to #ededed,
+   causing inherited text to render as near-invisible light grey. */
 
 body {
   background: var(--background);

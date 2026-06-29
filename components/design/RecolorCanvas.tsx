@@ -97,7 +97,7 @@ export type RegionUndoDelta = {
 
 export type RecolorCanvasHandle = {
   /** Returns a data URL of the current recolored image, scaled to maxWidth. */
-  getSnapshot: (maxWidth?: number) => string | null;
+  getSnapshot: (maxWidth?: number, format?: "png" | "jpeg", quality?: number) => string | null;
   /** Pick the palette color at the given viewport coordinates (forwarded from CanvasZone). */
   pickColorAt: (clientX: number, clientY: number) => void;
   /**
@@ -207,10 +207,10 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
   // ── Expose handle methods to parent ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
-    getSnapshot(maxWidth = 300) {
+    getSnapshot(maxWidth = 300, format: "png" | "jpeg" = "png", quality = 0.8) {
       const canvas = canvasRef.current;
       if (!canvas) return null;
-      const scale = Math.min(1, maxWidth / canvas.width);
+      const scale = Math.min(1, maxWidth / Math.max(canvas.width, canvas.height));
       const w = Math.round(canvas.width * scale);
       const h = Math.round(canvas.height * scale);
       const offscreen = document.createElement("canvas");
@@ -218,7 +218,8 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       offscreen.height = h;
       try {
         offscreen.getContext("2d")!.drawImage(canvas, 0, 0, w, h);
-        return offscreen.toDataURL("image/png");
+        const mime = format === "jpeg" ? "image/jpeg" : "image/png";
+        return offscreen.toDataURL(mime, quality);
       } catch {
         // Canvas tainted by CORS — snapshot unavailable
         return null;

@@ -103,10 +103,12 @@ export async function generateColorwayExport(params: {
   const { width, height } = design;
 
   // Fetch the PNG image to get RGBA pixel data
+  console.log(`[ColorwayExport] Fetching design image for colorwayId=${colorwayId} url=${design.imageUrl.substring(0, 80)}`);
   const imgResponse = await fetch(design.imageUrl);
   if (!imgResponse.ok)
-    throw new Error(`Failed to fetch design image: ${imgResponse.status}`);
+    throw new Error(`Failed to fetch design image: ${imgResponse.status} ${imgResponse.statusText}`);
   const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+  console.log(`[ColorwayExport] Image fetched, ${imgBuffer.length} bytes`);
 
   const img = await Jimp.read(imgBuffer);
   const { data: pixels } = img.bitmap;
@@ -219,81 +221,99 @@ export async function generateColorwayExport(params: {
     indexedPixels[i] = rgbToFinalIndex.get(key) ?? 0;
   }
 
-  // 4. Generate files
+  // 4. Generate and upload files independently — each in its own try/catch
+  //    so one failing doesn't block the others.
   const safeName = sanitizeFilename(colorwayName);
-  const bmpBuffer = buildIndexedBmp(width, height, finalPalette, indexedPixels);
-  const yarnSheet = buildYarnSheet(colorwayName, finalPalette);
+  const basePath = `${tenantId}/${userId}/${colorwayId}`;
+  const admin = createAdminClient();
+  const updateData: { bmpUrl?: string; yarnSheetUrl?: string; pdfUrl?: string } = {};
 
-  // Fetch snapshot image for the PDF (if available)
-  let snapshotBuffer: Buffer | null = null;
-  if (colorwayRecord?.snapshotUrl) {
+  // ── BMP ──
+  try {
+    console.log(`[ColorwayExport] Generating BMP for colorwayId=${colorwayId}`);
+    const bmpBuffer = buildIndexedBmp(width, height, finalPalette, indexedPixels);
+    const bmpUrl = await uploadFile(admin, basePath, `${safeName}.bmp`, bmpBuffer, "image/bmp");
+    updateData.bmpUrl = bmpUrl;
+    console.log(`[ColorwayExport] BMP uploaded colorwayId=${colorwayId}`);
+  } catch (err) {
+    console.error(`[ColorwayExport] BMP FAILED colorwayId=${colorwayId}`, err instanceof Error ? err.stack : err);
+  }
+
+  // ── Yarn sheet ──
+  try {
+    console.log(`[ColorwayExport] Generating yarn sheet for colorwayId=${colorwayId}`);
+    const yarnSheet = buildYarnSheet(colorwayName, finalPalette);
+    const yarnSheetUrl = await uploadFile(admin, basePath, `${safeName}_yarns.txt`, Buffer.from(yarnSheet, "utf-8"), "text/plain");
+    updateData.yarnSheetUrl = yarnSheetUrl;
+    console.log(`[ColorwayExport] Yarn sheet uploaded colorwayId=${colorwayId}`);
+  } catch (err) {
+    console.error(`[ColorwayExport] Yarn sheet FAILED colorwayId=${colorwayId}`, err instanceof Error ? err.stack : err);
+  }
+
+  // ── PDF spec sheet ──
+  try {
+    console.log(`[ColorwayExport] Generating PDF for colorwayId=${colorwayId}`);
+
+    // Fetch snapshot for preview
+    let snapshotBuffer: Buffer | null = null;
+    if (colorwayRecord?.snapshotUrl) {
+      try {
+        const snapRes = await fetch(colorwayRecord.snapshotUrl);
+        if (snapRes.ok) snapshotBuffer = Buffer.from(await snapRes.arrayBuffer());
+      } catch (snapErr) {
+        console.error(`[ColorwayExport] Snapshot fetch failed for PDF colorwayId=${colorwayId}`, snapErr);
+      }
+    }
+
+    // Look up yarn names
+    const yarnCodes = finalPalette.map((p) => p.yarnCode).filter((c) => c !== "original");
+    const yarnRows = yarnCodes.length > 0
+      ? await db.yarnColor.findMany({
+          where: { code: { in: yarnCodes }, tenantId },
+          select: { code: true, name: true },
+        })
+      : [];
+    const yarnNameByCode = new Map(yarnRows.map((y) => [y.code, y.name]));
+
+    const pdfBuffer = await buildPdfSpecSheet({
+      tenantName: tenant.displayName ?? tenant.name,
+      logoUrl: tenant.logoUrl,
+      designName: design.name,
+      designWidth: width,
+      designHeight: height,
+      colorwayName,
+      folderName: folder?.name ?? null,
+      userEmail,
+      createdAt: colorwayRecord?.createdAt ?? new Date(),
+      previewImage: snapshotBuffer ?? imgBuffer,
+      palette: finalPalette,
+      yarnNameByCode,
+    });
+    const pdfUrl = await uploadFile(admin, basePath, `${safeName}_spec.pdf`, pdfBuffer, "application/pdf");
+    updateData.pdfUrl = pdfUrl;
+    console.log(`[ColorwayExport] PDF uploaded colorwayId=${colorwayId}`);
+  } catch (err) {
+    console.error(`[ColorwayExport] PDF FAILED colorwayId=${colorwayId}`, err instanceof Error ? err.stack : err);
+  }
+
+  // 5. Update the SavedColorway record with whatever succeeded
+  if (Object.keys(updateData).length > 0) {
     try {
-      const snapRes = await fetch(colorwayRecord.snapshotUrl);
-      if (snapRes.ok) snapshotBuffer = Buffer.from(await snapRes.arrayBuffer());
-    } catch {
-      // Snapshot fetch failed — PDF will use design image instead
+      await db.savedColorway.update({
+        where: { id: colorwayId },
+        data: updateData,
+      });
+      console.log(`[ColorwayExport] DB updated colorwayId=${colorwayId} fields=${Object.keys(updateData).join(",")}`);
+    } catch (err) {
+      console.error(`[ColorwayExport] DB update FAILED colorwayId=${colorwayId}`, err instanceof Error ? err.stack : err);
     }
   }
 
-  // Look up yarn names for the PDF table
-  const yarnCodes = finalPalette
-    .map((p) => p.yarnCode)
-    .filter((c) => c !== "original");
-  const yarnRows = yarnCodes.length > 0
-    ? await db.yarnColor.findMany({
-        where: { code: { in: yarnCodes }, tenantId },
-        select: { code: true, name: true },
-      })
-    : [];
-  const yarnNameByCode = new Map(yarnRows.map((y) => [y.code, y.name]));
-
-  const pdfBuffer = await buildPdfSpecSheet({
-    tenantName: tenant.displayName ?? tenant.name,
-    logoUrl: tenant.logoUrl,
-    designName: design.name,
-    designWidth: width,
-    designHeight: height,
-    colorwayName,
-    folderName: folder?.name ?? null,
-    userEmail,
-    createdAt: colorwayRecord?.createdAt ?? new Date(),
-    previewImage: snapshotBuffer ?? imgBuffer,
-    palette: finalPalette,
-    yarnNameByCode,
-  });
-
-  // 5. Upload to Supabase Storage
-  const basePath = `${tenantId}/${userId}/${colorwayId}`;
-  const admin = createAdminClient();
-
-  const [bmpUrl, yarnSheetUrl, pdfUrl] = await Promise.all([
-    uploadFile(admin, basePath, `${safeName}.bmp`, bmpBuffer, "image/bmp"),
-    uploadFile(
-      admin,
-      basePath,
-      `${safeName}_yarns.txt`,
-      Buffer.from(yarnSheet, "utf-8"),
-      "text/plain"
-    ),
-    uploadFile(
-      admin,
-      basePath,
-      `${safeName}_spec.pdf`,
-      pdfBuffer,
-      "application/pdf"
-    ),
-  ]);
-
-  // 6. Update the SavedColorway record
-  await db.savedColorway.update({
-    where: { id: colorwayId },
-    data: { bmpUrl, yarnSheetUrl, pdfUrl },
-  });
-
-  console.log(
-    `[ColorwayExport] SUCCESS colorwayId=${colorwayId} files=${basePath}`
-  );
-  return { bmpUrl, yarnSheetUrl, pdfUrl };
+  return {
+    bmpUrl: updateData.bmpUrl ?? "",
+    yarnSheetUrl: updateData.yarnSheetUrl ?? "",
+    pdfUrl: updateData.pdfUrl ?? "",
+  };
 }
 
 // ─── BMP Generation ──────────────────────────────────────────────────────────

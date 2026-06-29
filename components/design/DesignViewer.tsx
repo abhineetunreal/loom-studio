@@ -445,35 +445,24 @@ export default function DesignViewer({
   }, [design.id, buildOperations]);
 
   // ── Order sheet download (client-side PDF) ──────────────────────────────────
+  const [orderSheetBusy, setOrderSheetBusy] = useState(false);
+
   const handleDownloadOrderSheet = useCallback(async () => {
-    const { default: jsPDF } = await import("jspdf");
+    setOrderSheetBusy(true);
+    // Yield to let the UI update before heavy work
+    await new Promise((r) => setTimeout(r, 50));
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const pw = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    const contentW = pw - margin * 2;
-    let y = margin;
+    try {
+      const { default: jsPDF } = await import("jspdf");
 
-    // ── Header: logo + brand name ──
-    if (brandLogoUrl) {
-      try {
-        const logoImg = await loadImageAsDataUrl(brandLogoUrl);
-        if (logoImg) {
-          doc.addImage(logoImg, "PNG", margin, y, 20, 20);
-          doc.setFontSize(16);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(26, 22, 18);
-          doc.text(yarnLibraryName, margin + 24, y + 9);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(136, 136, 136);
-          doc.text("Order Sheet", margin + 24, y + 14);
-          y += 24;
-        } else {
-          throw new Error("skip");
-        }
-      } catch {
-        // Logo failed — text-only header
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pw = doc.internal.pageSize.getWidth();
+      const margin = 15;
+      const contentW = pw - margin * 2;
+      let y = margin;
+
+      // ── Header: logo + brand name ──
+      const drawTextHeader = () => {
         doc.setFontSize(16);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(26, 22, 18);
@@ -483,136 +472,146 @@ export default function DesignViewer({
         doc.setTextColor(136, 136, 136);
         doc.text("Order Sheet", margin, y + 11);
         y += 15;
+      };
+
+      if (brandLogoUrl) {
+        try {
+          const logoImg = await loadImageAsDataUrl(brandLogoUrl);
+          if (logoImg) {
+            doc.addImage(logoImg, "JPEG", margin, y, 20, 20);
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(26, 22, 18);
+            doc.text(yarnLibraryName, margin + 24, y + 9);
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(136, 136, 136);
+            doc.text("Order Sheet", margin + 24, y + 14);
+            y += 24;
+          } else {
+            drawTextHeader();
+          }
+        } catch {
+          drawTextHeader();
+        }
+      } else {
+        drawTextHeader();
       }
-    } else {
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(26, 22, 18);
-      doc.text(yarnLibraryName, margin, y + 6);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(136, 136, 136);
-      doc.text("Order Sheet", margin, y + 11);
-      y += 15;
-    }
 
-    // ── Divider ──
-    doc.setDrawColor(224, 224, 224);
-    doc.setLineWidth(0.3);
-    doc.line(margin, y, margin + contentW, y);
-    y += 5;
-
-    // ── Preview image ──
-    const snapshot = canvasRef.current?.getSnapshot(1200);
-    if (snapshot) {
-      const imgAspect = design.width / design.height;
-      const maxH = 90;
-      let imgW = contentW;
-      let imgH = imgW / imgAspect;
-      if (imgH > maxH) { imgH = maxH; imgW = imgH * imgAspect; }
-      const imgX = margin + (contentW - imgW) / 2;
-      doc.addImage(snapshot, "PNG", imgX, y, imgW, imgH);
-      y += imgH + 5;
-    }
-
-    // ── Metadata ──
-    const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-    const meta: [string, string][] = [
-      ["Design", design.name],
-      ["Size", `${design.width} x ${design.height} px`],
-      ["Date", dateStr],
-    ];
-
-    doc.setFontSize(9);
-    for (const [label, value] of meta) {
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(85, 85, 85);
-      doc.text(label, margin, y + 3);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(26, 22, 18);
-      doc.text(value, margin + 28, y + 3);
+      // ── Divider ──
+      doc.setDrawColor(224, 224, 224);
+      doc.setLineWidth(0.3);
+      doc.line(margin, y, margin + contentW, y);
       y += 5;
-    }
-    y += 4;
 
-    // ── Divider ──
-    doc.setDrawColor(224, 224, 224);
-    doc.line(margin, y, margin + contentW, y);
-    y += 5;
-
-    // ── Yarn color table ──
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(26, 22, 18);
-    doc.text("Yarn Colors", margin, y + 3);
-    y += 7;
-
-    // Table header
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(136, 136, 136);
-    doc.text("Swatch", margin, y + 3);
-    doc.text("Code", margin + 20, y + 3);
-    doc.text("Yarn Name", margin + 55, y + 3);
-    doc.text("%", margin + contentW - 5, y + 3, { align: "right" });
-    y += 5;
-
-    // Build table rows from effectivePalette + colorMap
-    const rows = effectivePalette
-      .filter((e) => e.percentage >= 0.05)
-      .sort((a, b) => b.percentage - a.percentage);
-
-    const pageH = doc.internal.pageSize.getHeight();
-    for (const entry of rows) {
-      if (y + 7 > pageH - margin) {
-        doc.addPage();
-        y = margin;
+      // ── Preview image (JPEG, max 1000px longest side) ──
+      const jpegSnapshot = canvasRef.current?.getSnapshot(1000, "jpeg", 0.8) ?? null;
+      if (jpegSnapshot) {
+        const imgAspect = design.width / design.height;
+        const maxH = 90;
+        let imgW = contentW;
+        let imgH = imgW / imgAspect;
+        if (imgH > maxH) { imgH = maxH; imgW = imgH * imgAspect; }
+        const imgX = margin + (contentW - imgW) / 2;
+        doc.addImage(jpegSnapshot, "JPEG", imgX, y, imgW, imgH);
+        y += imgH + 5;
       }
 
-      const yarn = recolor.current[entry.hex] ?? null;
-      const hex = yarn?.hex ?? entry.hex;
-      const code = yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
-      const name = yarn?.name ?? "";
+      // ── Metadata ──
+      const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      const meta: [string, string][] = [
+        ["Design", design.name],
+        ["Size", `${design.width} x ${design.height} px`],
+        ["Date", dateStr],
+      ];
 
-      // Swatch
-      const { r, g, b } = hexToRgbLocal(hex);
-      doc.setFillColor(r, g, b);
-      doc.rect(margin, y, 5, 5, "F");
-      doc.setDrawColor(200, 200, 200);
-      doc.rect(margin, y, 5, 5, "S");
+      doc.setFontSize(9);
+      for (const [label, value] of meta) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(85, 85, 85);
+        doc.text(label, margin, y + 3);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(26, 22, 18);
+        doc.text(value, margin + 28, y + 3);
+        y += 5;
+      }
+      y += 4;
 
-      // Code
-      doc.setFontSize(8);
+      // ── Divider ──
+      doc.setDrawColor(224, 224, 224);
+      doc.line(margin, y, margin + contentW, y);
+      y += 5;
+
+      // ── Yarn color table ──
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(26, 22, 18);
-      doc.text(code, margin + 20, y + 3.5);
-
-      // Name
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(85, 85, 85);
-      doc.text(name, margin + 55, y + 3.5);
-
-      // Percentage
-      doc.setTextColor(136, 136, 136);
-      doc.text(`${entry.percentage.toFixed(1)}%`, margin + contentW - 5, y + 3.5, { align: "right" });
-
+      doc.text("Yarn Colors", margin, y + 3);
       y += 7;
+
+      // Table header
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(136, 136, 136);
+      doc.text("Swatch", margin, y + 3);
+      doc.text("Code", margin + 20, y + 3);
+      doc.text("Yarn Name", margin + 55, y + 3);
+      doc.text("%", margin + contentW - 5, y + 3, { align: "right" });
+      y += 5;
+
+      const rows = effectivePalette
+        .filter((e) => e.percentage >= 0.05)
+        .sort((a, b) => b.percentage - a.percentage);
+
+      const pageH = doc.internal.pageSize.getHeight();
+      for (const entry of rows) {
+        if (y + 7 > pageH - margin) {
+          doc.addPage();
+          y = margin;
+        }
+
+        const yarn = recolor.current[entry.hex] ?? null;
+        const hex = yarn?.hex ?? entry.hex;
+        const code = yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
+        const name = yarn?.name ?? "";
+
+        const { r, g, b } = hexToRgbLocal(hex);
+        doc.setFillColor(r, g, b);
+        doc.rect(margin, y, 5, 5, "F");
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(margin, y, 5, 5, "S");
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(26, 22, 18);
+        doc.text(code, margin + 20, y + 3.5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(85, 85, 85);
+        doc.text(name, margin + 55, y + 3.5);
+
+        doc.setTextColor(136, 136, 136);
+        doc.text(`${entry.percentage.toFixed(1)}%`, margin + contentW - 5, y + 3.5, { align: "right" });
+
+        y += 7;
+      }
+
+      // ── Footer ──
+      const footY = pageH - 8;
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(170, 170, 170);
+      doc.text(
+        `Generated by Loom Studio on ${new Date().toISOString().split("T")[0]}`,
+        pw / 2, footY, { align: "center" }
+      );
+
+      const safeName = design.name.replace(/[^a-zA-Z0-9_\-. ]/g, "").replace(/\s+/g, "_");
+      const dateTag = new Date().toISOString().split("T")[0];
+      doc.save(`${safeName}_OrderSheet_${dateTag}.pdf`);
+    } finally {
+      setOrderSheetBusy(false);
     }
-
-    // ── Footer ──
-    const footY = pageH - 8;
-    doc.setFontSize(6);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(170, 170, 170);
-    doc.text(
-      `Generated by Loom Studio on ${new Date().toISOString().split("T")[0]}`,
-      pw / 2, footY, { align: "center" }
-    );
-
-    // Download
-    const safeName = design.name.replace(/[^a-zA-Z0-9_\-. ]/g, "").replace(/\s+/g, "_");
-    const dateTag = new Date().toISOString().split("T")[0];
-    doc.save(`${safeName}_OrderSheet_${dateTag}.pdf`);
   }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl]);
 
   // ── Rebuild effective palette when global colorMap changes ───────────────────
@@ -743,6 +742,7 @@ export default function DesignViewer({
         onRegionUndoDelta={handleRegionUndoDelta}
         onRegionClear={handleRegionClear}
         onDownloadOrderSheet={tierInfo.tier !== "demo" ? handleDownloadOrderSheet : undefined}
+        orderSheetBusy={orderSheetBusy}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -869,7 +869,7 @@ function loadImageAsDataUrl(url: string): Promise<string | null> {
       canvas.height = img.naturalHeight;
       canvas.getContext("2d")!.drawImage(img, 0, 0);
       try {
-        resolve(canvas.toDataURL("image/png"));
+        resolve(canvas.toDataURL("image/jpeg", 0.8));
       } catch {
         resolve(null);
       }
@@ -878,3 +878,4 @@ function loadImageAsDataUrl(url: string): Promise<string | null> {
     img.src = url;
   });
 }
+

@@ -149,7 +149,7 @@ export default function CompactPalette({
                   {displayCode}
                 </span>
                 {/* Percentage */}
-                <span className="text-[13px] tabular-nums shrink-0 text-stone-400">
+                <span className="text-[13px] tabular-nums shrink-0 text-stone-500">
                   {entry.percentage.toFixed(1)}%
                 </span>
               </button>

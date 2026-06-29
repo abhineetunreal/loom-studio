@@ -102,7 +102,7 @@ function PaletteRow({
               {assignedYarn.library && (
                 <span
                   className={`text-xs block leading-snug ${
-                    isSelected ? "text-stone-400" : "text-stone-400"
+                    isSelected ? "text-stone-400" : "text-stone-500"
                   }`}
                 >
                   {assignedYarn.library}
@@ -120,7 +120,7 @@ function PaletteRow({
               </span>
               <span
                 className={`text-xs block leading-snug ${
-                  isSelected ? "text-stone-400" : "text-stone-400"
+                  isSelected ? "text-stone-400" : "text-stone-500"
                 }`}
               >
                 original
@@ -132,7 +132,7 @@ function PaletteRow({
         {/* Percentage — always visible */}
         <span
           className={`text-xs tabular-nums shrink-0 ${
-            isSelected ? "text-stone-400" : "text-stone-400"
+            isSelected ? "text-stone-400" : "text-stone-500"
           }`}
         >
           {entry.percentage.toFixed(1)}%

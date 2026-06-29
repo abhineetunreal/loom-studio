@@ -43,6 +43,8 @@ type Props = {
   onRegionClear?: () => void;
   /** Download a PDF order sheet of the current design state */
   onDownloadOrderSheet?: () => void;
+  /** True while the order sheet PDF is being generated */
+  orderSheetBusy?: boolean;
 };
 
 function clampPan(
@@ -93,6 +95,7 @@ export default function CanvasZone({
   onRegionUndoDelta,
   onRegionClear,
   onDownloadOrderSheet,
+  orderSheetBusy,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -542,9 +545,10 @@ export default function CanvasZone({
             {onDownloadOrderSheet && (
               <button
                 onClick={onDownloadOrderSheet}
-                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 transition-colors whitespace-nowrap"
+                disabled={orderSheetBusy}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 disabled:opacity-50 disabled:cursor-wait transition-colors whitespace-nowrap"
               >
-                Save Order Sheet
+                {orderSheetBusy ? "Generating\u2026" : "Save Order Sheet"}
               </button>
             )}
           </div>
