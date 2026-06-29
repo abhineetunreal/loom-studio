@@ -163,7 +163,7 @@ export default function CompactPalette({
                   className={`absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors ${
                     isSelected
                       ? "text-stone-400 hover:text-white"
-                      : "text-stone-300 hover:text-stone-600"
+                      : "text-stone-400 hover:text-stone-600"
                   }`}
                 >
                   <RevertIcon />

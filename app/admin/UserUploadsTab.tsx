@@ -198,11 +198,11 @@ function UploadCard({
             </button>
           </div>
         ) : (
-          <p className="text-stone-300 italic">No save yet</p>
+          <p className="text-stone-400 italic">No save yet</p>
         )}
 
         {/* Upload date */}
-        <p className="text-stone-300 mt-auto pt-1 border-t border-stone-100">
+        <p className="text-stone-400 mt-auto pt-1 border-t border-stone-100">
           Uploaded {formatDate(design.createdAt)}
         </p>
       </div>

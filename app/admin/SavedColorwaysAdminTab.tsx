@@ -136,7 +136,7 @@ function ColorwayAdminRow({
           </a>
         )}
         {!colorway.bmpUrl && !colorway.ctfUrl && (
-          <span className="text-[10px] text-stone-300 italic">no exports</span>
+          <span className="text-[10px] text-stone-400 italic">no exports</span>
         )}
       </div>
       {/* Delete */}

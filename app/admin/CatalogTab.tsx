@@ -614,7 +614,7 @@ function DesignCard({
                 SKU: {design.externalSku}
               </span>
             ) : (
-              <span className="text-xs text-stone-300 italic">No SKU</span>
+              <span className="text-xs text-stone-400 italic">No SKU</span>
             )}
             <PencilIcon />
           </button>

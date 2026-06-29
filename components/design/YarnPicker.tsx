@@ -227,7 +227,7 @@ export default function YarnPicker({
                 )}
               </p>
             ) : (
-              <p className="text-xs text-stone-300">
+              <p className="text-xs text-stone-400">
                 {libraryYarns.length} color{libraryYarns.length !== 1 ? "s" : ""}
                 {query && " matched"}
               </p>

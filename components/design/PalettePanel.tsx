@@ -113,7 +113,7 @@ function PaletteRow({
             <>
               <span
                 className={`font-mono text-xs block leading-snug ${
-                  isSelected ? "text-stone-300" : "text-stone-500"
+                  isSelected ? "text-stone-400" : "text-stone-600"
                 }`}
               >
                 {entry.hex.toUpperCase()}
@@ -147,7 +147,7 @@ function PaletteRow({
           className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded transition-colors ${
             isSelected
               ? "text-stone-500 hover:text-white"
-              : "text-stone-300 hover:text-stone-600"
+              : "text-stone-400 hover:text-stone-600"
           }`}
           aria-label={initialYarn ? `Revert to ${initialYarn.name}` : "Remove assignment"}
         >
