@@ -41,7 +41,7 @@ async function resolveUser() {
 export async function GET(request: NextRequest) {
   const auth = await resolveUser();
   if ("error" in auth) return auth.error;
-  const { tenantUser, tenant } = auth;
+  const { tenant, email } = auth;
 
   const { searchParams } = new URL(request.url);
   const folderId = searchParams.get("folderId");
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   const colorways = await db.savedColorway.findMany({
     where: {
       tenantId: tenant.id,
-      userId: tenantUser.id,
+      userEmail: email,
       folderId: folderId ?? null,
     },
     select: {
@@ -102,19 +102,26 @@ export async function POST(request: NextRequest) {
     if (!folder) return NextResponse.json({ error: "Folder not found" }, { status: 404 });
   }
 
-  const colorway = await db.savedColorway.create({
-    data: {
-      designId,
-      userId: tenantUser.id,
-      tenantId: tenant.id,
-      name: name.trim(),
-      userEmail: email,
-      operations: (operations ?? {}) as never,
-      colorMapping: {},
-      folderId: folderId ?? null,
-    },
-    select: { id: true },
-  });
+  let colorway: { id: string };
+  try {
+    colorway = await db.savedColorway.create({
+      data: {
+        designId,
+        userId: tenantUser.id,
+        tenantId: tenant.id,
+        name: name.trim(),
+        userEmail: email,
+        operations: (operations ?? {}) as never,
+        colorMapping: {},
+        folderId: folderId ?? null,
+      },
+      select: { id: true },
+    });
+    console.log(`[SaveColorway] SUCCESS email=${email} tenantId=${tenant.id} colorwayId=${colorway.id}`);
+  } catch (err) {
+    console.error(`[SaveColorway] FAILED email=${email} tenantId=${tenant.id}`, err);
+    return NextResponse.json({ error: "Failed to save colorway" }, { status: 500 });
+  }
 
   // Upload snapshot async (fire-and-forget)
   if (snapshotDataUrl) {

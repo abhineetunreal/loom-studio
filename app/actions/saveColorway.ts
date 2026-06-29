@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getUser } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase";
 import { getCurrentTenant } from "@/lib/tenant";
 
@@ -32,15 +32,16 @@ export type SaveColorwayResult = { ok: true } | { ok: false; error: string };
 export async function saveColorwayAction(
   input: SaveColorwayInput
 ): Promise<SaveColorwayResult> {
-  // Auth
-  const authUser = await getUser();
-  if (!authUser) return { ok: false, error: "Not authenticated" };
+  // Auth — use email-based lookup (stable across all auth methods)
+  const session = await getSession();
+  if (!session?.user.email) return { ok: false, error: "Not authenticated" };
+  const email = session.user.email;
 
   const tenant = await getCurrentTenant();
   if (!tenant) return { ok: false, error: "Tenant not found" };
 
-  const tenantUser = await db.tenantUser.findFirst({
-    where: { tenantId: tenant.id, authUserId: authUser.id },
+  const tenantUser = await db.tenantUser.findUnique({
+    where: { tenantId_email: { tenantId: tenant.id, email } },
     select: { id: true },
   });
   if (!tenantUser) return { ok: false, error: "User not found" };
@@ -58,7 +59,7 @@ export async function saveColorwayAction(
   // Find existing row (first match for this user+design) or create new one
   try {
     const existing = await db.savedColorway.findFirst({
-      where: { designId: input.designId, userId: tenantUser.id },
+      where: { designId: input.designId, userEmail: email },
       select: { id: true },
     });
     if (existing) {
@@ -66,6 +67,7 @@ export async function saveColorwayAction(
         where: { id: existing.id },
         data: {
           colorMapping: input.colorMapping,
+          userEmail: email,
           ...(snapshotUrl !== null ? { snapshotUrl } : {}),
         },
       });
@@ -75,14 +77,16 @@ export async function saveColorwayAction(
           designId: input.designId,
           userId: tenantUser.id,
           tenantId: tenant.id,
+          userEmail: email,
           colorMapping: input.colorMapping,
           snapshotUrl,
         },
       });
     }
+    console.log(`[SaveColorwayAction] SUCCESS email=${email} tenantId=${tenant.id} designId=${input.designId}`);
     return { ok: true };
   } catch (err) {
-    console.error("SavedColorway save error:", err);
+    console.error(`[SaveColorwayAction] FAILED email=${email} tenantId=${tenant.id}`, err);
     return { ok: false, error: "Failed to save colorway" };
   }
 }

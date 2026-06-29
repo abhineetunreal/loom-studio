@@ -10,6 +10,7 @@ async function resolveUser() {
   if (!session?.user.email) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+  const email = session.user.email;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -17,7 +18,7 @@ async function resolveUser() {
   }
 
   const tenantUser = await db.tenantUser.findUnique({
-    where: { tenantId_email: { tenantId: tenant.id, email: session.user.email } },
+    where: { tenantId_email: { tenantId: tenant.id, email } },
     select: { id: true, role: true },
   });
 
@@ -29,7 +30,7 @@ async function resolveUser() {
     return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
   }
 
-  return { tenantUser, tenant };
+  return { tenantUser, tenant, email };
 }
 
 // ─── PUT /api/colorways/[id] ──────────────────────────────────────────────────
@@ -40,14 +41,14 @@ export async function PUT(
   const { id } = await params;
   const auth = await resolveUser();
   if ("error" in auth) return auth.error;
-  const { tenantUser } = auth;
+  const { tenantUser, email } = auth;
 
   const colorway = await db.savedColorway.findFirst({
     where: { id, tenantId: auth.tenant.id },
-    select: { userId: true },
+    select: { userEmail: true },
   });
   if (!colorway) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (colorway.userId !== tenantUser.id) {
+  if (colorway.userEmail !== email) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -88,12 +89,13 @@ export async function DELETE(
   if (!session?.user.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const email = session.user.email;
 
   const tenant = await getCurrentTenant();
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
 
   const tenantUser = await db.tenantUser.findUnique({
-    where: { tenantId_email: { tenantId: tenant.id, email: session.user.email } },
+    where: { tenantId_email: { tenantId: tenant.id, email } },
     select: { id: true, role: true },
   });
   if (!tenantUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -103,11 +105,11 @@ export async function DELETE(
 
   const colorway = await db.savedColorway.findFirst({
     where: { id, tenantId: tenant.id },
-    select: { userId: true },
+    select: { userEmail: true },
   });
   if (!colorway) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (!isAdmin && colorway.userId !== tenantUser.id) {
+  if (!isAdmin && colorway.userEmail !== email) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

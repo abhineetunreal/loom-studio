@@ -124,53 +124,43 @@ export default async function DesignPage({ params, searchParams }: Props) {
   let savedColorMap: Record<string, YarnOption> | undefined;
   let savedOperations: ColorwayOperations | undefined;
 
+  // ── Restore saved colorway (email-based, works for all auth methods) ────────
   const userEmail = session?.user.email;
-  if (userEmail && tenant) {
-    const tenantUser = await db.tenantUser.findUnique({
-      where: { tenantId_email: { tenantId: tenant.id, email: userEmail } },
-      select: { id: true },
+  if (userEmail && tenant && colorwayId) {
+    const saved = await db.savedColorway.findFirst({
+      where: { id: colorwayId, designId: design.id, userEmail },
+      select: { colorMapping: true, operations: true },
     });
 
-    if (tenantUser) {
-      // Only load a saved colorway when explicitly requested via ?colorway= param.
-      // Navigating to a design without that param always shows the original colors.
-      const saved = colorwayId
-        ? await db.savedColorway.findFirst({
-            where: { id: colorwayId, designId: design.id, userId: tenantUser.id },
-            select: { colorMapping: true, operations: true },
-          })
-        : null;
+    if (saved) {
+      const yarnById = new Map(yarns.map((y) => [y.id, y]));
 
-      if (saved) {
-        const yarnById = new Map(yarns.map((y) => [y.id, y]));
-
-        // New format: operations JSON with globalMap + regionFills
-        if (saved.operations) {
-          const ops = saved.operations as ColorwayOperations;
-          if (ops.globalMap && typeof ops.globalMap === "object") {
-            savedOperations = ops;
-            savedColorMap = {};
-            for (const [hex, entry] of Object.entries(ops.globalMap)) {
-              const yarn = yarnById.get(entry.yarnId);
-              if (yarn) savedColorMap[hex] = yarn;
-            }
-            if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;
-          }
-        }
-
-        // Legacy format: index-keyed colorMapping (for old saves without operations)
-        if (!savedColorMap && saved.colorMapping) {
-          const mapping = saved.colorMapping as Record<string, { yarnId: string }>;
+      // New format: operations JSON with globalMap + regionFills
+      if (saved.operations) {
+        const ops = saved.operations as ColorwayOperations;
+        if (ops.globalMap && typeof ops.globalMap === "object") {
+          savedOperations = ops;
           savedColorMap = {};
-          for (const [indexStr, entry] of Object.entries(mapping)) {
-            const idx = parseInt(indexStr, 10);
-            const paletteEntry = palette.find((e) => e.index === idx);
-            if (!paletteEntry) continue;
+          for (const [hex, entry] of Object.entries(ops.globalMap)) {
             const yarn = yarnById.get(entry.yarnId);
-            if (yarn) savedColorMap[paletteEntry.hex] = yarn;
+            if (yarn) savedColorMap[hex] = yarn;
           }
           if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;
         }
+      }
+
+      // Legacy format: index-keyed colorMapping (for old saves without operations)
+      if (!savedColorMap && saved.colorMapping) {
+        const mapping = saved.colorMapping as Record<string, { yarnId: string }>;
+        savedColorMap = {};
+        for (const [indexStr, entry] of Object.entries(mapping)) {
+          const idx = parseInt(indexStr, 10);
+          const paletteEntry = palette.find((e) => e.index === idx);
+          if (!paletteEntry) continue;
+          const yarn = yarnById.get(entry.yarnId);
+          if (yarn) savedColorMap[paletteEntry.hex] = yarn;
+        }
+        if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;
       }
     }
   }
