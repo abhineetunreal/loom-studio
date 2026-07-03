@@ -449,6 +449,7 @@ export default function DesignViewer({
 
   // ── Order sheet download (client-side PDF) ──────────────────────────────────
   const [orderSheetBusy, setOrderSheetBusy] = useState(false);
+  const [additionalInstructions, setAdditionalInstructions] = useState("");
 
   const handleDownloadOrderSheet = useCallback(async () => {
     setOrderSheetBusy(true);
@@ -518,13 +519,22 @@ export default function DesignViewer({
       doc.setTextColor(120, 113, 108);
       doc.text("ADDITIONAL INSTRUCTIONS", pad, sy);
       sy += 5;
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.2);
-      for (let i = 0; i < 5; i++) {
-        const lineY = sy + i * 6;
-        doc.line(pad, lineY, sidebarW - pad, lineY);
+      if (additionalInstructions.trim()) {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(28, 25, 23);
+        const instrLines = doc.splitTextToSize(additionalInstructions.trim(), sidebarW - pad * 2);
+        doc.text(instrLines, pad, sy);
+        sy += instrLines.length * 3.5 + 8;
+      } else {
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.2);
+        for (let i = 0; i < 5; i++) {
+          const lineY = sy + i * 6;
+          doc.line(pad, lineY, sidebarW - pad, lineY);
+        }
+        sy += 35;
       }
-      sy += 35;
 
       // ORDER DATE
       doc.setFontSize(7);
@@ -548,14 +558,14 @@ export default function DesignViewer({
       const disclaimerLines = doc.splitTextToSize(disclaimerText, sidebarW - pad * 2);
       doc.text(disclaimerLines, pad, ph - 8 - disclaimerLines.length * 2.5);
 
-      // ── Center: LARGE rug image filling the center column ──
-      const jpegSnapshot = canvasRef.current?.getSnapshot(1200, "jpeg", 0.8) ?? null;
+      // ── Center: LARGE rug image — visual centerpiece filling the page ──
+      const jpegSnapshot = canvasRef.current?.getSnapshot(2400, "jpeg", 0.8) ?? null;
       if (jpegSnapshot) {
         const centerX = sidebarW;
         const centerW = rightX - sidebarW; // center column width
         const imgAspect = design.width / design.height;
-        const maxImgW = centerW - 6;  // 3mm padding each side
-        const maxImgH = ph - 20;      // 10mm top/bottom margin — fill most of page height
+        const maxImgW = centerW - 2;  // 1mm padding each side — maximize width
+        const maxImgH = ph - 10;      // 5mm top/bottom margin — fill nearly full page height
         let imgW = maxImgW;
         let imgH = imgW / imgAspect;
         if (imgH > maxImgH) {
@@ -659,7 +669,7 @@ export default function DesignViewer({
     } finally {
       setOrderSheetBusy(false);
     }
-  }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl, customerName]);
+  }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl, customerName, additionalInstructions]);
 
   // ── Rebuild effective palette when global colorMap changes ───────────────────
   // This covers: initial load (savedColorMap / initialColorMap), every ASSIGN/UNDO/REDO/RESET.
@@ -789,6 +799,8 @@ export default function DesignViewer({
         onRegionUndoDelta={handleRegionUndoDelta}
         onRegionClear={handleRegionClear}
         onDownloadOrderSheet={tierInfo.tier !== "demo" ? handleDownloadOrderSheet : undefined}
+        additionalInstructions={additionalInstructions}
+        onAdditionalInstructionsChange={setAdditionalInstructions}
         orderSheetBusy={orderSheetBusy}
       />
 
@@ -891,6 +903,7 @@ export default function DesignViewer({
           onClose={() => setShowSaveModal(false)}
         />
       )}
+
     </div>
   );
 }

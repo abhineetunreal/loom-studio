@@ -45,6 +45,10 @@ type Props = {
   onDownloadOrderSheet?: () => void;
   /** True while the order sheet PDF is being generated */
   orderSheetBusy?: boolean;
+  /** Additional instructions text for the order sheet PDF */
+  additionalInstructions?: string;
+  /** Callback to update additional instructions */
+  onAdditionalInstructionsChange?: (value: string) => void;
 };
 
 function clampPan(
@@ -96,6 +100,8 @@ export default function CanvasZone({
   onRegionClear,
   onDownloadOrderSheet,
   orderSheetBusy,
+  additionalInstructions,
+  onAdditionalInstructionsChange,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -541,15 +547,31 @@ export default function CanvasZone({
               </button>
             )}
 
-            {/* Download order sheet */}
+            {/* Order sheet: instructions + download */}
             {onDownloadOrderSheet && (
-              <button
-                onClick={onDownloadOrderSheet}
-                disabled={orderSheetBusy}
-                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 disabled:opacity-50 disabled:cursor-wait transition-colors whitespace-nowrap"
-              >
-                {orderSheetBusy ? "Generating\u2026" : "Save Order Sheet"}
-              </button>
+              <div className="pointer-events-auto flex flex-col gap-1.5 items-end">
+                {onAdditionalInstructionsChange && (
+                  <div className="w-52">
+                    <label className="block text-[10px] font-medium text-stone-500 mb-0.5">
+                      Additional Instructions (optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={additionalInstructions ?? ""}
+                      onChange={(e) => onAdditionalInstructionsChange(e.target.value)}
+                      placeholder="Fringe, serge edges, dye notes…"
+                      className="w-full rounded-md border border-stone-300 bg-white/95 px-2 py-1 text-xs text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400 resize-none shadow"
+                    />
+                  </div>
+                )}
+                <button
+                  onClick={onDownloadOrderSheet}
+                  disabled={orderSheetBusy}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 disabled:opacity-50 disabled:cursor-wait transition-colors whitespace-nowrap"
+                >
+                  {orderSheetBusy ? "Generating\u2026" : "Save Order Sheet"}
+                </button>
+              </div>
             )}
           </div>
         )}
