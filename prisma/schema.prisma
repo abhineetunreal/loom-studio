@@ -37,6 +37,7 @@ model Tenant {
   savedColorways   SavedColorway[]
   colorwayFolders  ColorwayFolder[]
   colorLookups     ColorLookup[]
+  folderAccess     FolderAccess[]
 }
 
 model TenantUser {
@@ -223,9 +224,24 @@ model ColorwayFolder {
   userId    String
   user      TenantUser      @relation(fields: [userId], references: [id])
   name      String
+  isPrivate Boolean         @default(false)
   createdAt DateTime        @default(now())
 
-  colorways SavedColorway[]
+  colorways    SavedColorway[]
+  folderAccess FolderAccess[]
 
   @@unique([userId, name])
+}
+
+// Grants a specific user access to a private ColorwayFolder
+model FolderAccess {
+  id        String         @id @default(cuid())
+  folderId  String
+  folder    ColorwayFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  userEmail String
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
+  createdAt DateTime       @default(now())
+
+  @@unique([folderId, userEmail])
 }

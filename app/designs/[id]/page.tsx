@@ -185,6 +185,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}
         brandLogoUrl={tenant?.logoUrl ?? undefined}
         viewProductUrl={viewProductUrl}
+        customerName={(session?.user?.user_metadata?.full_name as string | undefined) ?? session?.user?.email ?? undefined}
       />
     </div>
   );

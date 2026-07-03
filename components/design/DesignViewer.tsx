@@ -119,6 +119,8 @@ type Props = {
   brandLogoUrl?: string;
   /** Full URL to the product page on the brand's website, if available. */
   viewProductUrl?: string;
+  /** Signed-in user's display name or email, for the PDF order sheet. */
+  customerName?: string;
 };
 
 // State for the floating popover shown on canvas click (before the full picker opens)
@@ -139,6 +141,7 @@ export default function DesignViewer({
   yarnLibraryName,
   brandLogoUrl,
   viewProductUrl,
+  customerName,
 }: Props) {
   // Saved colorway takes precedence over the lookup-matched initial map.
   // For user uploads, initialColorMap is typically empty anyway.
@@ -449,162 +452,192 @@ export default function DesignViewer({
 
   const handleDownloadOrderSheet = useCallback(async () => {
     setOrderSheetBusy(true);
-    // Yield to let the UI update before heavy work
     await new Promise((r) => setTimeout(r, 50));
 
     try {
       const { default: jsPDF } = await import("jspdf");
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pw = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      const contentW = pw - margin * 2;
-      let y = margin;
+      const pw = doc.internal.pageSize.getWidth();   // 210
+      const ph = doc.internal.pageSize.getHeight();   // 297
 
-      // ── Header: logo + brand name ──
-      const drawTextHeader = () => {
-        doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(26, 22, 18);
-        doc.text(yarnLibraryName, margin, y + 6);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(136, 136, 136);
-        doc.text("Order Sheet", margin, y + 11);
-        y += 15;
-      };
+      // ── Layout constants ──
+      const sidebarW = 65;
+      const rightX = 148;
+      const rightW = pw - rightX - 5; // ~57mm
+      const pad = 8; // internal padding
 
-      if (brandLogoUrl) {
-        try {
-          const logoImg = await loadImageAsDataUrl(brandLogoUrl);
-          if (logoImg) {
-            doc.addImage(logoImg, "JPEG", margin, y, 20, 20);
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(26, 22, 18);
-            doc.text(yarnLibraryName, margin + 24, y + 9);
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(136, 136, 136);
-            doc.text("Order Sheet", margin + 24, y + 14);
-            y += 24;
-          } else {
-            drawTextHeader();
-          }
-        } catch {
-          drawTextHeader();
-        }
-      } else {
-        drawTextHeader();
-      }
+      // ── Left sidebar background ──
+      doc.setFillColor(245, 245, 244); // stone-100
+      doc.rect(0, 0, sidebarW, ph, "F");
 
-      // ── Divider ──
-      doc.setDrawColor(224, 224, 224);
-      doc.setLineWidth(0.3);
-      doc.line(margin, y, margin + contentW, y);
-      y += 5;
+      // ── Left sidebar content ──
+      let sy = pad + 5;
 
-      // ── Preview image (JPEG, max 1000px longest side) ──
-      const jpegSnapshot = canvasRef.current?.getSnapshot(1000, "jpeg", 0.8) ?? null;
-      if (jpegSnapshot) {
-        const imgAspect = design.width / design.height;
-        const maxH = 90;
-        let imgW = contentW;
-        let imgH = imgW / imgAspect;
-        if (imgH > maxH) { imgH = maxH; imgW = imgH * imgAspect; }
-        const imgX = margin + (contentW - imgW) / 2;
-        doc.addImage(jpegSnapshot, "JPEG", imgX, y, imgW, imgH);
-        y += imgH + 5;
-      }
-
-      // ── Metadata ──
-      const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-      const meta: [string, string][] = [
-        ["Design", design.name],
-        ["Size", `${design.width} x ${design.height} px`],
-        ["Date", dateStr],
-      ];
-
-      doc.setFontSize(9);
-      for (const [label, value] of meta) {
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(85, 85, 85);
-        doc.text(label, margin, y + 3);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(26, 22, 18);
-        doc.text(value, margin + 28, y + 3);
-        y += 5;
-      }
-      y += 4;
-
-      // ── Divider ──
-      doc.setDrawColor(224, 224, 224);
-      doc.line(margin, y, margin + contentW, y);
-      y += 5;
-
-      // ── Yarn color table ──
-      doc.setFontSize(11);
+      // Design name
+      doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(26, 22, 18);
-      doc.text("Yarn Colors", margin, y + 3);
-      y += 7;
+      doc.setTextColor(28, 25, 23); // stone-900
+      const nameLines = doc.splitTextToSize(design.name, sidebarW - pad * 2);
+      doc.text(nameLines, pad, sy);
+      sy += nameLines.length * 6 + 8;
 
-      // Table header
+      // SIZE
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(136, 136, 136);
-      doc.text("Swatch", margin, y + 3);
-      doc.text("Code", margin + 20, y + 3);
-      doc.text("Yarn Name", margin + 55, y + 3);
-      doc.text("%", margin + contentW - 5, y + 3, { align: "right" });
-      y += 5;
+      doc.setTextColor(120, 113, 108); // stone-500
+      doc.text("SIZE", pad, sy);
+      sy += 4;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(28, 25, 23);
+      doc.text(`${design.width} \u00d7 ${design.height} px`, pad, sy);
+      sy += 10;
+
+      // CUSTOMER NAME
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(120, 113, 108);
+      doc.text("CUSTOMER NAME", pad, sy);
+      sy += 4;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(28, 25, 23);
+      const custName = customerName || "\u2014";
+      const custLines = doc.splitTextToSize(custName, sidebarW - pad * 2);
+      doc.text(custLines, pad, sy);
+      sy += custLines.length * 5 + 10;
+
+      // ADDITIONAL INSTRUCTIONS
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(120, 113, 108);
+      doc.text("ADDITIONAL INSTRUCTIONS", pad, sy);
+      sy += 4;
+      // blank space for handwritten notes
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      for (let i = 0; i < 5; i++) {
+        const lineY = sy + i * 6;
+        doc.line(pad, lineY, sidebarW - pad, lineY);
+      }
+      sy += 35;
+
+      // ORDER DATE
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(120, 113, 108);
+      doc.text("ORDER DATE", pad, sy);
+      sy += 4;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(28, 25, 23);
+      const dateStr = new Date().toLocaleDateString("en-US", {
+        year: "numeric", month: "long", day: "numeric",
+      });
+      doc.text(dateStr, pad, sy);
+
+      // Disclaimer at bottom of sidebar
+      doc.setFontSize(5.5);
+      doc.setFont("helvetica", "italic");
+      doc.setTextColor(168, 162, 158); // stone-400
+      const disclaimerText = "Please note that the colors on display or print may vary than the actual rug color due to viewing conditions.";
+      const disclaimerLines = doc.splitTextToSize(disclaimerText, sidebarW - pad * 2);
+      doc.text(disclaimerLines, pad, ph - 8 - disclaimerLines.length * 2.5);
+
+      // ── Center: rug image ──
+      const jpegSnapshot = canvasRef.current?.getSnapshot(1000, "jpeg", 0.8) ?? null;
+      if (jpegSnapshot) {
+        const centerX = sidebarW;
+        const centerW = rightX - sidebarW; // 83mm
+        const imgAspect = design.width / design.height;
+        const maxImgW = centerW - 10; // 5mm padding each side
+        const maxImgH = ph - 40; // 20mm top/bottom margin
+        let imgW = maxImgW;
+        let imgH = imgW / imgAspect;
+        if (imgH > maxImgH) {
+          imgH = maxImgH;
+          imgW = imgH * imgAspect;
+        }
+        const imgX = centerX + (centerW - imgW) / 2;
+        const imgY = (ph - imgH) / 2;
+        doc.addImage(jpegSnapshot, "JPEG", imgX, imgY, imgW, imgH);
+      }
+
+      // ── Right column: yarn legend ──
+      let ry = pad + 5;
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(28, 25, 23);
+      doc.text("YARN LEGEND", rightX, ry);
+      ry += 6;
+
+      // Thin separator
+      doc.setDrawColor(214, 211, 209);
+      doc.setLineWidth(0.3);
+      doc.line(rightX, ry, rightX + rightW, ry);
+      ry += 4;
 
       const rows = effectivePalette
         .filter((e) => e.percentage >= 0.05)
         .sort((a, b) => b.percentage - a.percentage);
 
-      const pageH = doc.internal.pageSize.getHeight();
-      for (const entry of rows) {
-        if (y + 7 > pageH - margin) {
+      for (let i = 0; i < rows.length; i++) {
+        if (ry + 12 > ph - 25) {
           doc.addPage();
-          y = margin;
+          // Re-draw sidebar bg on new page
+          doc.setFillColor(245, 245, 244);
+          doc.rect(0, 0, sidebarW, ph, "F");
+          ry = pad + 5;
         }
 
+        const entry = rows[i];
         const yarn = recolor.current[entry.hex] ?? null;
         const hex = yarn?.hex ?? entry.hex;
-        const code = yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
-        const name = yarn?.name ?? "";
+        const yarnName = yarn?.name ?? yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
+        const material = yarn?.library ?? "Wool";
 
+        // Numbered color swatch
         const { r, g, b } = hexToRgbLocal(hex);
         doc.setFillColor(r, g, b);
-        doc.rect(margin, y, 5, 5, "F");
+        doc.roundedRect(rightX, ry, 5, 5, 0.5, 0.5, "F");
         doc.setDrawColor(200, 200, 200);
-        doc.rect(margin, y, 5, 5, "S");
+        doc.roundedRect(rightX, ry, 5, 5, 0.5, 0.5, "S");
 
-        doc.setFontSize(8);
+        // Number beside swatch
+        doc.setFontSize(6);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(26, 22, 18);
-        doc.text(code, margin + 20, y + 3.5);
+        // Pick text color based on luminance
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        doc.setTextColor(lum > 128 ? 0 : 255, lum > 128 ? 0 : 255, lum > 128 ? 0 : 255);
+        doc.text(String(i + 1), rightX + 2.5, ry + 3.5, { align: "center" });
 
+        // Yarn name
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(28, 25, 23);
+        const yarnNameTrunc = yarnName.length > 20 ? yarnName.substring(0, 19) + "\u2026" : yarnName;
+        doc.text(yarnNameTrunc, rightX + 7, ry + 2.5);
+
+        // Material
+        doc.setFontSize(6);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(85, 85, 85);
-        doc.text(name, margin + 55, y + 3.5);
+        doc.setTextColor(120, 113, 108);
+        doc.text(material, rightX + 7, ry + 5);
 
-        doc.setTextColor(136, 136, 136);
-        doc.text(`${entry.percentage.toFixed(1)}%`, margin + contentW - 5, y + 3.5, { align: "right" });
-
-        y += 7;
+        ry += 8;
       }
 
-      // ── Footer ──
-      const footY = pageH - 8;
-      doc.setFontSize(6);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(170, 170, 170);
-      doc.text(
-        `Generated by Loom Studio on ${new Date().toISOString().split("T")[0]}`,
-        pw / 2, footY, { align: "center" }
-      );
+      // ── Bottom-right: brand logo ──
+      if (brandLogoUrl) {
+        try {
+          const logoImg = await loadImageAsDataUrl(brandLogoUrl);
+          if (logoImg) {
+            doc.addImage(logoImg, "JPEG", pw - 20, ph - 20, 15, 15);
+          }
+        } catch { /* skip logo */ }
+      }
 
       const safeName = design.name.replace(/[^a-zA-Z0-9_\-. ]/g, "").replace(/\s+/g, "_");
       const dateTag = new Date().toISOString().split("T")[0];
@@ -612,7 +645,7 @@ export default function DesignViewer({
     } finally {
       setOrderSheetBusy(false);
     }
-  }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl]);
+  }, [design, effectivePalette, recolor, canvasRef, yarnLibraryName, brandLogoUrl, customerName]);
 
   // ── Rebuild effective palette when global colorMap changes ───────────────────
   // This covers: initial load (savedColorMap / initialColorMap), every ASSIGN/UNDO/REDO/RESET.
