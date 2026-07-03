@@ -26,7 +26,6 @@ export default async function AdminPage() {
     submissionsThisMonth,
     collections,
     allDesigns,
-    userAccess,
   ] = await Promise.all([
     db.tenantUser.findMany({
       where: { tenantId: tenant.id },
@@ -44,7 +43,9 @@ export default async function AdminPage() {
         id: true,
         name: true,
         slug: true,
+        isPrivate: true,
         _count: { select: { designs: true } },
+        access: { select: { userEmail: true } },
       },
       orderBy: { name: "asc" },
     }),
@@ -53,10 +54,6 @@ export default async function AdminPage() {
       where: { tenantId: tenant.id, isActive: true, uploadedById: null },
       select: { id: true, name: true, slug: true, collectionId: true, isHidden: true },
       orderBy: { name: "asc" },
-    }),
-    db.collectionAccess.findMany({
-      where: { tenantUser: { tenantId: tenant.id } },
-      select: { tenantUserId: true, collectionId: true },
     }),
   ]);
 
@@ -78,10 +75,11 @@ export default async function AdminPage() {
         id: c.id,
         name: c.name,
         slug: c.slug,
+        isPrivate: c.isPrivate,
         designCount: c._count.designs,
+        accessEmails: c.access.map((a) => a.userEmail),
       }))}
       designs={allDesigns}
-      userAccess={userAccess}
     />
   );
 }

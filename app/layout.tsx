@@ -4,7 +4,7 @@ import "./globals.css";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
 import { getCurrentTenant } from "@/lib/tenant";
-import { getCollectionAccessIds } from "@/lib/collections";
+import { getPrivateCollectionAccess } from "@/lib/collections";
 import { getUser } from "@/lib/auth";
 import AppShell from "@/components/AppShell";
 import { resolveDesignImageUrls } from "@/lib/design-urls";
@@ -47,17 +47,28 @@ export default async function RootLayout({
     canUpload = tenantUser?.canUpload ?? false;
   }
 
-  // For APPROVED users: check collection-level access restrictions
-  let collectionIds: string[] | null = null;
-  if (tierInfo.tier === "full" && tenant) {
-    collectionIds = await getCollectionAccessIds(tenant.id);
+  // Private collection visibility: OWNER/ADMIN see all; regular users see
+  // public collections + private ones where they have a CollectionAccess row.
+  let privateAccess = { filterPrivate: false, accessiblePrivateIds: [] as string[] };
+  if (tenant) {
+    privateAccess = await getPrivateCollectionAccess(tenant.id);
   }
 
-  // Build collection filter — only applies when APPROVED user has explicit restrictions
-  const collectionWhere =
-    collectionIds !== null
-      ? { OR: [{ collectionId: { in: collectionIds } }, { collectionId: null }] }
-      : undefined;
+  // Build collection filter for private visibility
+  const collectionWhere = privateAccess.filterPrivate
+    ? {
+        OR: [
+          // Designs in public collections
+          { collection: { isPrivate: false } },
+          // Designs in private collections the user can access
+          ...(privateAccess.accessiblePrivateIds.length > 0
+            ? [{ collectionId: { in: privateAccess.accessiblePrivateIds } }]
+            : []),
+          // Uncategorized designs (no collection)
+          { collectionId: null },
+        ],
+      }
+    : undefined;
 
   const designs = tenant
     ? await db.design.findMany({
@@ -77,7 +88,7 @@ export default async function RootLayout({
           uploadedById: true,
           width: true,
           height: true,
-          collection: { select: { id: true, name: true, slug: true } },
+          collection: { select: { id: true, name: true, slug: true, isPrivate: true } },
         },
         orderBy: { createdAt: "desc" },
       })

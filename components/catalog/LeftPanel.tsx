@@ -83,19 +83,26 @@ export default function LeftPanel({
     });
   };
 
-  // Designs grouped by collection, filtered by search
-  const groupedDesigns = useMemo(() => {
+  // Designs grouped by collection, filtered by search.
+  // Private collections are separated and pinned at the top.
+  const { privateGroups, publicGroups } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = q
       ? designs.filter((d) => d.name.toLowerCase().includes(q))
       : designs;
-    const map = new Map<string, DesignSummary[]>();
+
+    const privMap = new Map<string, DesignSummary[]>();
+    const pubMap = new Map<string, DesignSummary[]>();
+
     for (const d of filtered) {
       const key = d.collection?.name ?? "Uncategorized";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(d);
+      const isPrivate = d.collection?.isPrivate === true;
+      const target = isPrivate ? privMap : pubMap;
+      if (!target.has(key)) target.set(key, []);
+      target.get(key)!.push(d);
     }
-    return map;
+
+    return { privateGroups: privMap, publicGroups: pubMap };
   }, [designs, search]);
 
 
@@ -168,38 +175,75 @@ export default function LeftPanel({
               </div>
             </div>
 
-            {groupedDesigns.size === 0 ? (
+            {privateGroups.size === 0 && publicGroups.size === 0 ? (
               <p className="px-3 py-6 text-xs text-stone-400 text-center">
                 No designs match &ldquo;{search}&rdquo;
               </p>
             ) : (
-              [...groupedDesigns.entries()].map(([collection, items]) => (
-                <div key={collection}>
-                  <button
-                    onClick={() => toggleFolder(collection)}
-                    className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors"
-                  >
-                    <FolderChevron expanded={expandedFolders.has(collection)} />
-                    <span className="flex-1 text-left truncate">{collection}</span>
-                    <span className="text-stone-400 font-normal">{items.length}</span>
-                  </button>
+              <>
+                {/* Private collections pinned at top with accent styling */}
+                {privateGroups.size > 0 && (
+                  <div className="bg-violet-50/50 border-b border-violet-100">
+                    {[...privateGroups.entries()].map(([collection, items]) => (
+                      <div key={collection}>
+                        <button
+                          onClick={() => toggleFolder(collection)}
+                          className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-violet-700 hover:text-violet-900 hover:bg-violet-50 transition-colors"
+                        >
+                          <FolderChevron expanded={expandedFolders.has(collection)} />
+                          <StarIcon />
+                          <span className="flex-1 text-left truncate">{collection}</span>
+                          <span className="text-violet-400 font-normal">{items.length}</span>
+                        </button>
 
-                  {expandedFolders.has(collection) && (
-                    <div className="grid grid-cols-2 gap-1 px-1 pb-1">
-                      {items.map((d) => (
-                        <DesignThumb
-                          key={d.id}
-                          design={d}
-                          isActive={d.id === activeDesignId}
-                          isFavorite={favorites.has(d.id)}
-                          onFavoriteToggle={toggleFavorite}
-                          onNavigate={onMobileClose}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))
+                        {expandedFolders.has(collection) && (
+                          <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+                            {items.map((d) => (
+                              <DesignThumb
+                                key={d.id}
+                                design={d}
+                                isActive={d.id === activeDesignId}
+                                isFavorite={favorites.has(d.id)}
+                                onFavoriteToggle={toggleFavorite}
+                                onNavigate={onMobileClose}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Public collections */}
+                {[...publicGroups.entries()].map(([collection, items]) => (
+                  <div key={collection}>
+                    <button
+                      onClick={() => toggleFolder(collection)}
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700 hover:bg-stone-50 transition-colors"
+                    >
+                      <FolderChevron expanded={expandedFolders.has(collection)} />
+                      <span className="flex-1 text-left truncate">{collection}</span>
+                      <span className="text-stone-400 font-normal">{items.length}</span>
+                    </button>
+
+                    {expandedFolders.has(collection) && (
+                      <div className="grid grid-cols-2 gap-1 px-1 pb-1">
+                        {items.map((d) => (
+                          <DesignThumb
+                            key={d.id}
+                            design={d}
+                            isActive={d.id === activeDesignId}
+                            isFavorite={favorites.has(d.id)}
+                            onFavoriteToggle={toggleFavorite}
+                            onNavigate={onMobileClose}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}
@@ -332,6 +376,23 @@ function DesignThumb({
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
+
+function StarIcon() {
+  return (
+    <svg
+      className="w-3 h-3 shrink-0 text-violet-500 fill-violet-500"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+      />
+    </svg>
+  );
+}
 
 function FolderChevron({ expanded }: { expanded: boolean }) {
   return (

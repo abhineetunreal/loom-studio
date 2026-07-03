@@ -29,14 +29,34 @@ function toSlug(name: string): string {
 
 // ─── Collections CRUD ─────────────────────────────────────────────────────────
 
-export async function createCollectionAction(name: string): Promise<void> {
+export async function createCollectionAction(
+  name: string,
+  isPrivate: boolean = false,
+  accessEmails: string[] = []
+): Promise<void> {
   await requireAdmin();
   const tenantId = await getDefaultTenantId();
   const slug = toSlug(name);
   await db.collection.create({
-    data: { tenantId, name: name.trim(), slug },
+    data: {
+      tenantId,
+      name: name.trim(),
+      slug,
+      isPrivate,
+      ...(isPrivate && accessEmails.length > 0
+        ? {
+            access: {
+              create: accessEmails.map((email) => ({
+                userEmail: email.toLowerCase().trim(),
+                tenantId,
+              })),
+            },
+          }
+        : {}),
+    },
   });
   revalidatePath("/admin");
+  revalidatePath("/");
 }
 
 export async function renameCollectionAction(
@@ -50,6 +70,34 @@ export async function renameCollectionAction(
     data: { name: name.trim(), slug },
   });
   revalidatePath("/admin");
+  revalidatePath("/");
+}
+
+export async function setCollectionPrivacyAction(
+  collectionId: string,
+  isPrivate: boolean,
+  accessEmails: string[]
+): Promise<void> {
+  await requireAdmin();
+  const tenantId = await getDefaultTenantId();
+  // Update privacy flag
+  await db.collection.update({
+    where: { id: collectionId },
+    data: { isPrivate },
+  });
+  // Replace access list
+  await db.collectionAccess.deleteMany({ where: { collectionId } });
+  if (isPrivate && accessEmails.length > 0) {
+    await db.collectionAccess.createMany({
+      data: accessEmails.map((email) => ({
+        collectionId,
+        userEmail: email.toLowerCase().trim(),
+        tenantId,
+      })),
+    });
+  }
+  revalidatePath("/admin");
+  revalidatePath("/");
 }
 
 export async function deleteCollectionAction(id: string): Promise<void> {
@@ -89,22 +137,15 @@ export async function toggleDesignHiddenAction(
   revalidatePath("/admin");
 }
 
-// ─── User collection access ────────────────────────────────────────────────────
-
-/**
- * Replace a user's entire collection access grant with the given list.
- * Pass an empty array to grant unrestricted access (backward-compatible default).
- */
-export async function setUserCollectionAccessAction(
-  tenantUserId: string,
-  collectionIds: string[]
+export async function deleteCollectionAccessAction(
+  collectionId: string
 ): Promise<void> {
   await requireAdmin();
-  await db.collectionAccess.deleteMany({ where: { tenantUserId } });
-  if (collectionIds.length > 0) {
-    await db.collectionAccess.createMany({
-      data: collectionIds.map((collectionId) => ({ tenantUserId, collectionId })),
-    });
-  }
+  await db.collection.update({
+    where: { id: collectionId },
+    data: { isPrivate: false },
+  });
+  await db.collectionAccess.deleteMany({ where: { collectionId } });
   revalidatePath("/admin");
+  revalidatePath("/");
 }

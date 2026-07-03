@@ -462,37 +462,41 @@ export default function DesignViewer({
       const ph = doc.internal.pageSize.getHeight();   // 297
 
       // ── Layout constants ──
-      const sidebarW = 65;
-      const rightX = 148;
-      const rightW = pw - rightX - 5; // ~57mm
-      const pad = 8; // internal padding
+      const sidebarW = 55;
+      const rightW = 52;
+      const rightX = pw - rightW - 5; // ~153mm
+      const pad = 7;
+
+      // ── Parse real dimensions from design name ──
+      const sizeStr = parseRugSize(design.name, design.width, design.height);
 
       // ── Left sidebar background ──
-      doc.setFillColor(245, 245, 244); // stone-100
+      doc.setFillColor(237, 233, 228); // warm stone
       doc.rect(0, 0, sidebarW, ph, "F");
 
       // ── Left sidebar content ──
       let sy = pad + 5;
 
       // Design name
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(28, 25, 23); // stone-900
+      doc.setTextColor(28, 25, 23);
       const nameLines = doc.splitTextToSize(design.name, sidebarW - pad * 2);
       doc.text(nameLines, pad, sy);
-      sy += nameLines.length * 6 + 8;
+      sy += nameLines.length * 5.5 + 8;
 
-      // SIZE
+      // SIZE — real rug dimensions
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(120, 113, 108); // stone-500
+      doc.setTextColor(120, 113, 108);
       doc.text("SIZE", pad, sy);
       sy += 4;
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(28, 25, 23);
-      doc.text(`${design.width} \u00d7 ${design.height} px`, pad, sy);
-      sy += 10;
+      const sizeLines = doc.splitTextToSize(sizeStr, sidebarW - pad * 2);
+      doc.text(sizeLines, pad, sy);
+      sy += sizeLines.length * 4.5 + 10;
 
       // CUSTOMER NAME
       doc.setFontSize(7);
@@ -513,8 +517,7 @@ export default function DesignViewer({
       doc.setFont("helvetica", "bold");
       doc.setTextColor(120, 113, 108);
       doc.text("ADDITIONAL INSTRUCTIONS", pad, sy);
-      sy += 4;
-      // blank space for handwritten notes
+      sy += 5;
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.2);
       for (let i = 0; i < 5; i++) {
@@ -540,19 +543,19 @@ export default function DesignViewer({
       // Disclaimer at bottom of sidebar
       doc.setFontSize(5.5);
       doc.setFont("helvetica", "italic");
-      doc.setTextColor(168, 162, 158); // stone-400
+      doc.setTextColor(168, 162, 158);
       const disclaimerText = "Please note that the colors on display or print may vary than the actual rug color due to viewing conditions.";
       const disclaimerLines = doc.splitTextToSize(disclaimerText, sidebarW - pad * 2);
       doc.text(disclaimerLines, pad, ph - 8 - disclaimerLines.length * 2.5);
 
-      // ── Center: rug image ──
-      const jpegSnapshot = canvasRef.current?.getSnapshot(1000, "jpeg", 0.8) ?? null;
+      // ── Center: LARGE rug image filling the center column ──
+      const jpegSnapshot = canvasRef.current?.getSnapshot(1200, "jpeg", 0.8) ?? null;
       if (jpegSnapshot) {
         const centerX = sidebarW;
-        const centerW = rightX - sidebarW; // 83mm
+        const centerW = rightX - sidebarW; // center column width
         const imgAspect = design.width / design.height;
-        const maxImgW = centerW - 10; // 5mm padding each side
-        const maxImgH = ph - 40; // 20mm top/bottom margin
+        const maxImgW = centerW - 6;  // 3mm padding each side
+        const maxImgH = ph - 20;      // 10mm top/bottom margin — fill most of page height
         let imgW = maxImgW;
         let imgH = imgW / imgAspect;
         if (imgH > maxImgH) {
@@ -560,11 +563,11 @@ export default function DesignViewer({
           imgW = imgH * imgAspect;
         }
         const imgX = centerX + (centerW - imgW) / 2;
-        const imgY = (ph - imgH) / 2;
+        const imgY = (ph - imgH) / 2; // vertically centered
         doc.addImage(jpegSnapshot, "JPEG", imgX, imgY, imgW, imgH);
       }
 
-      // ── Right column: yarn legend ──
+      // ── Right column: numbered yarn legend ──
       let ry = pad + 5;
 
       doc.setFontSize(8);
@@ -573,7 +576,6 @@ export default function DesignViewer({
       doc.text("YARN LEGEND", rightX, ry);
       ry += 6;
 
-      // Thin separator
       doc.setDrawColor(214, 211, 209);
       doc.setLineWidth(0.3);
       doc.line(rightX, ry, rightX + rightW, ry);
@@ -586,8 +588,7 @@ export default function DesignViewer({
       for (let i = 0; i < rows.length; i++) {
         if (ry + 12 > ph - 25) {
           doc.addPage();
-          // Re-draw sidebar bg on new page
-          doc.setFillColor(245, 245, 244);
+          doc.setFillColor(237, 233, 228);
           doc.rect(0, 0, sidebarW, ph, "F");
           ry = pad + 5;
         }
@@ -595,8 +596,22 @@ export default function DesignViewer({
         const entry = rows[i];
         const yarn = recolor.current[entry.hex] ?? null;
         const hex = yarn?.hex ?? entry.hex;
-        const yarnName = yarn?.name ?? yarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase();
-        const material = yarn?.library ?? "Wool";
+
+        // Determine yarn label: use yarn code, fall back to matchedYarnCode,
+        // and if still just a hex code, mark it as unresolved.
+        let yarnLabel: string;
+        let isUnresolved = false;
+        if (yarn?.code) {
+          yarnLabel = yarn.code;
+        } else if (entry.matchedYarnCode) {
+          yarnLabel = entry.matchedYarnCode;
+        } else {
+          yarnLabel = entry.hex.toUpperCase() + " (Unresolved)";
+          isUnresolved = true;
+        }
+
+        // Material: always "Wool" — never show internal library names like "OneLoom"
+        const material = "Wool";
 
         // Numbered color swatch
         const { r, g, b } = hexToRgbLocal(hex);
@@ -605,22 +620,21 @@ export default function DesignViewer({
         doc.setDrawColor(200, 200, 200);
         doc.roundedRect(rightX, ry, 5, 5, 0.5, 0.5, "S");
 
-        // Number beside swatch
+        // Number inside swatch
         doc.setFontSize(6);
         doc.setFont("helvetica", "bold");
-        // Pick text color based on luminance
         const lum = 0.299 * r + 0.587 * g + 0.114 * b;
         doc.setTextColor(lum > 128 ? 0 : 255, lum > 128 ? 0 : 255, lum > 128 ? 0 : 255);
         doc.text(String(i + 1), rightX + 2.5, ry + 3.5, { align: "center" });
 
-        // Yarn name
+        // Yarn code/label
         doc.setFontSize(7);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(28, 25, 23);
-        const yarnNameTrunc = yarnName.length > 20 ? yarnName.substring(0, 19) + "\u2026" : yarnName;
-        doc.text(yarnNameTrunc, rightX + 7, ry + 2.5);
+        doc.setTextColor(isUnresolved ? 180 : 28, isUnresolved ? 80 : 25, isUnresolved ? 80 : 23);
+        const yarnLabelTrunc = yarnLabel.length > 22 ? yarnLabel.substring(0, 21) + "\u2026" : yarnLabel;
+        doc.text(yarnLabelTrunc, rightX + 7, ry + 2.5);
 
-        // Material
+        // Material line
         doc.setFontSize(6);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(120, 113, 108);
@@ -634,7 +648,7 @@ export default function DesignViewer({
         try {
           const logoImg = await loadImageAsDataUrl(brandLogoUrl);
           if (logoImg) {
-            doc.addImage(logoImg, "JPEG", pw - 20, ph - 20, 15, 15);
+            doc.addImage(logoImg, "JPEG", pw - 22, ph - 22, 17, 17);
           }
         } catch { /* skip logo */ }
       }
@@ -882,6 +896,55 @@ export default function DesignViewer({
 }
 
 // ─── PDF helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Parse real rug dimensions from the design name.
+ * Patterns handled:
+ *   "244x 305cm" or "244x305 cm" or "244 x 305cm" → "244 x 305 cm"
+ *   "8x10" or "8 x 10" (feet) → "8' x 10'"
+ *   "8'x10'" → "8' x 10'"
+ *   "2.44x3.05m" → "244 x 305 cm"
+ * Falls back to stored pixel dimensions if nothing parseable.
+ */
+function parseRugSize(name: string, widthPx: number, heightPx: number): string {
+  // Try cm pattern: "244x305cm" or "244x 305 cm" or "244 x 305cm"
+  const cmMatch = name.match(/(\d{2,4})\s*[x×]\s*(\d{2,4})\s*cm/i);
+  if (cmMatch) {
+    const w = parseInt(cmMatch[1], 10);
+    const h = parseInt(cmMatch[2], 10);
+    // Also show feet conversion
+    const wFt = (w / 30.48).toFixed(1);
+    const hFt = (h / 30.48).toFixed(1);
+    return `${w} \u00d7 ${h} cm (${wFt}' \u00d7 ${hFt}')`;
+  }
+
+  // Try meters: "2.44x3.05m"
+  const mMatch = name.match(/(\d+\.?\d*)\s*[x×]\s*(\d+\.?\d*)\s*m\b/i);
+  if (mMatch) {
+    const w = Math.round(parseFloat(mMatch[1]) * 100);
+    const h = Math.round(parseFloat(mMatch[2]) * 100);
+    return `${w} \u00d7 ${h} cm`;
+  }
+
+  // Try feet with apostrophe: "8'x10'" or "8' x 10'"
+  const ftApostrophe = name.match(/(\d+)['\u2019]\s*[x×]\s*(\d+)['\u2019]/);
+  if (ftApostrophe) {
+    return `${ftApostrophe[1]}' \u00d7 ${ftApostrophe[2]}'`;
+  }
+
+  // Try simple feet-like numbers: "8x10" — only match if digits are small (< 30 suggests feet)
+  const ftMatch = name.match(/\b(\d{1,2})\s*[x×]\s*(\d{1,2})\b/);
+  if (ftMatch) {
+    const w = parseInt(ftMatch[1], 10);
+    const h = parseInt(ftMatch[2], 10);
+    if (w <= 25 && h <= 25) {
+      return `${w}' \u00d7 ${h}'`;
+    }
+  }
+
+  // Fallback: show stored pixel dimensions with note
+  return `${widthPx} \u00d7 ${heightPx} px`;
+}
 
 function hexToRgbLocal(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace("#", "");

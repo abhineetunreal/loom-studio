@@ -10,7 +10,6 @@ import {
   setCanUploadAction,
 } from "@/app/actions/admin";
 import { assignableRoles, canActorModifyTarget } from "@/lib/role-utils";
-import { setUserCollectionAccessAction } from "@/app/actions/collections";
 import { CollectionsTab } from "./CollectionsTab";
 import { UserUploadsTab } from "./UserUploadsTab";
 import { CatalogTab } from "./CatalogTab";
@@ -44,7 +43,6 @@ type Props = {
   stats: Stats;
   collections: CollectionSummary[];
   designs: DesignBrief[];
-  userAccess: Array<{ tenantUserId: string; collectionId: string }>;
 };
 
 type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors" | "colorways";
@@ -58,19 +56,10 @@ export function AdminPanel({
   stats,
   collections,
   designs,
-  userAccess,
 }: Props) {
   const [tab, setTab] = useState<Tab>("pending");
-  const [accessModalUser, setAccessModalUser] = useState<User | null>(null);
 
   const pendingUsers = users.filter((u) => u.role === "PENDING");
-
-  // Pre-compute per-user access map
-  const accessByUser = new Map<string, string[]>();
-  for (const a of userAccess) {
-    if (!accessByUser.has(a.tenantUserId)) accessByUser.set(a.tenantUserId, []);
-    accessByUser.get(a.tenantUserId)!.push(a.collectionId);
-  }
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -150,18 +139,12 @@ export function AdminPanel({
           <PendingTab
             actorRole={actorRole}
             users={pendingUsers}
-            collections={collections}
-            accessByUser={accessByUser}
-            onOpenAccess={setAccessModalUser}
           />
         )}
         {tab === "all" && (
           <AllUsersTab
             actorRole={actorRole}
             users={users}
-            collections={collections}
-            accessByUser={accessByUser}
-            onOpenAccess={setAccessModalUser}
           />
         )}
         {tab === "collections" && (
@@ -173,15 +156,7 @@ export function AdminPanel({
         {tab === "colorways" && <SavedColorwaysAdminTab />}
       </div>
 
-      {/* User access modal */}
-      {accessModalUser && (
-        <UserAccessModal
-          user={accessModalUser}
-          collections={collections}
-          currentAccess={accessByUser.get(accessModalUser.id) ?? []}
-          onClose={() => setAccessModalUser(null)}
-        />
-      )}
+      {/* Collection access is now managed per-collection in the Collections tab */}
     </div>
   );
 }
@@ -191,15 +166,9 @@ export function AdminPanel({
 function PendingTab({
   actorRole,
   users,
-  collections,
-  accessByUser,
-  onOpenAccess,
 }: {
   actorRole: string;
   users: User[];
-  collections: CollectionSummary[];
-  accessByUser: Map<string, string[]>;
-  onOpenAccess: (u: User) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
@@ -310,13 +279,6 @@ function PendingTab({
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    {collections.length > 0 && (
-                      <AccessBadge
-                        count={accessByUser.get(user.id)?.length ?? 0}
-                        total={collections.length}
-                        onClick={() => onOpenAccess(user)}
-                      />
-                    )}
                     <button
                       onClick={() => handleApprove(user.id)}
                       disabled={isPending}
@@ -347,15 +309,9 @@ function PendingTab({
 function AllUsersTab({
   actorRole,
   users,
-  collections,
-  accessByUser,
-  onOpenAccess,
 }: {
   actorRole: string;
   users: User[];
-  collections: CollectionSummary[];
-  accessByUser: Map<string, string[]>;
-  onOpenAccess: (u: User) => void;
 }) {
   const [search, setSearch] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -474,13 +430,6 @@ function AllUsersTab({
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {collections.length > 0 && canEdit && (
-                          <AccessBadge
-                            count={accessByUser.get(user.id)?.length ?? 0}
-                            total={collections.length}
-                            onClick={() => onOpenAccess(user)}
-                          />
-                        )}
                         {canEdit ? (
                           <select
                             value={user.role}
@@ -514,118 +463,6 @@ function AllUsersTab({
   );
 }
 
-// ─── UserAccessModal ──────────────────────────────────────────────────────────
-
-function UserAccessModal({
-  user,
-  collections,
-  currentAccess,
-  onClose,
-}: {
-  user: User;
-  collections: CollectionSummary[];
-  currentAccess: string[];
-  onClose: () => void;
-}) {
-  const [checked, setChecked] = useState<Set<string>>(new Set(currentAccess));
-  const [isPending, startTransition] = useTransition();
-
-  const toggle = (id: string) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const save = () => {
-    startTransition(async () => {
-      await setUserCollectionAccessAction(user.id, [...checked]);
-      onClose();
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden">
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-stone-100">
-          <p className="text-xs text-stone-400 mb-0.5">Collection access for</p>
-          <p className="font-medium text-stone-900 truncate">{user.email}</p>
-        </div>
-
-        {/* Helper text */}
-        <div className="px-5 pt-3 pb-1">
-          <p className="text-xs text-stone-500 leading-relaxed">
-            Select which collections this user can see. If none are selected, they
-            see <strong>all collections</strong>.
-          </p>
-        </div>
-
-        {/* Grant/Revoke all */}
-        <div className="px-5 py-2 flex gap-2">
-          <button
-            onClick={() => setChecked(new Set(collections.map((c) => c.id)))}
-            className="text-xs text-stone-600 hover:text-stone-900 underline underline-offset-2"
-          >
-            Grant all
-          </button>
-          <span className="text-stone-300">·</span>
-          <button
-            onClick={() => setChecked(new Set())}
-            className="text-xs text-stone-600 hover:text-stone-900 underline underline-offset-2"
-          >
-            Revoke all
-          </button>
-        </div>
-
-        {/* Collection checkboxes */}
-        <div className="px-5 pb-3 max-h-60 overflow-y-auto space-y-1.5">
-          {collections.length === 0 ? (
-            <p className="text-xs text-stone-400 py-4 text-center">
-              No collections exist yet.
-            </p>
-          ) : (
-            collections.map((col) => (
-              <label
-                key={col.id}
-                className="flex items-center gap-3 cursor-pointer py-1 group"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked.has(col.id)}
-                  onChange={() => toggle(col.id)}
-                  className="rounded border-stone-300 shrink-0"
-                />
-                <span className="text-sm text-stone-700 flex-1">{col.name}</span>
-                <span className="text-xs text-stone-400">
-                  {col.designCount}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-stone-100 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-900 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={isPending}
-            className="px-4 py-1.5 text-sm font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── InviteUserModal ──────────────────────────────────────────────────────────
 
@@ -779,27 +616,6 @@ function UserCell({ user }: { user: User }) {
         {user.email}
       </div>
     </>
-  );
-}
-
-function AccessBadge({
-  count,
-  total,
-  onClick,
-}: {
-  count: number;
-  total: number;
-  onClick: () => void;
-}) {
-  const label = count === 0 ? "All" : `${count}/${total}`;
-  return (
-    <button
-      onClick={onClick}
-      title="Manage collection access"
-      className="text-xs px-2 py-0.5 rounded border border-stone-200 text-stone-500 hover:border-stone-400 hover:text-stone-700 transition-colors"
-    >
-      {label} collections
-    </button>
   );
 }
 

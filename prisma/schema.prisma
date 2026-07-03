@@ -52,7 +52,6 @@ model TenantUser {
   canUpload  Boolean  @default(false)
   createdAt  DateTime @default(now())
 
-  collectionAccess CollectionAccess[]
   uploadedDesigns  Design[]
   savedColorways   SavedColorway[]
   colorwayFolders  ColorwayFolder[]
@@ -105,6 +104,7 @@ model Collection {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   name      String
   slug      String
+  isPrivate Boolean  @default(false)
   parentId  String? // for nested folders later
   parent    Collection?  @relation("CollectionTree", fields: [parentId], references: [id])
   children  Collection[] @relation("CollectionTree")
@@ -117,12 +117,13 @@ model Collection {
 
 model CollectionAccess {
   id           String     @id @default(cuid())
-  tenantUserId String
-  tenantUser   TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
   collectionId String
   collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  userEmail    String
+  tenantId     String
+  createdAt    DateTime   @default(now())
 
-  @@unique([tenantUserId, collectionId])
+  @@unique([collectionId, userEmail])
 }
 
 // A yarn from the physical yarn library (scoped per tenant)
