@@ -70,6 +70,9 @@ export function AdminPanel({
           <p className="text-sm text-stone-500 mt-0.5">{tenantName}</p>
         </div>
 
+        {/* View as user */}
+        <ViewAsUserControl />
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <StatCard label="Total users" value={stats.totalUsers} />
@@ -430,6 +433,7 @@ function AllUsersTab({
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <ViewAsButton email={user.email} />
                         {canEdit ? (
                           <select
                             value={user.role}
@@ -668,6 +672,91 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function ViewAsButton({ email }: { email: string }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/preview-as", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) router.push("/");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      title={`Preview as ${email}`}
+      className="text-xs font-medium px-2 py-1 rounded-md border border-violet-200 text-violet-600 hover:bg-violet-50 disabled:opacity-50 transition-colors"
+    >
+      {loading ? "…" : "View as"}
+    </button>
+  );
+}
+
+function ViewAsUserControl() {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+
+  const handlePreview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/preview-as", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
+      });
+      if (res.ok) {
+        // Navigate to main app to see the preview
+        router.push("/");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 p-3 bg-violet-50 border border-violet-200 rounded-lg">
+      <form onSubmit={handlePreview} className="flex items-center gap-3">
+        <svg className="w-4 h-4 text-violet-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <label className="text-sm font-medium text-violet-800 whitespace-nowrap">
+          View as user
+        </label>
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="user@example.com"
+          className="flex-1 px-3 py-1.5 text-sm border border-violet-200 rounded-md bg-white placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="px-3 py-1.5 text-sm font-medium bg-violet-600 text-white rounded-md hover:bg-violet-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+        >
+          {submitting ? "Loading…" : "Preview"}
+        </button>
+      </form>
+    </div>
   );
 }
 

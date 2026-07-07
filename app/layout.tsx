@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
@@ -47,11 +48,19 @@ export default async function RootLayout({
     canUpload = tenantUser?.canUpload ?? false;
   }
 
+  // Admin "View as user" preview: read the cookie set from the admin panel.
+  // Only admins can use this — verified by checking tier.
+  const cookieStore = await cookies();
+  const previewAsEmail =
+    isAdmin && cookieStore.get("previewAsUser")?.value
+      ? cookieStore.get("previewAsUser")!.value
+      : undefined;
+
   // Private collection visibility: OWNER/ADMIN see all; regular users see
   // public collections + private ones where they have a CollectionAccess row.
   let privateAccess = { filterPrivate: false, accessiblePrivateIds: [] as string[] };
   if (tenant) {
-    privateAccess = await getPrivateCollectionAccess(tenant.id);
+    privateAccess = await getPrivateCollectionAccess(tenant.id, previewAsEmail);
   }
 
   // Build collection filter for private visibility
@@ -76,8 +85,8 @@ export default async function RootLayout({
           tenantId: tenant.id,
           isActive: true,
           uploadedById: null,
-          ...(isDemo ? { isDemo: true } : {}),
-          ...(isAdmin ? {} : { isHidden: false }),
+          ...(isDemo && !previewAsEmail ? { isDemo: true } : {}),
+          ...(!previewAsEmail && isAdmin ? {} : { isHidden: false }),
           ...collectionWhere,
         },
         select: {
@@ -121,6 +130,7 @@ export default async function RootLayout({
           canUpload={canUpload}
           user={userInfo}
           tenant={tenantBranding}
+          previewAsEmail={previewAsEmail ?? null}
         >
           {children}
         </AppShell>
