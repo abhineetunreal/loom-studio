@@ -8,7 +8,7 @@ import { getCurrentTenant } from "@/lib/tenant";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const next = searchParams.get("next") ?? "https://carpetsbazaar.com/interactive-design-studio/";
 
   if (code) {
     const supabase = await createAuthClient();
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL(next, origin));
+  return NextResponse.redirect(next.startsWith("http") ? next : new URL(next, origin));
 }
 
 // ─── Tenant user provisioning ─────────────────────────────────────────────────
