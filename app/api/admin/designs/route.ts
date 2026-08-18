@@ -15,6 +15,7 @@ export type CatalogDesign = {
   name: string;
   slug: string;
   imageUrl: string;
+  sourceBmpUrl: string | null;
   width: number;
   height: number;
   colorCount: number;
@@ -41,6 +42,7 @@ export async function GET() {
       name: true,
       slug: true,
       imageUrl: true,
+      sourceBmpUrl: true,
       width: true,
       height: true,
       palette: true,
@@ -56,6 +58,7 @@ export async function GET() {
     name: d.name,
     slug: d.slug,
     imageUrl: d.imageUrl,
+    sourceBmpUrl: d.sourceBmpUrl,
     width: d.width,
     height: d.height,
     colorCount: Array.isArray(d.palette)

@@ -16,6 +16,7 @@ type DesignCard = {
   id: string;
   name: string;
   imageUrl: string;
+  sourceBmpUrl: string | null;
   createdAt: string;
   savedColorway: SavedColorwayInfo;
 };
@@ -24,6 +25,18 @@ type UserGroup = {
   user: { id: string; name: string | null; email: string };
   designs: DesignCard[];
 };
+
+const USER_DESIGNS_PUBLIC_BASE =
+  "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/user-designs/";
+
+function resolveSourceUrl(sourceBmpUrl: string): string {
+  if (sourceBmpUrl.startsWith("https://")) return sourceBmpUrl;
+  return `${USER_DESIGNS_PUBLIC_BASE}${sourceBmpUrl}`;
+}
+
+function sourceFileType(sourceBmpUrl: string): "CTF" | "BMP" {
+  return sourceBmpUrl.toLowerCase().endsWith(".ctf") ? "CTF" : "BMP";
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -207,14 +220,27 @@ function UploadCard({
         </p>
       </div>
 
-      {/* Open-in-canvas link */}
-      <Link
-        href={`/designs/${design.id}`}
-        className="flex items-center justify-center gap-1 border-t border-stone-100 py-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-50 transition-colors"
-      >
-        <CanvasIcon />
-        <span>Open in canvas</span>
-      </Link>
+      {/* Download source file + Open-in-canvas link */}
+      <div className="flex border-t border-stone-100">
+        {design.sourceBmpUrl && (
+          <a
+            href={resolveSourceUrl(design.sourceBmpUrl)}
+            download
+            title={`Download source ${sourceFileType(design.sourceBmpUrl)} file`}
+            className="flex items-center justify-center gap-1 flex-1 py-1.5 text-stone-400 hover:text-blue-600 hover:bg-blue-50 transition-colors border-r border-stone-100"
+          >
+            <DownloadIcon />
+            <span>{sourceFileType(design.sourceBmpUrl)}</span>
+          </a>
+        )}
+        <Link
+          href={`/designs/${design.id}`}
+          className="flex items-center justify-center gap-1 flex-1 py-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-50 transition-colors"
+        >
+          <CanvasIcon />
+          <span>Open in canvas</span>
+        </Link>
+      </div>
     </div>
   );
 }
@@ -241,6 +267,14 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
       strokeWidth={2.5}
     >
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   );
 }

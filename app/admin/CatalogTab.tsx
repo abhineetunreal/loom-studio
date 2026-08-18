@@ -29,6 +29,20 @@ type QueueItem = {
 const MAX_CONCURRENT = 3;
 const MAX_FILE_MB = 20;
 
+const USER_DESIGNS_PUBLIC_BASE =
+  "https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/user-designs/";
+
+/** Resolve a sourceBmpUrl to a full download URL. */
+function resolveSourceUrl(sourceBmpUrl: string): string {
+  if (sourceBmpUrl.startsWith("https://")) return sourceBmpUrl;
+  return `${USER_DESIGNS_PUBLIC_BASE}${sourceBmpUrl}`;
+}
+
+/** Detect file type from a sourceBmpUrl string. */
+function sourceFileType(sourceBmpUrl: string): "CTF" | "BMP" {
+  return sourceBmpUrl.toLowerCase().endsWith(".ctf") ? "CTF" : "BMP";
+}
+
 // ─── CatalogTab ───────────────────────────────────────────────────────────────
 
 export function CatalogTab({ collections }: Props) {
@@ -635,6 +649,19 @@ function DesignCard({
           ))}
         </select>
 
+        {/* Download source file */}
+        {design.sourceBmpUrl && (
+          <a
+            href={resolveSourceUrl(design.sourceBmpUrl)}
+            download
+            title={`Download source ${sourceFileType(design.sourceBmpUrl)} file`}
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-md text-xs text-stone-400 hover:text-blue-600 hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100"
+          >
+            <DownloadIcon />
+            {sourceFileType(design.sourceBmpUrl)}
+          </a>
+        )}
+
         {/* Delete */}
         <button
           onClick={() => onDelete(design.id, design.name)}
@@ -663,6 +690,14 @@ function TrashIcon() {
   return (
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   );
 }

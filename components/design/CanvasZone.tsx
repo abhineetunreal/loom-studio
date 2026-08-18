@@ -41,6 +41,8 @@ type Props = {
   onRegionFillDelta?: (delta: RegionFillDelta) => void;
   onRegionUndoDelta?: (delta: RegionUndoDelta) => void;
   onRegionClear?: () => void;
+  /** Original source file URL (BMP/CTF) for admin download. */
+  sourceBmpUrl?: string | null;
   /** Download a PDF order sheet of the current design state */
   onDownloadOrderSheet?: () => void;
   /** True while the order sheet PDF is being generated */
@@ -98,6 +100,7 @@ export default function CanvasZone({
   onRegionFillDelta,
   onRegionUndoDelta,
   onRegionClear,
+  sourceBmpUrl,
   onDownloadOrderSheet,
   orderSheetBusy,
   additionalInstructions,
@@ -573,6 +576,25 @@ export default function CanvasZone({
                 </button>
               </div>
             )}
+
+            {/* Admin: download source file */}
+            {tierInfo.tier === "admin" && sourceBmpUrl && (() => {
+              const fileType = sourceBmpUrl.toLowerCase().endsWith(".ctf") ? "CTF" : "BMP";
+              const url = sourceBmpUrl.startsWith("https://")
+                ? sourceBmpUrl
+                : `https://uwlukzcyobewtvtwahzs.supabase.co/storage/v1/object/public/user-designs/${sourceBmpUrl}`;
+              return (
+                <a
+                  href={url}
+                  download
+                  title={`Download source ${fileType} file`}
+                  className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-400 bg-white/90 text-stone-700 shadow hover:bg-stone-50 transition-colors whitespace-nowrap flex items-center gap-1.5"
+                >
+                  <DownloadSourceIcon />
+                  Download {fileType}
+                </a>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -787,6 +809,14 @@ function SpinnerIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" d="M12 3a9 9 0 109 9" />
+    </svg>
+  );
+}
+
+function DownloadSourceIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
     </svg>
   );
 }

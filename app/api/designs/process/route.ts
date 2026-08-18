@@ -8,8 +8,27 @@ import { db } from "@/lib/db";
 import { getCurrentTenant } from "@/lib/tenant";
 import { getUser } from "@/lib/auth";
 import { createAdminClient, getSignedUrl, USER_DESIGNS_BUCKET } from "@/lib/supabase";
+import sharp from "sharp";
 import { bmpToPng, extractPalette } from "@/lib/design-processing";
 import type { PaletteEntry } from "@/types";
+
+// ─── Rug dimension parsing (server-side mirror of texture-shader logic) ──────
+
+const FALLBACK_FEET = { widthFeet: 8, heightFeet: 10 };
+
+function parseRugDimensions(
+  name: string
+): { widthFeet: number; heightFeet: number } | null {
+  const match = name.match(/(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const a = parseFloat(match[1]);
+  const b = parseFloat(match[2]);
+  if (a >= 30 || b >= 30) return null;
+  return { widthFeet: a, heightFeet: b };
+}
+
+const TARGET_PPI = 10; // target pixels-per-inch for upscaling
+const MIN_PPI = 8;     // threshold below which we upscale
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
@@ -108,13 +127,41 @@ export async function POST(request: NextRequest) {
     })
   );
 
+  // ── Upscale low-resolution designs ──────────────────────────────────────
+  // Parse physical rug dimensions from filename, calculate px/inch.
+  // If below MIN_PPI, upscale using nearest-neighbor to TARGET_PPI.
+  // This prevents blocky texture patterns on low-res user uploads.
+  let displayPng = pngBuffer;
+  let displayWidth = width;
+  let displayHeight = height;
+
+  const dims = parseRugDimensions(filename) ?? FALLBACK_FEET;
+  const ppiX = width / (dims.widthFeet * 12);
+  const ppiY = height / (dims.heightFeet * 12);
+  const ppi = Math.min(ppiX, ppiY);
+
+  if (ppi < MIN_PPI) {
+    const scale = TARGET_PPI / ppi;
+    displayWidth = Math.round(width * scale);
+    displayHeight = Math.round(height * scale);
+    console.log(
+      `[process] Low-res design detected: ${width}×${height} @ ${ppi.toFixed(1)} px/inch ` +
+      `(${dims.widthFeet}×${dims.heightFeet} ft). Upscaling ${scale.toFixed(2)}× ` +
+      `to ${displayWidth}×${displayHeight} using nearest-neighbor.`
+    );
+    displayPng = await sharp(pngBuffer)
+      .resize(displayWidth, displayHeight, { kernel: sharp.kernel.nearest })
+      .png()
+      .toBuffer();
+  }
+
   // ── Upload converted PNG ─────────────────────────────────────────────────
   // Replace the .bmp suffix with .png so the two objects share a UUID stem.
   const pngPath = storagePath.replace(/\.bmp$/i, ".png");
 
   const { error: pngUploadError } = await admin.storage
     .from(USER_DESIGNS_BUCKET)
-    .upload(pngPath, pngBuffer, { contentType: "image/png", upsert: true });
+    .upload(pngPath, displayPng, { contentType: "image/png", upsert: true });
 
   if (pngUploadError) {
     console.error("PNG upload error:", pngUploadError);
@@ -152,8 +199,8 @@ export async function POST(request: NextRequest) {
         slug,
         imageUrl: pngPath,
         sourceBmpUrl: storagePath,
-        width,
-        height,
+        width: displayWidth,
+        height: displayHeight,
         palette,
         uploadedById: tenantUser.id,
         isActive: false,

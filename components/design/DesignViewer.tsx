@@ -786,6 +786,7 @@ export default function DesignViewer({
         hasChanges={hasChanges}
         onSave={canSave ? async () => { setShowSaveModal(true); } : undefined}
         onRequestColorway={() => setShowSubmissionForm(true)}
+        sourceBmpUrl={design.sourceBmpUrl}
         tierInfo={tierInfo}
         canSave={canSave}
         colorwayLoading={colorwayLoading}

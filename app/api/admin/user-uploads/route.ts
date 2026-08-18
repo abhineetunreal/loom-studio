@@ -20,6 +20,7 @@ export async function GET() {
       id: true,
       name: true,
       imageUrl: true,
+      sourceBmpUrl: true,
       createdAt: true,
       uploadedBy: {
         select: { id: true, name: true, email: true },
@@ -68,6 +69,7 @@ export async function GET() {
         id: d.id,
         name: d.name,
         imageUrl,
+        sourceBmpUrl: d.sourceBmpUrl,
         createdAt: d.createdAt.toISOString(),
         uploadedBy: d.uploadedBy!,
         savedColorway: sc
