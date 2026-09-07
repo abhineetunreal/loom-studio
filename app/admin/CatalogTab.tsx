@@ -559,8 +559,7 @@ function DesignCard({
         href={`/designs/${design.id}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="block relative bg-stone-100 shrink-0"
-        style={{ paddingBottom: "133%" /* 3:4 aspect ratio */ }}
+        className="block aspect-square relative bg-stone-100 shrink-0"
         title="Preview design"
       >
         <Image
@@ -568,7 +567,7 @@ function DesignCard({
           alt={design.name}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          className="object-contain p-3"
+          className="object-contain p-2"
           unoptimized
         />
         {/* Hover overlay */}

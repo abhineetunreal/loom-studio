@@ -193,7 +193,7 @@ function ColorwayThumb({
             alt={colorway.name}
             fill
             sizes="120px"
-            className="object-contain p-0.5"
+            className="object-contain p-2"
           />
         </div>
 

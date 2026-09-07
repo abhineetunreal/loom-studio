@@ -4,6 +4,12 @@ import { useState, useMemo } from "react";
 import { hexToRgb } from "@/lib/recolor";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
+/** Append Supabase image-transform params to get a 128×128 thumbnail. */
+function swatchThumbUrl(url: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}width=128&height=128&resize=contain`;
+}
+
 function rgbDistance(hexA: string, hexB: string): number {
   const a = hexToRgb(hexA);
   const b = hexToRgb(hexB);
@@ -109,9 +115,10 @@ export default function InlineYarnPicker({
                     {yarn.renderType === "photo" && yarn.swatchImageUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={yarn.swatchImageUrl}
+                        src={swatchThumbUrl(yarn.swatchImageUrl)}
                         alt=""
                         loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover pointer-events-none"
                       />
                     )}
@@ -185,9 +192,10 @@ export default function InlineYarnPicker({
                   {yarn.renderType === "photo" && yarn.swatchImageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={yarn.swatchImageUrl}
+                      src={swatchThumbUrl(yarn.swatchImageUrl)}
                       alt=""
                       loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover pointer-events-none"
                     />
                   )}
