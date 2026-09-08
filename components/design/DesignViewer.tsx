@@ -65,7 +65,8 @@ type RecolorAction =
   | { type: "REVERT"; hex: string; yarn: YarnOption | null } // yarn=null → remove assignment
   | { type: "UNDO" }
   | { type: "REDO" }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "REFRESH" }; // new object reference, no state/history change
 
 function recolorReducer(state: RecolorState, action: RecolorAction): RecolorState {
   switch (action.type) {
@@ -109,6 +110,10 @@ function recolorReducer(state: RecolorState, action: RecolorAction): RecolorStat
         past: [...state.past.slice(-49), state.current],
         future: [],
       };
+    case "REFRESH":
+      // Create a new object reference for `current` without changing contents or history.
+      // Forces downstream deps (e.g. RecolorCanvas render effect) to re-fire.
+      return { ...state, current: { ...state.current } };
   }
 }
 
@@ -428,6 +433,23 @@ export default function DesignViewer({
     }
     // Reveal the canvas only after all fills are applied
     setColorwayLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasReady]); // only fires once when canvas becomes ready
+
+  // ── Force canvas repaint after initialization settles ──────────────────────────
+  // The render effect in RecolorCanvas watches `colorMap` by reference. During
+  // initialization, React may reconcile the <canvas> JSX width/height attributes
+  // which clears the canvas buffer (standard HTML Canvas behavior). If the render
+  // effect's deps haven't changed, it won't re-fire and the canvas stays blank or
+  // shows stale content (the raw drawImage from the image onload handler).
+  //
+  // Fix: after canvasReady (i.e. the first successful render completed), dispatch
+  // REFRESH to create a new colorMap reference.  This forces the render effect to
+  // re-fire and repaint, ensuring the preset/initial colors survive any buffer
+  // clears that occurred during the initialization state-change cascade.
+  useEffect(() => {
+    if (!canvasReady) return;
+    dispatch({ type: "REFRESH" });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasReady]); // only fires once when canvas becomes ready
 
