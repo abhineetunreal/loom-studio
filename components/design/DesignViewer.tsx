@@ -1,6 +1,7 @@
 "use client";
 
 import { useReducer, useState, useRef, useCallback, useEffect } from "react";
+import { debugLog, getDebugEntries, onDebugUpdate } from "@/lib/debug-log";
 import type { RecolorCanvasHandle } from "./RecolorCanvas";
 import { type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import CanvasZone from "./CanvasZone";
@@ -174,10 +175,22 @@ export default function DesignViewer({
     ?? initialColorMap
     ?? {};
 
+  const loggingReducer = useCallback((state: RecolorState, action: RecolorAction): RecolorState => {
+    const next = recolorReducer(state, action);
+    const prevN = Object.values(state.current).filter(Boolean).length;
+    const nextN = Object.values(next.current).filter(Boolean).length;
+    debugLog(`DISPATCH: ${action.type} colorMap ${prevN}→${nextN} ref_changed=${state.current !== next.current}`);
+    return next;
+  }, []);
+
   const [recolor, dispatch] = useReducer(
-    recolorReducer,
+    loggingReducer,
     startingColorMap,
-    (initial): RecolorState => ({ current: initial as ColorMap, past: [], future: [] })
+    (initial): RecolorState => {
+      const n = Object.values(initial).filter(Boolean).length;
+      debugLog(`REDUCER_INIT: ${n} entries (preset=${!!initialPreset} saved=${!!savedColorMap})`);
+      return { current: initial as ColorMap, past: [], future: [] };
+    }
   );
   // Set when YarnPicker should be open (from palette row click OR popover "choose yarn")
   const [selectedHex, setSelectedHex] = useState<string | null>(null);
@@ -377,6 +390,12 @@ export default function DesignViewer({
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
+  }, []);
+
+  // ── DEBUG: mount log ───────────────────────────────────────────────────────
+  useEffect(() => {
+    debugLog(`MOUNT: preset=${!!initialPreset} saved=${!!savedColorMap} initialMap=${Object.keys(initialColorMap ?? {}).length}`);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Restored-colorway toast ──────────────────────────────────────────────────
@@ -804,8 +823,39 @@ export default function DesignViewer({
   // Show save button for any signed-in non-demo user (catalog or upload)
   const canSave = tierInfo.tier !== "demo";
 
+  // ── DEBUG PANEL ─────────────────────────────────────────────────────────────
+  const [debugLines, setDebugLines] = useState<string[]>([]);
+  const debugScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    setDebugLines([...getDebugEntries()]);
+    return onDebugUpdate(() => {
+      setDebugLines([...getDebugEntries()]);
+      // Auto-scroll to bottom
+      requestAnimationFrame(() => {
+        debugScrollRef.current?.scrollTo(0, debugScrollRef.current.scrollHeight);
+      });
+    });
+  }, []);
+
   return (
     <div className="relative flex h-full overflow-hidden">
+      {/* DEBUG PANEL — TEMPORARY */}
+      <div
+        ref={debugScrollRef}
+        style={{
+          position: "fixed", top: 8, left: 8, zIndex: 9999,
+          background: "rgba(0,0,0,0.9)", color: "#0f0",
+          fontSize: 10, fontFamily: "monospace", lineHeight: 1.3,
+          padding: "6px 8px", borderRadius: 6, maxHeight: 300,
+          maxWidth: 480, overflowY: "auto", pointerEvents: "auto",
+          whiteSpace: "pre-wrap", wordBreak: "break-all",
+        }}
+      >
+        {debugLines.map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+      </div>
+
       {/* Restored-colorway toast */}
       {showRestoredToast && (
         <div
@@ -874,7 +924,7 @@ export default function DesignViewer({
         tierInfo={tierInfo}
         canSave={canSave}
         colorwayLoading={colorwayLoading}
-        onRenderComplete={() => setCanvasReady(true)}
+        onRenderComplete={() => { debugLog("DV_ON_RENDER_COMPLETE → setCanvasReady(true)"); setCanvasReady(true); }}
         textureEnabled={textureEnabled}
         onToggleTexture={() => setTextureEnabled((v) => !v)}
         mode={recolorMode}
