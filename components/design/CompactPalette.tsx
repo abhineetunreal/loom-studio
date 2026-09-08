@@ -117,8 +117,9 @@ export default function CompactPalette({
           const rawCode = !isRegionFillEntry && (isDemo || (isUserUpload && !assignedYarn))
             ? `Color ${i + 1}`
             : (assignedYarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase());
-          // Strip "Library:N_" prefix if present (e.g. "OneLoom:5_BM-813" → "BM-813")
-          const displayCode = rawCode.replace(/^[^:]+:\d+_/, "");
+          // Strip "Library:N_" or "Library:N_X " prefix if present
+          // e.g. "OneLoom:5_BM-813" → "BM-813", "OneLoom:6_B BM 973" → "BM 973"
+          const displayCode = rawCode.replace(/^[^:]+:\d+_(?:[A-Z] )?/, "");
 
           const entryKey = isRegionFillEntry ? `region-${entry.hex}` : entry.hex;
 
