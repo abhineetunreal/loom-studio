@@ -70,7 +70,9 @@ export async function GET(request: NextRequest) {
     db.design.count({ where }),
   ]);
 
-  const baseUrl = tenant.domain ? `https://${tenant.domain}` : null;
+  const baseUrl = tenant.domain
+    ? `https://${tenant.domain}`
+    : `https://${tenant.slug}.loomstudio.com`;
 
   const result = designs.map((d) => {
     const palette = (d.palette as PaletteEntry[]) ?? [];
@@ -100,9 +102,7 @@ export async function GET(request: NextRequest) {
       entry.dimensions = `${wFt} x ${hFt}`;
     }
 
-    if (baseUrl) {
-      entry.liveUrl = `${baseUrl}/designs/${d.id}`;
-    }
+    entry.liveUrl = `${baseUrl}/designs/${d.id}`;
 
     return entry;
   });
