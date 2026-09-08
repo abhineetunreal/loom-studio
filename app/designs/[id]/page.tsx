@@ -281,10 +281,12 @@ export default async function DesignPage({ params, searchParams }: Props) {
   return (
     <div className="h-full overflow-hidden">
       <DesignViewer
-        key={`${design.id}-${colorwayId ?? presetRaw ?? "original"}`}
+        key={`${design.id}-${colorwayId ?? (presetRaw ? "preset" : "original")}`}
         design={{ ...design, imageUrl, palette }}
         yarns={yarns}
-        initialColorMap={initialColorMap}
+        initialColorMap={resolvedPreset
+          ? { ...initialColorMap, ...resolvedPreset.colorMap }
+          : initialColorMap}
         savedColorMap={savedColorMap}
         savedOperations={savedOperations}
         initialPreset={resolvedPreset ?? undefined}
