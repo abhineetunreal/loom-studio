@@ -525,7 +525,15 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const flatOffscreen = new OffscreenCanvas(width, height);
       flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
       ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
-      debugLog(`PHASE1_PAINTED: lookup=${lookup.size} entries, canvas=${canvasW}x${canvasH}`);
+      // DEBUG: sample a few pixels from native data and check if lookup finds them
+      const samplePixels: string[] = [];
+      for (let si = 0; si < Math.min(5, width * height) * 4; si += 4 * Math.max(1, Math.floor(width * height / 5))) {
+        const sr = pixels[si], sg = pixels[si+1], sb = pixels[si+2];
+        const key = (sr << 16) | (sg << 8) | sb;
+        const found = lookup.has(key);
+        samplePixels.push(`#${sr.toString(16).padStart(2,"0")}${sg.toString(16).padStart(2,"0")}${sb.toString(16).padStart(2,"0")}→${found}`);
+      }
+      debugLog(`PHASE1_PAINTED: lookup=${lookup.size} entries, canvas=${canvasW}x${canvasH} samples=[${samplePixels.join(",")}]`);
       console.log(`[Canvas] phase 1 flat (${width}×${height}→${canvasW}×${canvasH}): ${(performance.now() - t0).toFixed(0)}ms`);
 
       if (!cancelled && !renderCompleteFired.current) {
@@ -540,7 +548,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
       // ── Yield to browser so phase 1 is composited before phase 2 blocks ────
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      if (cancelled) return;
+      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_RAF"); return; }
 
       // ── Phase 2: textured render at supersampled resolution ─────────────────
       const ss = SUPERSAMPLE_FACTOR;
@@ -548,7 +556,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const ssH = height * ss;
 
       await textureShader.load("422");
-      if (cancelled) return;
+      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_TEXTURE_LOAD"); return; }
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
 
@@ -609,7 +617,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         photoSwatchLayer.size > 0 ? photoSwatchLayer : undefined,
         photoMask,
       );
-      if (cancelled) return;
+      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_TEXTURE_RENDER"); return; }
 
       // ── Phase 2b: unsharp-mask sharpening on photo-swatch pixels ─────────────
       if (photoMask && sharpenStrength > 0) {
@@ -627,7 +635,23 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       // Draw SS render to DPR canvas — browser scales from SS to DPR dimensions in one pass,
       // avoiding the previous double-scaling (SS→native→display) that blurred photo areas.
       ctx.drawImage(offscreenRef.current, 0, 0, canvasW, canvasH);
-      debugLog(`PHASE2_PAINTED: lookup=${lookup.size} photo=${photoLookup.size}`);
+      // DEBUG: sample SS pixels and check lookup hits
+      const ssSamples: string[] = [];
+      for (let si = 0; si < Math.min(5, ssW * ssH) * 4; si += 4 * Math.max(1, Math.floor(ssW * ssH / 5))) {
+        const sr = ssPixels[si], sg = ssPixels[si+1], sb = ssPixels[si+2];
+        const key = rgbToInt(sr, sg, sb);
+        const found = lookup.has(key);
+        ssSamples.push(`#${sr.toString(16).padStart(2,"0")}${sg.toString(16).padStart(2,"0")}${sb.toString(16).padStart(2,"0")}→${found}`);
+      }
+      // Show what keys the lookup actually has
+      const lookupKeys: string[] = [];
+      let lkCount = 0;
+      for (const k of lookup.keys()) {
+        if (lkCount++ >= 5) break;
+        const lr = (k >> 16) & 0xff, lg = (k >> 8) & 0xff, lb = k & 0xff;
+        lookupKeys.push(`#${lr.toString(16).padStart(2,"0")}${lg.toString(16).padStart(2,"0")}${lb.toString(16).padStart(2,"0")}`);
+      }
+      debugLog(`PHASE2_PAINTED: lookup=${lookup.size} photo=${photoLookup.size} ssSamples=[${ssSamples.join(",")}] lookupKeys=[${lookupKeys.join(",")}]`);
     }
 
     render();
