@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -30,7 +31,13 @@ async function resolveUser() {
     return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
   }
 
-  return { tenantUser, tenant, email };
+  // Check for admin "View as user" preview
+  const isAdmin = tenantUser.role === "OWNER" || tenantUser.role === "ADMIN";
+  const cookieStore = await cookies();
+  const previewCookie = cookieStore.get("previewAsUser")?.value;
+  const previewEmail = isAdmin && previewCookie ? previewCookie : null;
+
+  return { tenantUser, tenant, email, previewEmail };
 }
 
 // ─── PUT /api/colorways/[id] ──────────────────────────────────────────────────
@@ -41,7 +48,12 @@ export async function PUT(
   const { id } = await params;
   const auth = await resolveUser();
   if ("error" in auth) return auth.error;
-  const { tenantUser, email } = auth;
+  const { tenantUser, email, previewEmail } = auth;
+
+  // Block writes during admin preview
+  if (previewEmail) {
+    return NextResponse.json({ error: "Read-only during preview" }, { status: 403 });
+  }
 
   const colorway = await db.savedColorway.findFirst({
     where: { id, tenantId: auth.tenant.id },
@@ -93,6 +105,13 @@ export async function DELETE(
 
   const tenant = await getCurrentTenant();
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+
+  // Block writes during admin preview
+  const cookieStore = await cookies();
+  const previewCookie = cookieStore.get("previewAsUser")?.value;
+  if (previewCookie) {
+    return NextResponse.json({ error: "Read-only during preview" }, { status: 403 });
+  }
 
   const tenantUser = await db.tenantUser.findUnique({
     where: { tenantId_email: { tenantId: tenant.id, email } },

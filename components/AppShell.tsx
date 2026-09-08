@@ -131,6 +131,7 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
           onToggleCollapse={() => setCollapsed((v) => !v)}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
+          previewAsEmail={previewAsEmail}
         />
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>

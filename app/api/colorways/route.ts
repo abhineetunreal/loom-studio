@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/tenant";
@@ -8,13 +9,15 @@ import { generateColorwayExport } from "@/lib/colorway-export";
 const SNAPSHOTS_BUCKET = process.env.SUPABASE_SNAPSHOTS_BUCKET ?? "snapshots";
 
 // ─── Shared auth helper ───────────────────────────────────────────────────────
-// Returns { tenantUser, email } or a NextResponse error to return immediately.
+// Returns { tenantUser, email, previewEmail } or a NextResponse error.
+// When an admin is previewing as another user, previewEmail is set and email
+// reflects the preview target so queries return the target user's data.
 async function resolveUser() {
   const session = await getSession();
   if (!session?.user.email) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
-  const email = session.user.email;
+  const sessionEmail = session.user.email;
 
   const tenant = await getCurrentTenant();
   if (!tenant) {
@@ -22,7 +25,7 @@ async function resolveUser() {
   }
 
   const tenantUser = await db.tenantUser.findUnique({
-    where: { tenantId_email: { tenantId: tenant.id, email } },
+    where: { tenantId_email: { tenantId: tenant.id, email: sessionEmail } },
     select: { id: true, email: true, role: true },
   });
 
@@ -35,7 +38,16 @@ async function resolveUser() {
     return { error: NextResponse.json({ error: "Account not approved" }, { status: 403 }) };
   }
 
-  return { tenantUser, tenant, email };
+  // Check for admin "View as user" preview
+  const isAdmin = tenantUser.role === "OWNER" || tenantUser.role === "ADMIN";
+  const cookieStore = await cookies();
+  const previewCookie = cookieStore.get("previewAsUser")?.value;
+  const previewEmail = isAdmin && previewCookie ? previewCookie : null;
+
+  // Use preview email for data queries when active
+  const email = previewEmail ?? sessionEmail;
+
+  return { tenantUser, tenant, email, previewEmail };
 }
 
 // ─── GET /api/colorways ───────────────────────────────────────────────────────
@@ -72,7 +84,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const auth = await resolveUser();
   if ("error" in auth) return auth.error;
-  const { tenantUser, tenant, email } = auth;
+  const { tenantUser, tenant, email, previewEmail } = auth;
+
+  // Block writes during admin preview
+  if (previewEmail) {
+    return NextResponse.json({ error: "Read-only during preview" }, { status: 403 });
+  }
 
   const body = await request.json();
   const { designId, name, operations, folderId, snapshotDataUrl } = body as {

@@ -20,6 +20,7 @@ type Props = {
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onMobileClose: () => void;
+  previewAsEmail: string | null;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ export default function LeftPanel({
   onToggleCollapse,
   mobileOpen,
   onMobileClose,
+  previewAsEmail,
 }: Props) {
   const pathname = usePathname();
 
@@ -250,7 +252,7 @@ export default function LeftPanel({
 
         {/* ── Saved colorways tab ── */}
         {activeTab === "favorites" && (
-          <SavedColorwaysTab onNavigate={onMobileClose} />
+          <SavedColorwaysTab onNavigate={onMobileClose} readOnly={!!previewAsEmail} />
         )}
 
         {/* ── Rooms / Visualizations tab ── */}

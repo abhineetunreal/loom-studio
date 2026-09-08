@@ -25,7 +25,7 @@ type Folder = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => void }) {
+export default function SavedColorwaysTab({ onNavigate, readOnly = false }: { onNavigate: () => void; readOnly?: boolean }) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [rootColorways, setRootColorways] = useState<ColorwaySummary[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -126,6 +126,7 @@ export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => vo
                       colorway={c}
                       onDelete={handleDelete}
                       onNavigate={onNavigate}
+                      readOnly={readOnly}
                     />
                   ))
                 )}
@@ -148,6 +149,7 @@ export default function SavedColorwaysTab({ onNavigate }: { onNavigate: () => vo
                 colorway={c}
                 onDelete={handleDelete}
                 onNavigate={onNavigate}
+                readOnly={readOnly}
               />
             ))}
           </div>
@@ -165,10 +167,12 @@ function ColorwayThumb({
   colorway,
   onDelete,
   onNavigate,
+  readOnly,
 }: {
   colorway: ColorwaySummary;
   onDelete: (id: string) => void;
   onNavigate: () => void;
+  readOnly: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -211,8 +215,8 @@ function ColorwayThumb({
         </div>
       </Link>
 
-      {/* Three-dot overflow menu */}
-      <div className="absolute top-1 right-1">
+      {/* Three-dot overflow menu (hidden in read-only preview) */}
+      {!readOnly && <div className="absolute top-1 right-1">
         <button
           onClick={(e) => { e.preventDefault(); setMenuOpen((v) => !v); }}
           className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded-full bg-white/90 shadow-sm text-stone-400 hover:text-stone-700 transition-all"
@@ -233,7 +237,7 @@ function ColorwayThumb({
             </div>
           </>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
