@@ -26,6 +26,7 @@ model Tenant {
   adminEmail   String
   ssoSecret    String?  // shared secret for SSO token verification
   websiteUrl   String?  // brand's main website URL for product linking
+  apiKey       String?  @unique // per-tenant key for AI API endpoints
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
 
