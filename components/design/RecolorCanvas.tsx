@@ -26,7 +26,6 @@
  */
 
 import { useEffect, useRef, useImperativeHandle, forwardRef, useState } from "react";
-import { debugLog } from "@/lib/debug-log";
 import { applyRecolor, buildColorLookup, rgbToHex, hexToRgb, rgbToInt } from "@/lib/recolor";
 import { textureShader, computeTileScales, SUPERSAMPLE_FACTOR, applyUnsharpMask } from "@/lib/texture-shader";
 import type { PhotoSwatchData, PhotoSwatchEntry } from "@/lib/texture-shader";
@@ -185,8 +184,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   // Bumped when the image finishes loading so the render effect re-fires with real pixels.
   const [pixelsVersion, setPixelsVersion] = useState(0);
-  // DEBUG: track previous render effect deps to log which changed
-  const prevRenderDeps = useRef<Record<string, unknown>>({});
   // Set of valid palette hex values for fast lookup on click
   const paletteHexSet = useRef<Set<string>>(new Set(palette.map((e) => e.hex)));
   // Guard: only call onRenderComplete once per design load
@@ -298,15 +295,12 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     // Check module-level cache first — avoids full image decode on revisit
     const cached = pixelCache.get(imageUrl);
     if (cached) {
-      debugLog("IMG_CACHE_HIT");
       console.log(`[Canvas] image pixels: cache hit for ${imageUrl.split("/").pop()}`);
       originalPixels.current = cached.native;
       supersampledPixels.current = cached.supersampled;
       setPixelsVersion((v) => v + 1);
       return;
     }
-    debugLog("IMG_LOAD_START (no cache)");
-
     // Clear stale pixel data so the render effect can't use old pixels
     // for a different design while the new image is in flight.
     originalPixels.current = null;
@@ -328,27 +322,40 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     img.onload = () => {
       const loadMs = (performance.now() - t0).toFixed(0);
-      debugLog(`IMG_LOAD_COMPLETE (${loadMs}ms) canvas=${canvas.width}x${canvas.height}`);
       console.log(`[Canvas] image load: ${loadMs}ms (network/disk)`);
 
       ctx.drawImage(img, 0, 0, width, height);
       try {
         const t1 = performance.now();
         const imageData = ctx.getImageData(0, 0, width, height);
-        debugLog(`PIXELS_EXTRACTED: ${imageData.data.length / 4} px`);
         // Slice makes an independent copy — the Uint8ClampedArray is immutable
         const native = imageData.data.slice();
 
-        // Extract 2× supersampled pixels for the render pass.
-        // imageSmoothingEnabled=false: flat-color CAD image, no sub-pixel detail.
+        // Extract 2× supersampled pixels via programmatic nearest-neighbor upscale
+        // from the native pixel data.  This guarantees identical RGB values between
+        // native and SS arrays — using canvas drawImage for the upscale can introduce
+        // color-space rounding differences that break the integer-keyed color lookup
+        // in the texture shader (Phase 2), causing preset swaps to silently revert.
         const ss = SUPERSAMPLE_FACTOR;
         const ssW = width * ss;
         const ssH = height * ss;
-        const ssCanvas = new OffscreenCanvas(ssW, ssH);
-        const ssCtx = ssCanvas.getContext("2d")!;
-        ssCtx.imageSmoothingEnabled = false;
-        ssCtx.drawImage(img, 0, 0, ssW, ssH);
-        const supersampled = ssCtx.getImageData(0, 0, ssW, ssH).data.slice();
+        const supersampled = new Uint8ClampedArray(ssW * ssH * 4);
+        for (let ny = 0; ny < height; ny++) {
+          for (let nx = 0; nx < width; nx++) {
+            const si = (ny * width + nx) * 4;
+            const r = native[si], g = native[si + 1], b = native[si + 2], a = native[si + 3];
+            // Write the 2×2 block
+            for (let dy = 0; dy < ss; dy++) {
+              for (let dx = 0; dx < ss; dx++) {
+                const di = ((ny * ss + dy) * ssW + (nx * ss + dx)) * 4;
+                supersampled[di] = r;
+                supersampled[di + 1] = g;
+                supersampled[di + 2] = b;
+                supersampled[di + 3] = a;
+              }
+            }
+          }
+        }
 
         console.log(`[Canvas] pixel extraction: ${(performance.now() - t1).toFixed(0)}ms (${ssW}×${ssH} = ${(ssW * ssH / 1e6).toFixed(1)}Mpx)`);
 
@@ -407,8 +414,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     }
 
     if (toLoad.length === 0) return;
-    debugLog(`SWATCH_LOAD_START: ${toLoad.length} swatches`);
-
     let cancelled = false;
     (async () => {
       await Promise.all(toLoad.map(async (url) => {
@@ -436,10 +441,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       }));
       // Bump swatchVersion even if some loads failed — re-render will pick up
       // whatever did load.  Failed swatches fall back to flat yarn.hex color.
-      if (!cancelled) {
-        debugLog(`SWATCH_LOAD_DONE: bumping swatchVersion`);
-        setSwatchVersion((v) => v + 1);
-      }
+      if (!cancelled) setSwatchVersion((v) => v + 1);
     })();
 
     return () => { cancelled = true; };
@@ -464,27 +466,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   //   • Row offsets pre-computed; bitwise ops replace Math.floor / %
   //   • overrideVersion dep ensures region fills re-render without stale closure
   useEffect(() => {
-    // DEBUG: detect which dep changed
-    const curDeps: Record<string, unknown> = { colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion };
-    const changed: string[] = [];
-    for (const k of Object.keys(curDeps)) {
-      if (prevRenderDeps.current[k] !== curDeps[k]) changed.push(k);
-    }
-    prevRenderDeps.current = curDeps;
-    const colorMapSize = Object.keys(colorMap).length;
-    const colorMapNonNull = Object.values(colorMap).filter(Boolean).length;
-    debugLog(`RENDER_EFFECT_FIRED changed=[${changed.join(",")}] colorMap=${colorMapNonNull}/${colorMapSize}`);
-
     let cancelled = false;
 
     async function render() {
       const canvas = canvasRef.current;
       const pixels = originalPixels.current;
       const ssPixels = supersampledPixels.current;
-      if (!canvas || !pixels) {
-        debugLog(`RENDER_SKIP: canvas=${!!canvas} pixels=${!!pixels}`);
-        return;
-      }
+      if (!canvas || !pixels) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
@@ -497,14 +485,8 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const canvasW = rect.width > 0 ? Math.round(rect.width * dpr) : width;
       const canvasH = rect.height > 0 ? Math.round(rect.height * dpr) : height;
       // Only resize when dimensions actually change — resizing clears the canvas buffer.
-      if (canvas.width !== canvasW) {
-        debugLog(`CANVAS_RESIZE_W: ${canvas.width}→${canvasW}`);
-        canvas.width = canvasW;
-      }
-      if (canvas.height !== canvasH) {
-        debugLog(`CANVAS_RESIZE_H: ${canvas.height}→${canvasH}`);
-        canvas.height = canvasH;
-      }
+      if (canvas.width !== canvasW) canvas.width = canvasW;
+      if (canvas.height !== canvasH) canvas.height = canvasH;
 
       const lookup = buildColorLookup(colorMap);
       const overrideLayer = overrideLayerRef.current;
@@ -525,20 +507,10 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const flatOffscreen = new OffscreenCanvas(width, height);
       flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
       ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
-      // DEBUG: sample a few pixels from native data and check if lookup finds them
-      const samplePixels: string[] = [];
-      for (let si = 0; si < Math.min(5, width * height) * 4; si += 4 * Math.max(1, Math.floor(width * height / 5))) {
-        const sr = pixels[si], sg = pixels[si+1], sb = pixels[si+2];
-        const key = (sr << 16) | (sg << 8) | sb;
-        const found = lookup.has(key);
-        samplePixels.push(`#${sr.toString(16).padStart(2,"0")}${sg.toString(16).padStart(2,"0")}${sb.toString(16).padStart(2,"0")}→${found}`);
-      }
-      debugLog(`PHASE1_PAINTED: lookup=${lookup.size} entries, canvas=${canvasW}x${canvasH} samples=[${samplePixels.join(",")}]`);
       console.log(`[Canvas] phase 1 flat (${width}×${height}→${canvasW}×${canvasH}): ${(performance.now() - t0).toFixed(0)}ms`);
 
       if (!cancelled && !renderCompleteFired.current) {
         renderCompleteFired.current = true;
-        debugLog("ON_RENDER_COMPLETE_CALLED");
         onRenderComplete?.();
       }
 
@@ -548,7 +520,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
       // ── Yield to browser so phase 1 is composited before phase 2 blocks ────
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_RAF"); return; }
+      if (cancelled) return;
 
       // ── Phase 2: textured render at supersampled resolution ─────────────────
       const ss = SUPERSAMPLE_FACTOR;
@@ -556,7 +528,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const ssH = height * ss;
 
       await textureShader.load("422");
-      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_TEXTURE_LOAD"); return; }
+      if (cancelled) return;
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
 
@@ -617,7 +589,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         photoSwatchLayer.size > 0 ? photoSwatchLayer : undefined,
         photoMask,
       );
-      if (cancelled) { debugLog("PHASE2_CANCELLED_AT_TEXTURE_RENDER"); return; }
+      if (cancelled) return;
 
       // ── Phase 2b: unsharp-mask sharpening on photo-swatch pixels ─────────────
       if (photoMask && sharpenStrength > 0) {
@@ -635,27 +607,10 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       // Draw SS render to DPR canvas — browser scales from SS to DPR dimensions in one pass,
       // avoiding the previous double-scaling (SS→native→display) that blurred photo areas.
       ctx.drawImage(offscreenRef.current, 0, 0, canvasW, canvasH);
-      // DEBUG: sample SS pixels and check lookup hits
-      const ssSamples: string[] = [];
-      for (let si = 0; si < Math.min(5, ssW * ssH) * 4; si += 4 * Math.max(1, Math.floor(ssW * ssH / 5))) {
-        const sr = ssPixels[si], sg = ssPixels[si+1], sb = ssPixels[si+2];
-        const key = rgbToInt(sr, sg, sb);
-        const found = lookup.has(key);
-        ssSamples.push(`#${sr.toString(16).padStart(2,"0")}${sg.toString(16).padStart(2,"0")}${sb.toString(16).padStart(2,"0")}→${found}`);
-      }
-      // Show what keys the lookup actually has
-      const lookupKeys: string[] = [];
-      let lkCount = 0;
-      for (const k of lookup.keys()) {
-        if (lkCount++ >= 5) break;
-        const lr = (k >> 16) & 0xff, lg = (k >> 8) & 0xff, lb = k & 0xff;
-        lookupKeys.push(`#${lr.toString(16).padStart(2,"0")}${lg.toString(16).padStart(2,"0")}${lb.toString(16).padStart(2,"0")}`);
-      }
-      debugLog(`PHASE2_PAINTED: lookup=${lookup.size} photo=${photoLookup.size} ssSamples=[${ssSamples.join(",")}] lookupKeys=[${lookupKeys.join(",")}]`);
     }
 
     render();
-    return () => { cancelled = true; debugLog("RENDER_EFFECT_CLEANUP"); };
+    return () => { cancelled = true; };
   // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
