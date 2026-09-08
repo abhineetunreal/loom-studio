@@ -124,16 +124,33 @@ export default async function DesignPage({ params, searchParams }: Props) {
   let savedColorMap: Record<string, YarnOption> | undefined;
   let savedOperations: ColorwayOperations | undefined;
 
-  // ── Restore saved colorway (email-based, works for all auth methods) ────────
-  const userEmail = session?.user.email;
-  if (userEmail && tenant && colorwayId) {
+  // ── Restore saved colorway ──────────────────────────────────────────────────
+  // When loading a specific colorway by ID (via ?colorway= param), fetch it
+  // regardless of who owns it — the colorway ID is the authorization token.
+  // The email filter only applies when *listing* colorways (the Saved tab).
+  if (tenant && colorwayId) {
     const saved = await db.savedColorway.findFirst({
-      where: { id: colorwayId, designId: design.id, userEmail },
+      where: { id: colorwayId, designId: design.id, tenantId: tenant.id },
       select: { colorMapping: true, operations: true },
     });
 
     if (saved) {
       const yarnById = new Map(yarns.map((y) => [y.id, y]));
+      // Secondary lookup: material+code → yarn (for cross-library disambiguation)
+      const yarnByMaterialCode = new Map(
+        yarns.map((y) => [`${y.library ?? ""}:${y.code}`, y])
+      );
+
+      /** Resolve a yarn from saved entry, preferring material+code over ID-only. */
+      function resolveYarn(entry: { yarnId: string; yarnCode?: string; material?: string }): YarnOption | undefined {
+        // Try exact material+code match first (handles library disambiguation)
+        if (entry.material && entry.yarnCode) {
+          const byMC = yarnByMaterialCode.get(`${entry.material}:${entry.yarnCode}`);
+          if (byMC) return byMC;
+        }
+        // Fall back to ID lookup (works for old saves and single-library cases)
+        return yarnById.get(entry.yarnId);
+      }
 
       // New format: operations JSON with globalMap + regionFills
       if (saved.operations) {
@@ -142,7 +159,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
           savedOperations = ops;
           savedColorMap = {};
           for (const [hex, entry] of Object.entries(ops.globalMap)) {
-            const yarn = yarnById.get(entry.yarnId);
+            const yarn = resolveYarn(entry);
             if (yarn) savedColorMap[hex] = yarn;
           }
           if (Object.keys(savedColorMap).length === 0) savedColorMap = undefined;

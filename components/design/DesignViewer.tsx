@@ -21,10 +21,22 @@ export type RegionFillOperation = {
   newHex: string;
   newYarnCode: string;
   newYarnId: string;
+  // Added for correct library+photo restoration (backward-compatible: may be absent in old saves)
+  material?: string;
+  renderType?: "shader" | "photo";
+  swatchImageUrl?: string | null;
 };
 
 export type ColorwayOperations = {
-  globalMap: Record<string, { hex: string; yarnCode: string; yarnId: string }>;
+  globalMap: Record<string, {
+    hex: string;
+    yarnCode: string;
+    yarnId: string;
+    // Added for correct library restoration (backward-compatible: may be absent in old saves)
+    material?: string;
+    renderType?: "shader" | "photo";
+    swatchImageUrl?: string | null;
+  }>;
   regionFills: RegionFillOperation[];
 };
 
@@ -282,6 +294,9 @@ export default function DesignViewer({
       newHex: delta.yarn.hex,
       newYarnCode: delta.yarn.code,
       newYarnId: delta.yarn.id,
+      material: delta.yarn.library ?? undefined,
+      renderType: delta.yarn.renderType,
+      swatchImageUrl: delta.yarn.swatchImageUrl,
     });
 
     rebuildEffectivePalette();
@@ -387,7 +402,14 @@ export default function DesignViewer({
     const globalMap: ColorwayOperations["globalMap"] = {};
     for (const [hex, yarn] of Object.entries(recolor.current)) {
       if (!yarn) continue;
-      globalMap[hex] = { hex: yarn.hex, yarnCode: yarn.code, yarnId: yarn.id };
+      globalMap[hex] = {
+        hex: yarn.hex,
+        yarnCode: yarn.code,
+        yarnId: yarn.id,
+        material: yarn.library ?? undefined,
+        renderType: yarn.renderType,
+        swatchImageUrl: yarn.swatchImageUrl,
+      };
     }
     return { globalMap, regionFills: [...regionFillHistoryRef.current] };
   }, [recolor]);
@@ -396,11 +418,23 @@ export default function DesignViewer({
   // Apply globalMap to recolor state and replay region fills on the canvas.
   const loadColorway = useCallback(async (ops: ColorwayOperations, yarns: YarnOption[]) => {
     const yarnById = new Map(yarns.map((y) => [y.id, y]));
+    const yarnByMaterialCode = new Map(
+      yarns.map((y) => [`${y.library ?? ""}:${y.code}`, y])
+    );
+
+    /** Resolve yarn preferring material+code for disambiguation. */
+    function resolve(entry: { yarnId: string; yarnCode?: string; material?: string }): YarnOption | undefined {
+      if (entry.material && entry.yarnCode) {
+        const byMC = yarnByMaterialCode.get(`${entry.material}:${entry.yarnCode}`);
+        if (byMC) return byMC;
+      }
+      return yarnById.get(entry.yarnId);
+    }
 
     // Apply global map
     const newColorMap: Record<string, YarnOption | null> = {};
     for (const [hex, entry] of Object.entries(ops.globalMap)) {
-      const yarn = yarnById.get(entry.yarnId);
+      const yarn = resolve(entry);
       if (yarn) newColorMap[hex] = yarn;
     }
     // Reset to the loaded global map via RESET then individual ASSIGNs
@@ -412,7 +446,7 @@ export default function DesignViewer({
     // Clear existing region fills then replay
     canvasRef.current?.clearRegionFills();
     for (const fill of ops.regionFills) {
-      const yarn = yarnById.get(fill.newYarnId);
+      const yarn = resolve({ yarnId: fill.newYarnId, yarnCode: fill.newYarnCode, material: fill.material });
       if (!yarn) continue;
       canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
     }
