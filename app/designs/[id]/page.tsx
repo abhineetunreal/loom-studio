@@ -197,7 +197,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
       .map((p) => p.trim())
       .filter(Boolean)
       .map((p) => {
-        const sepIdx = p.indexOf(":");
+        const sepIdx = p.indexOf(">");
         if (sepIdx < 1) return null;
         return {
           originalCode: p.slice(0, sepIdx).trim(),
