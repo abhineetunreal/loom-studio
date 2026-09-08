@@ -309,6 +309,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     const canvas = canvasRef.current;
     if (!canvas) return;
+    // Ensure the canvas buffer is large enough for pixel extraction.
+    // (JSX no longer sets width/height — the render effect owns DPR sizing,
+    // but the image onload needs at least native dimensions for getImageData.)
+    if (canvas.width < width) canvas.width = width;
+    if (canvas.height < height) canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -734,8 +739,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     <div className="relative">
       <canvas
         ref={canvasRef}
-        width={width}
-        height={height}
         onClick={handleClick}
         onTouchEnd={handleTouchEnd}
         className="w-full h-full rounded-xl border border-stone-200 cursor-crosshair touch-none"
