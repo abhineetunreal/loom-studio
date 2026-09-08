@@ -38,6 +38,7 @@ model Tenant {
   colorwayFolders  ColorwayFolder[]
   colorLookups     ColorLookup[]
   folderAccess     FolderAccess[]
+  presetLogs       PresetLog[]
 }
 
 model TenantUser {
@@ -245,4 +246,23 @@ model FolderAccess {
   createdAt DateTime       @default(now())
 
   @@unique([folderId, userEmail])
+}
+
+// Audit log for ?preset= URL parameter usage (AI-powered rug recoloring)
+model PresetLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  designId   String
+  presetRaw  String
+  totalPairs Int
+  applied    Int
+  failed     Int
+  failures   Json?
+  referrer   String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([createdAt])
 }

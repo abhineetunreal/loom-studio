@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
 import { getCurrentTenant } from "@/lib/tenant";
 import DesignViewer from "@/components/design/DesignViewer";
+import type { ResolvedPreset } from "@/components/design/DesignViewer";
 import { resolveDesignImageUrl } from "@/lib/design-urls";
 import { getSession } from "@/lib/auth";
 import type { PaletteEntry, YarnOption } from "@/types";
@@ -37,12 +39,12 @@ function loadRenderedLookup(): Map<string, string> {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ colorway?: string }>;
+  searchParams: Promise<{ colorway?: string; preset?: string }>;
 };
 
 export default async function DesignPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { colorway: colorwayId } = await searchParams;
+  const { colorway: colorwayId, preset: presetRaw } = await searchParams;
 
   // Resolve tenant first (cached after first call) so the yarn query can be scoped.
   const tenant = await getCurrentTenant();
@@ -182,6 +184,94 @@ export default async function DesignPage({ params, searchParams }: Props) {
     }
   }
 
+  // ── Resolve ?preset= URL parameter ─────────────────────────────────────────
+  // Format: originalYarnCode:replacementCode,... (comma-separated pairs)
+  // Maps original codes → renderedHex (via ColorLookup) then resolves replacement
+  // yarns from the tenant's yarn library with full render metadata.
+  let resolvedPreset: ResolvedPreset | null = null;
+
+  if (tenant && presetRaw && presetRaw.trim()) {
+    const decoded = decodeURIComponent(presetRaw.trim());
+    const pairs = decoded
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => {
+        const sepIdx = p.indexOf(":");
+        if (sepIdx < 1) return null;
+        return {
+          originalCode: p.slice(0, sepIdx).trim(),
+          replacementCode: p.slice(sepIdx + 1).trim(),
+        };
+      })
+      .filter((p): p is { originalCode: string; replacementCode: string } => p !== null);
+
+    if (pairs.length > 0) {
+      // Build lookup maps from data already fetched
+      const codeLookup = new Map(
+        dbColorLookupRows.map((r) => [r.yarnCode, r.renderedHex.toLowerCase()])
+      );
+      const yarnByCode = new Map(yarns.map((y) => [y.code, y]));
+
+      const colorMap: ResolvedPreset["colorMap"] = {};
+      const failures: { originalCode: string; replacementCode: string; reason: string }[] = [];
+
+      for (const { originalCode, replacementCode } of pairs) {
+        // Find the renderedHex for the original yarn code
+        const renderedHex = codeLookup.get(originalCode);
+        if (!renderedHex) {
+          failures.push({ originalCode, replacementCode, reason: "color_lookup_not_found" });
+          continue;
+        }
+
+        // Find the palette entry that uses this renderedHex (case-insensitive)
+        const paletteHex = palette.find(
+          (e) => e.hex.toLowerCase() === renderedHex
+        )?.hex;
+        if (!paletteHex) {
+          failures.push({ originalCode, replacementCode, reason: "original_not_found" });
+          continue;
+        }
+
+        // Find the replacement yarn
+        const yarn = yarnByCode.get(replacementCode);
+        if (!yarn) {
+          failures.push({ originalCode, replacementCode, reason: "replacement_not_found" });
+          continue;
+        }
+
+        colorMap[paletteHex] = yarn;
+      }
+
+      const applied = Object.keys(colorMap).length;
+      const failed = failures.length;
+
+      resolvedPreset = {
+        colorMap,
+        totalPairs: pairs.length,
+        appliedCount: applied,
+        failedCount: failed,
+        failures: failed > 0 ? failures : undefined,
+      };
+
+      // Log to PresetLog (fire-and-forget — don't block page load)
+      const h = await headers();
+      db.presetLog.create({
+        data: {
+          tenantId: tenant.id,
+          designId: design.id,
+          presetRaw: decoded,
+          totalPairs: pairs.length,
+          applied,
+          failed,
+          failures: failed > 0 ? failures : undefined,
+          referrer: h.get("referer") ?? null,
+          userAgent: h.get("user-agent") ?? null,
+        },
+      }).catch((err) => console.error("[PresetLog] Failed to log:", err));
+    }
+  }
+
   // Build "View Product" URL if both tenant.websiteUrl and design.externalSku are set
   const viewProductUrl =
     tenant?.websiteUrl && design.externalSku
@@ -191,12 +281,13 @@ export default async function DesignPage({ params, searchParams }: Props) {
   return (
     <div className="h-full overflow-hidden">
       <DesignViewer
-        key={`${design.id}-${colorwayId ?? "original"}`}
+        key={`${design.id}-${colorwayId ?? presetRaw ?? "original"}`}
         design={{ ...design, imageUrl, palette }}
         yarns={yarns}
         initialColorMap={initialColorMap}
         savedColorMap={savedColorMap}
         savedOperations={savedOperations}
+        initialPreset={resolvedPreset ?? undefined}
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}

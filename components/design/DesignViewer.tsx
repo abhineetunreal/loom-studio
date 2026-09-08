@@ -40,6 +40,16 @@ export type ColorwayOperations = {
   regionFills: RegionFillOperation[];
 };
 
+// ─── Preset types ────────────────────────────────────────────────────────────
+
+export type ResolvedPreset = {
+  colorMap: Record<string, YarnOption>;
+  totalPairs: number;
+  appliedCount: number;
+  failedCount: number;
+  failures?: { originalCode: string; replacementCode: string; reason: string }[];
+};
+
 // ─── Recolor state + reducer ──────────────────────────────────────────────────
 
 type ColorMap = Record<string, YarnOption | null>;
@@ -122,6 +132,8 @@ type Props = {
    * When provided, region fills are replayed onto the canvas after it first renders.
    */
   savedOperations?: ColorwayOperations;
+  /** Resolved preset from ?preset= URL parameter — applies yarn swaps on load. */
+  initialPreset?: ResolvedPreset;
   /** True when this design was uploaded by a user (not seeded from catalog). */
   isUserUpload: boolean;
   tierInfo: TierInfo;
@@ -148,6 +160,7 @@ export default function DesignViewer({
   initialColorMap,
   savedColorMap,
   savedOperations,
+  initialPreset,
   isUserUpload,
   tierInfo,
   yarnLibraryName,
@@ -155,9 +168,11 @@ export default function DesignViewer({
   viewProductUrl,
   customerName,
 }: Props) {
-  // Saved colorway takes precedence over the lookup-matched initial map.
-  // For user uploads, initialColorMap is typically empty anyway.
-  const startingColorMap = savedColorMap ?? initialColorMap ?? {};
+  // Priority: saved colorway > preset > initial color map (from rendered-color lookup)
+  const startingColorMap = savedColorMap
+    ?? (initialPreset ? { ...initialColorMap, ...initialPreset.colorMap } : null)
+    ?? initialColorMap
+    ?? {};
 
   const [recolor, dispatch] = useReducer(
     recolorReducer,
@@ -175,6 +190,8 @@ export default function DesignViewer({
   const [showRestoredToast, setShowRestoredToast] = useState(false);
   // Toast: shown briefly after a successful save
   const [showSavedToast, setShowSavedToast] = useState(false);
+  // Toast: shown when a ?preset= URL was applied (warning style if partial failures)
+  const [presetToast, setPresetToast] = useState<string | null>(null);
   // True once the canvas has rendered for the first time — gates region-fill replay
   const [canvasReady, setCanvasReady] = useState(false);
   // True while a saved colorway with region fills is being restored — keeps canvas covered
@@ -375,6 +392,23 @@ export default function DesignViewer({
     if (!hasSavedState) return;
     setShowRestoredToast(true);
     const t = setTimeout(() => setShowRestoredToast(false), 3500);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only on mount
+
+  // ── Preset toast ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialPreset) return;
+    let msg: string;
+    if (initialPreset.appliedCount === 0) {
+      msg = "Colors couldn\u2019t be applied \u2014 the design is shown in its original colors";
+    } else if (initialPreset.failedCount > 0) {
+      msg = `${initialPreset.failedCount} of ${initialPreset.totalPairs} colors couldn\u2019t be applied \u2014 tap the highlighted regions to pick replacements`;
+    } else {
+      msg = `Preset applied \u2014 ${initialPreset.appliedCount} color${initialPreset.appliedCount !== 1 ? "s" : ""} swapped`;
+    }
+    setPresetToast(msg);
+    const t = setTimeout(() => setPresetToast(null), 6000);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally only on mount
@@ -790,6 +824,21 @@ export default function DesignViewer({
           className="absolute bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-3 py-1.5 rounded-full bg-green-700/90 text-white text-xs font-medium shadow-lg whitespace-nowrap animate-fade-in"
         >
           Colorway saved
+        </div>
+      )}
+
+      {/* Preset toast — shown when ?preset= URL param was processed */}
+      {presetToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`absolute bottom-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-4 py-2 rounded-full text-white text-xs font-medium shadow-lg max-w-sm text-center animate-fade-in ${
+            initialPreset && initialPreset.appliedCount > 0 && initialPreset.failedCount === 0
+              ? "bg-stone-800/90"
+              : "bg-amber-600/90"
+          }`}
+        >
+          {presetToast}
         </div>
       )}
 
