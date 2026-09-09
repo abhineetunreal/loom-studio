@@ -295,7 +295,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     // Check module-level cache first — avoids full image decode on revisit
     const cached = pixelCache.get(imageUrl);
     if (cached) {
-      console.log(`[Canvas] image pixels: cache hit for ${imageUrl.split("/").pop()}`);
+
       originalPixels.current = cached.native;
       supersampledPixels.current = cached.supersampled;
       setPixelsVersion((v) => v + 1);
@@ -316,17 +316,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const t0 = performance.now();
     const img = new Image();
     img.crossOrigin = "anonymous";
 
     img.onload = () => {
-      const loadMs = (performance.now() - t0).toFixed(0);
-      console.log(`[Canvas] image load: ${loadMs}ms (network/disk)`);
 
       ctx.drawImage(img, 0, 0, width, height);
       try {
-        const t1 = performance.now();
         const imageData = ctx.getImageData(0, 0, width, height);
         // Slice makes an independent copy — the Uint8ClampedArray is immutable
         const native = imageData.data.slice();
@@ -356,8 +352,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
             }
           }
         }
-
-        console.log(`[Canvas] pixel extraction: ${(performance.now() - t1).toFixed(0)}ms (${ssW}×${ssH} = ${(ssW * ssH / 1e6).toFixed(1)}Mpx)`);
 
         cachePixels(imageUrl, native, supersampled);
         originalPixels.current = native;
@@ -434,7 +428,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
           ctx.drawImage(img, 0, 0);
           const d = ctx.getImageData(0, 0, w, h);
           swatchCache.set(url, { data: d.data.slice() as Uint8ClampedArray, w, h });
-          console.log(`[Canvas] swatch loaded: ${url.split("/").pop()} (${w}×${h})`);
+
         } catch (err) {
           console.warn("[Canvas] Failed to load swatch:", err);
         }
@@ -453,12 +447,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // Two-phase render for instant perceived feedback:
   //
   //   Phase 1 — flat recolor at native resolution (~5–15 ms).
-  //             Paints to the canvas immediately so the user sees the new
-  //             colors without waiting for the texture pass.
+  //             Only painted when no texture pass will follow (flat-only mode).
+  //             When textures are active, Phase 1 computes the lookup data but
+  //             does NOT paint to the visible canvas — avoids a misleading flash
+  //             of flat hex colors before the final textured result.
   //
   //   Phase 2 — textured render at 2× supersampled resolution.
-  //             Queued via requestAnimationFrame so the browser first composites
-  //             phase 1, then runs the heavier pixel loop without blocking the UI.
+  //             Paints the final result (shader grain or photo swatch) directly.
   //
   // Performance notes:
   //   • lookup uses integer keys (r<<16|g<<8|b) — no per-pixel string allocation
@@ -497,29 +492,25 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         Object.values(colorMap).some((y) => y?.renderType === "photo" && y?.swatchImageUrl) ||
         photoUrlOverrideLayerRef.current.size > 0;
 
-      // ── Phase 1: flat recolor at native resolution — fast path ─────────────
-      const t0 = performance.now();
+      // ── Phase 1: flat recolor at native resolution ─────────────────────────
       const flatData = applyRecolor(
         pixels, width, height, lookup,
         hasOverrides ? overrideLayer : undefined,
       );
-      // DPR canvas: putImageData writes at native size; scale up to fill the DPR buffer.
-      const flatOffscreen = new OffscreenCanvas(width, height);
-      flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
-      ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
-      console.log(`[Canvas] phase 1 flat (${width}×${height}→${canvasW}×${canvasH}): ${(performance.now() - t0).toFixed(0)}ms`);
 
-      if (!cancelled && !renderCompleteFired.current) {
-        renderCompleteFired.current = true;
-        onRenderComplete?.();
+      // If no texture pass will run, the flat recolor IS the final result — paint it.
+      const willRunPhase2 = (textureEnabled || hasPhotoColors) && !!ssPixels;
+      if (!willRunPhase2) {
+        const flatOffscreen = new OffscreenCanvas(width, height);
+        flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
+        ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
+        if (!cancelled && !renderCompleteFired.current) {
+          renderCompleteFired.current = true;
+          onRenderComplete?.();
+        }
+        return;
       }
 
-      // Run texture pass if shader texturing is on OR if any photo colors are in use
-      // (photo colors always show their photograph, even when textureEnabled=false)
-      if ((!textureEnabled && !hasPhotoColors) || !ssPixels || cancelled) return;
-
-      // ── Yield to browser so phase 1 is composited before phase 2 blocks ────
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       if (cancelled) return;
 
       // ── Phase 2: textured render at supersampled resolution ─────────────────
@@ -579,7 +570,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         ? new Uint8Array(ssW * ssH)
         : undefined;
 
-      const t1 = performance.now();
       const texturedData = textureShader.applyRecolorAndTexture(
         ssPixels, ssW, ssH, lookup, tileScaleX, tileScaleY,
         textureEnabled ? textureStrength : 0, // strength=0 → flat shader colors in photo-only mode
@@ -596,7 +586,6 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         applyUnsharpMask(texturedData.data, ssW, ssH, photoMask, sharpenStrength);
       }
 
-      console.log(`[Canvas] phase 2 textured (${ssW}×${ssH}→${canvasW}×${canvasH}): ${(performance.now() - t1).toFixed(0)}ms`);
 
       // Reuse OffscreenCanvas — allocate only when SS size changes
       if (!offscreenRef.current || offscreenRef.current.width !== ssW || offscreenRef.current.height !== ssH) {
@@ -607,6 +596,11 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       // Draw SS render to DPR canvas — browser scales from SS to DPR dimensions in one pass,
       // avoiding the previous double-scaling (SS→native→display) that blurred photo areas.
       ctx.drawImage(offscreenRef.current, 0, 0, canvasW, canvasH);
+
+      if (!cancelled && !renderCompleteFired.current) {
+        renderCompleteFired.current = true;
+        onRenderComplete?.();
+      }
     }
 
     render();
@@ -661,9 +655,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     if (pixels[si + 3] === 0) return; // transparent — ignore
     const originalHex = rgbToHex(pixels[si], pixels[si + 1], pixels[si + 2]);
 
-    const t0 = performance.now();
     const indices = floodFill(pixels, x, y, width, height);
-    console.log(`[Canvas] flood fill: ${indices.length} pixels in ${(performance.now() - t0).toFixed(0)}ms`);
     if (indices.length === 0) return;
 
     const isPhotoFill = yarn.renderType === "photo" && !!yarn.swatchImageUrl;

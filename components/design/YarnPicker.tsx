@@ -251,7 +251,7 @@ export default function YarnPicker({
           ) : (
             <div
               className="grid gap-1"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(32px, 1fr))" }}
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))" }}
             >
               {libraryYarns.map((yarn) => {
                 const isCurrent = currentYarn?.id === yarn.id;
@@ -264,22 +264,31 @@ export default function YarnPicker({
                     title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
-                    className={`aspect-square rounded-sm border-2 transition-colors overflow-hidden ${
+                    className={`flex flex-col items-center gap-0.5 rounded-sm border-2 p-0.5 transition-colors ${
                       isCurrent
                         ? "border-stone-800 ring-1 ring-stone-800 ring-offset-1"
                         : "border-transparent hover:border-stone-500"
                     }`}
-                    style={yarn.renderType !== "photo" || !yarn.swatchImageUrl ? { backgroundColor: yarn.hex } : undefined}
                   >
-                    {yarn.renderType === "photo" && yarn.swatchImageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={swatchThumbUrl(yarn.swatchImageUrl)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover pointer-events-none"
-                      />
+                    <span
+                      className="w-full aspect-square rounded-[2px] overflow-hidden block"
+                      style={yarn.renderType !== "photo" || !yarn.swatchImageUrl ? { backgroundColor: yarn.hex } : undefined}
+                    >
+                      {yarn.renderType === "photo" && yarn.swatchImageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={swatchThumbUrl(yarn.swatchImageUrl)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover pointer-events-none"
+                        />
+                      )}
+                    </span>
+                    {!isDemo && (
+                      <span className="text-[8px] leading-tight text-stone-500 font-mono truncate w-full text-center">
+                        {yarn.code}
+                      </span>
                     )}
                   </button>
                 );
