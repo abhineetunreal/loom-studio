@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
   const slug = await uniqueSlug(baseSlug);
 
   // PNG sits alongside the BMP in the same folder: designs/{slug}/{slug}.png
-  const pngStoragePath = `${slug}/${slug}.png`;
+  const pngStoragePath = `tenants/${tenant.slug}/${slug}/${slug}.png`;
 
   // ── (e) Upload PNG to public designs bucket ────────────────────────────────
   const { error: pngUploadError } = await admin.storage

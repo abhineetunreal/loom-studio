@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getDefaultTierInfo } from "@/lib/tier";
+import { getCurrentTenant } from "@/lib/tenant";
 import { createAdminClient, DESIGNS_BUCKET } from "@/lib/supabase";
 
 function filenameToSlug(filename: string): string {
@@ -24,6 +25,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
+  // ── Tenant ──────────────────────────────────────────────────────────────────
+  const tenant = await getCurrentTenant();
+  if (!tenant) {
+    return NextResponse.json({ error: "Tenant not found" }, { status: 500 });
+  }
+
   // ── Validate query param ───────────────────────────────────────────────────
   const filename = request.nextUrl.searchParams.get("filename") ?? "";
   const lower = filename.toLowerCase();
@@ -39,7 +46,7 @@ export async function GET(request: NextRequest) {
   // ── Generate signed upload URL ─────────────────────────────────────────────
   const ext = lower.endsWith(".ctf") ? "ctf" : "bmp";
   const uuid8 = crypto.randomUUID().slice(0, 8);
-  const storagePath = `${slug}/${uuid8}.${ext}`;
+  const storagePath = `tenants/${tenant.slug}/${slug}/${uuid8}.${ext}`;
 
   const admin = createAdminClient();
   const { data, error } = await admin.storage
