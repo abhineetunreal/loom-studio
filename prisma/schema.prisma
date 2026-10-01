@@ -40,6 +40,7 @@ model Tenant {
   colorLookups     ColorLookup[]
   folderAccess     FolderAccess[]
   presetLogs       PresetLog[]
+  analyticsEvents  AnalyticsEvent[]
 }
 
 model TenantUser {
@@ -266,4 +267,33 @@ model PresetLog {
 
   @@index([tenantId])
   @@index([createdAt])
+}
+
+// Platform-level users — cross-tenant access (e.g., platform owner, ops team)
+model PlatformUser {
+  id        String       @id @default(cuid())
+  email     String       @unique
+  name      String?
+  role      PlatformRole @default(PLATFORM_ADMIN)
+  createdAt DateTime     @default(now())
+}
+
+enum PlatformRole {
+  SUPER_OWNER    // full access to every tenant + platform settings
+  PLATFORM_ADMIN // access to every tenant for ops/support, no platform settings
+}
+
+// Usage analytics — records events across all tenants
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  event     String   // DESIGN_VIEW, COLOR_CHANGE, COLORWAY_SAVE, COLORWAY_EXPORT, DESIGN_UPLOAD
+  designId  String?
+  userEmail String?
+  metadata  Json?    // extra context (e.g., yarn codes changed, export format)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([event, createdAt])
 }

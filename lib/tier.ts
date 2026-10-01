@@ -26,6 +26,13 @@ export async function getTierForUser(tenantId: string): Promise<TierInfo> {
   const session = await getSession();
   if (!session?.user.email) return { tier: "demo", pendingApproval: false };
 
+  // Platform-level users get admin access to every tenant
+  const platformUser = await db.platformUser.findUnique({
+    where: { email: session.user.email },
+    select: { role: true },
+  });
+  if (platformUser) return { tier: "admin", pendingApproval: false };
+
   const tenantUser = await db.tenantUser.findUnique({
     where: {
       tenantId_email: { tenantId, email: session.user.email },
