@@ -99,7 +99,7 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
               alt={tenant.displayName}
               width={120}
               height={32}
-              className="h-8 w-auto object-contain"
+              className="h-10 w-auto object-contain max-w-[180px]"
               priority
             />
           ) : (
