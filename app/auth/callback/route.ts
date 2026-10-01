@@ -71,8 +71,14 @@ async function upsertTenantUser(
     }
 
     // Upsert current-domain tenant as PENDING (only on create, don't demote existing)
+    // Skip if the user is a PlatformUser — they get access via tier.ts, no tenant row needed
+    const platformUser = await db.platformUser.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
     const currentTenant = await getCurrentTenant();
-    if (currentTenant && !ownerTenantIds.has(currentTenant.id)) {
+    if (currentTenant && !ownerTenantIds.has(currentTenant.id) && !platformUser) {
       await db.tenantUser.upsert({
         where: { tenantId_email: { tenantId: currentTenant.id, email } },
         update: {
