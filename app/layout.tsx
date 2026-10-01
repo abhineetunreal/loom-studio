@@ -38,6 +38,16 @@ export default async function RootLayout({
   const isDemo = tierInfo.tier === "demo";
   const isAdmin = tierInfo.tier === "admin";
 
+  // Check if user is a PlatformUser (cross-tenant admin)
+  let isPlatformUser = false;
+  if (user?.email) {
+    const pu = await db.platformUser.findUnique({
+      where: { email: user.email },
+      select: { id: true },
+    });
+    isPlatformUser = !!pu;
+  }
+
   // canUpload — only relevant for authenticated, non-demo users
   let canUpload = false;
   if (tenant && user) {
@@ -131,6 +141,7 @@ export default async function RootLayout({
           user={userInfo}
           tenant={tenantBranding}
           previewAsEmail={previewAsEmail ?? null}
+          isPlatformUser={isPlatformUser}
         >
           {children}
         </AppShell>

@@ -18,6 +18,15 @@ type TenantBranding = {
   logoUrl: string | null;
 };
 
+type TenantInfo = {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  designCount: number;
+  userCount: number;
+};
+
 type Props = {
   designs: DesignSummary[];
   tierInfo: TierInfo;
@@ -25,11 +34,12 @@ type Props = {
   user: UserInfo | null;
   tenant: TenantBranding | null;
   previewAsEmail: string | null;
+  isPlatformUser: boolean;
   children: React.ReactNode;
 };
 
 
-export default function AppShell({ designs, tierInfo, canUpload, user, tenant, previewAsEmail, children }: Props) {
+export default function AppShell({ designs, tierInfo, canUpload, user, tenant, previewAsEmail, isPlatformUser, children }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -107,6 +117,7 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
               {tenant?.displayName ?? "Loom Studio"}
             </span>
           )}
+          {isPlatformUser && <TenantSwitcher />}
         </span>
 
         {/* User menu / sign-in link */}
@@ -237,7 +248,104 @@ function UserMenu({ user, isAdmin }: { user: UserInfo; isAdmin: boolean }) {
   );
 }
 
+// ─── TenantSwitcher (PlatformUser only) ──────────────────────────────────────
+
+function TenantSwitcher() {
+  const [open, setOpen] = useState(false);
+  const [tenants, setTenants] = useState<TenantInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && tenants.length === 0) {
+      setLoading(true);
+      fetch("/api/platform/tenants")
+        .then((r) => r.json())
+        .then((data) => setTenants(data.tenants ?? []))
+        .finally(() => setLoading(false));
+    }
+  }
+
+  function tenantUrl(t: TenantInfo) {
+    if (t.domain) return `${window.location.protocol}//${t.domain}`;
+    return `${window.location.protocol}//${t.slug}.${window.location.host.split(".").slice(-2).join(".")}`;
+  }
+
+  return (
+    <div ref={ref} className="relative ml-2">
+      <button
+        onClick={toggle}
+        className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors"
+        aria-label="Switch tenant"
+        aria-expanded={open}
+        title="Switch tenant"
+      >
+        <GridIcon />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-72 rounded-lg border border-stone-200 bg-white shadow-lg z-50 overflow-hidden">
+          <div className="px-3 py-2 border-b border-stone-100">
+            <p className="text-xs font-medium text-stone-500">All tenants</p>
+          </div>
+          {loading ? (
+            <div className="px-3 py-4 text-xs text-stone-400 text-center">Loading…</div>
+          ) : tenants.length === 0 ? (
+            <div className="px-3 py-4 text-xs text-stone-400 text-center">No tenants found</div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto">
+              {tenants.map((t) => (
+                <a
+                  key={t.id}
+                  href={tenantUrl(t)}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-stone-50 transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center shrink-0 text-xs font-semibold text-stone-500">
+                    {t.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium text-stone-800 truncate">{t.name}</span>
+                    <span className="block text-[11px] text-stone-400">
+                      {t.domain ?? `${t.slug}`}
+                      <span className="mx-1">·</span>
+                      {t.designCount} designs
+                      <span className="mx-1">·</span>
+                      {t.userCount} users
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
+
+function GridIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <rect x="3" y="3" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="14" y="3" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="3" y="14" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="14" y="14" width="7" height="7" rx="1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function MenuIcon() {
   return (
