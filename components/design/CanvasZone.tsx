@@ -20,8 +20,8 @@ type Props = {
   hasChanges: boolean;
   /** Opens the save modal when the user clicks "Save colorway" */
   onSave?: () => Promise<void>;
-  /** Opens the colorway submission form */
-  onRequestColorway: () => void;
+  /** Opens the colorway submission form. Hidden when not provided. */
+  onRequestColorway?: () => void;
   /** Tier info — controls which request-colorway CTA is shown */
   tierInfo: TierInfo;
   /** When true the "Save colorway" floating button is shown */
@@ -537,25 +537,27 @@ export default function CanvasZone({
               </button>
             )}
 
-            {/* Request colorway (primary) */}
-            {tierInfo.pendingApproval ? (
-              <p className="pointer-events-auto text-xs px-3 py-2 text-amber-700 bg-amber-50/95 rounded-lg border border-amber-200 shadow whitespace-nowrap">
-                Account pending approval
-              </p>
-            ) : tierInfo.tier === "demo" ? (
-              <Link
-                href="/auth/signin"
-                className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
-              >
-                Sign in to request
-              </Link>
-            ) : (
-              <button
-                onClick={onRequestColorway}
-                className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
-              >
-                Request colorway
-              </button>
+            {/* Request colorway (primary) — hidden when onRequestColorway is not provided */}
+            {onRequestColorway && (
+              tierInfo.pendingApproval ? (
+                <p className="pointer-events-auto text-xs px-3 py-2 text-amber-700 bg-amber-50/95 rounded-lg border border-amber-200 shadow whitespace-nowrap">
+                  Account pending approval
+                </p>
+              ) : tierInfo.tier === "demo" ? (
+                <Link
+                  href="/auth/signin"
+                  className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
+                >
+                  Sign in to request
+                </Link>
+              ) : (
+                <button
+                  onClick={onRequestColorway}
+                  className="pointer-events-auto text-xs px-4 py-2 rounded-lg bg-stone-900 text-white shadow hover:bg-stone-700 transition-colors whitespace-nowrap"
+                >
+                  Request colorway
+                </button>
+              )
             )}
 
             {/* Save colorway (secondary) — only for approved users */}
