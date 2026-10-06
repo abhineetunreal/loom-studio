@@ -516,6 +516,55 @@ export default function DesignViewer({
     setTimeout(() => setShowSavedToast(false), 2500);
   }, [design.id, buildOperations]);
 
+  // ── Update Catalog (admin only) ──────────────────────────────────────────────
+  const [updateCatalogBusy, setUpdateCatalogBusy] = useState(false);
+  const [showUpdateCatalogConfirm, setShowUpdateCatalogConfirm] = useState(false);
+
+  const handleUpdateCatalog = useCallback(async () => {
+    setShowUpdateCatalogConfirm(false);
+    setUpdateCatalogBusy(true);
+    try {
+      // Build updated palette: merge original palette with current color assignments
+      const updatedPalette = effectivePalette.map((entry) => {
+        const assignedYarn = recolor.current[entry.hex];
+        if (!assignedYarn) return entry;
+        return {
+          ...entry,
+          hex: assignedYarn.hex,
+          matchedYarnCode: assignedYarn.code,
+        };
+      });
+
+      // Capture the current canvas as the new thumbnail
+      const snapshot = canvasRef.current?.getSnapshot(1200, "png") ?? null;
+      if (!snapshot) throw new Error("Failed to capture canvas snapshot");
+
+      const res = await fetch(`/api/admin/designs/${design.id}/update-catalog`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          palette: updatedPalette,
+          snapshotDataUrl: snapshot,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Update failed");
+      }
+
+      // Refresh the page to show updated defaults and clear any colorway param
+      const url = new URL(window.location.href);
+      url.searchParams.delete("colorway");
+      window.location.href = url.toString();
+    } catch (err) {
+      console.error("[UpdateCatalog] Failed:", err);
+      alert(`Failed to update catalog: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setUpdateCatalogBusy(false);
+    }
+  }, [design.id, effectivePalette, recolor, canvasRef]);
+
   // ── Order sheet download (client-side PDF) ──────────────────────────────────
   const [orderSheetBusy, setOrderSheetBusy] = useState(false);
   const [additionalInstructions, setAdditionalInstructions] = useState("");
@@ -887,6 +936,8 @@ export default function DesignViewer({
         additionalInstructions={additionalInstructions}
         onAdditionalInstructionsChange={setAdditionalInstructions}
         orderSheetBusy={orderSheetBusy}
+        onUpdateCatalog={tierInfo.tier === "admin" ? () => setShowUpdateCatalogConfirm(true) : undefined}
+        updateCatalogBusy={updateCatalogBusy}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -987,6 +1038,34 @@ export default function DesignViewer({
           onSave={handleSaveSubmit}
           onClose={() => setShowSaveModal(false)}
         />
+      )}
+
+      {/* Update Catalog confirmation dialog */}
+      {showUpdateCatalogConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+            <h3 className="text-sm font-semibold text-stone-900 mb-2">
+              Update Catalog Colors
+            </h3>
+            <p className="text-xs text-stone-600 leading-relaxed mb-5">
+              This will update the default colors for <span className="font-medium">{design.name}</span> in the catalog. All users will see these colors when they open this design. Continue?
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowUpdateCatalogConfirm(false)}
+                className="text-xs px-4 py-2 rounded-lg border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateCatalog}
+                className="text-xs px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+              >
+                Update Catalog
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

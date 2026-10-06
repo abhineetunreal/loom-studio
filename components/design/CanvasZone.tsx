@@ -51,6 +51,10 @@ type Props = {
   additionalInstructions?: string;
   /** Callback to update additional instructions */
   onAdditionalInstructionsChange?: (value: string) => void;
+  /** Called when admin clicks "Update Catalog" to save current colors as catalog defaults. */
+  onUpdateCatalog?: () => void;
+  /** True while catalog update is in progress. */
+  updateCatalogBusy?: boolean;
 };
 
 function clampPan(
@@ -105,6 +109,8 @@ export default function CanvasZone({
   orderSheetBusy,
   additionalInstructions,
   onAdditionalInstructionsChange,
+  onUpdateCatalog,
+  updateCatalogBusy,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -516,6 +522,18 @@ export default function CanvasZone({
                 title="Save current scale as the calibrated default for these photo yarns"
               >
                 Save Scale
+              </button>
+            )}
+
+            {/* Update Catalog — admin/owner only */}
+            {onUpdateCatalog && tierInfo.tier === "admin" && (
+              <button
+                onClick={onUpdateCatalog}
+                disabled={updateCatalogBusy}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-amber-500 bg-amber-50/95 text-amber-800 shadow hover:bg-amber-100 disabled:opacity-50 disabled:cursor-wait transition-colors whitespace-nowrap"
+                title="Update catalog default colors for this design"
+              >
+                {updateCatalogBusy ? "Updating\u2026" : "Update Catalog"}
               </button>
             )}
 
