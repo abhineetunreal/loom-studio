@@ -41,6 +41,7 @@ model Tenant {
   folderAccess     FolderAccess[]
   presetLogs       PresetLog[]
   analyticsEvents  AnalyticsEvent[]
+  shareLinks       ShareLink[]
 }
 
 model TenantUser {
@@ -97,8 +98,10 @@ model Design {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  submissions    ColorwaySubmission[]
-  savedColorways SavedColorway[]
+  submissions         ColorwaySubmission[]
+  savedColorways      SavedColorway[]
+  shareLinksAsPrimary ShareLink[]       @relation("ShareLinkPrimary")
+  shareApprovals      ShareApproval[]
 
   @@unique([tenantId, externalSku])
 }
@@ -298,4 +301,64 @@ model AnalyticsEvent {
 
   @@index([tenantId, createdAt])
   @@index([event, createdAt])
+}
+
+// ─── Share Links (client approval flow) ──────────────────────────────────────
+
+// A curated share link for client rug approval
+model ShareLink {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  slug                String   @unique
+  clientName          String
+  clientEmail         String
+  primaryDesignId     String
+  additionalDesignIds Json     @default("[]")
+  allowedLibraries    Json     @default("[]")
+  presets             Json     @default("[]")
+  createdBy           String
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryDesign Design          @relation("ShareLinkPrimary", fields: [primaryDesignId], references: [id], onDelete: Cascade)
+  sessions      ShareSession[]
+  approvals     ShareApproval[]
+
+  @@index([tenantId])
+}
+
+// Tracks client visits to a share link
+model ShareSession {
+  id             String   @id @default(cuid())
+  shareLinkId    String
+  clientEmail    String
+  emailMatch     Boolean  @default(true)
+  startedAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  actionCount    Int      @default(0)
+  actions        Json     @default("[]")
+
+  shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shareLinkId])
+}
+
+// Client's colorway approval for a specific design within a share link
+model ShareApproval {
+  id          String   @id @default(cuid())
+  shareLinkId String
+  clientEmail String
+  designId    String
+  operations  Json     @default("{}")
+  thumbnail   String?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shareLink ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+  design    Design    @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([shareLinkId])
 }

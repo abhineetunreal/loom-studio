@@ -15,6 +15,7 @@ import { UserUploadsTab } from "./UserUploadsTab";
 import { CatalogTab } from "./CatalogTab";
 import { ColorMappingTab } from "./ColorMappingTab";
 import { SavedColorwaysAdminTab } from "./SavedColorwaysAdminTab";
+import { ShareLinksTab } from "./ShareLinksTab";
 import type { CollectionSummary, DesignBrief } from "./CollectionsTab";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ type Props = {
   designs: DesignBrief[];
 };
 
-type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors" | "colorways";
+type Tab = "pending" | "all" | "collections" | "uploads" | "catalog" | "colors" | "colorways" | "sharelinks";
 
 // ─── AdminPanel ───────────────────────────────────────────────────────────────
 
@@ -136,6 +137,12 @@ export function AdminPanel({
           >
             Saved Colorways
           </TabButton>
+          <TabButton
+            active={tab === "sharelinks"}
+            onClick={() => setTab("sharelinks")}
+          >
+            Share Links
+          </TabButton>
         </div>
 
         {tab === "pending" && (
@@ -157,6 +164,7 @@ export function AdminPanel({
         {tab === "catalog" && <CatalogTab collections={collections} />}
         {tab === "colors" && <ColorMappingTab />}
         {tab === "colorways" && <SavedColorwaysAdminTab />}
+        {tab === "sharelinks" && <ShareLinksTab />}
       </div>
 
       {/* Collection access is now managed per-collection in the Collections tab */}
