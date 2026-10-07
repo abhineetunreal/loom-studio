@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { createAdminClient } from "@/lib/supabase";
 import { createAuthClient } from "@/lib/supabase-server";
 import { verifySSOToken } from "@/lib/sso";
+import { sendNewPendingUserNotification } from "@/lib/email";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   // Look up tenant by slug
   const tenant = await db.tenant.findUnique({
     where: { slug: tenantSlug },
-    select: { id: true, ssoSecret: true },
+    select: { id: true, name: true, ssoSecret: true },
   });
 
   if (!tenant || !tenant.ssoSecret) {
@@ -85,6 +86,13 @@ export async function GET(request: NextRequest) {
         provider: "sso",
       },
     });
+
+    // Notify admin about the new pending user (fire-and-forget)
+    sendNewPendingUserNotification({
+      userName: name ?? email,
+      userEmail: email,
+      tenantName: tenant.name,
+    }).catch((err) => console.error("Failed to send pending-user notification:", err));
   }
 
   // Redirect to client-side callback to establish session
