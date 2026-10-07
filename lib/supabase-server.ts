@@ -19,7 +19,7 @@ export async function createAuthClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, { ...options, sameSite: "none", secure: true })
             );
           } catch {
             // setAll is a no-op in read-only Server Component contexts.
