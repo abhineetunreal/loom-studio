@@ -123,6 +123,23 @@ export type RecolorCanvasHandle = {
   undoRegionFill: () => boolean;
   /** Clear all region-fill overrides and the undo stack. */
   clearRegionFills: () => void;
+  /**
+   * Returns a data URL of the cropped region from the current rendered canvas
+   * (with all recoloring and texture applied).
+   */
+  getCroppedSnapshot: (
+    cropRect: { x: number; y: number; w: number; h: number },
+    maxWidth?: number,
+    format?: string,
+    quality?: number,
+  ) => string | null;
+  /**
+   * Extracts the crop region from originalPixels (the unmodified source image
+   * at native resolution). Returns raw ImageData for the admin catalog upload path.
+   */
+  getCroppedOriginal: (
+    cropRect: { x: number; y: number; w: number; h: number },
+  ) => ImageData | null;
 };
 
 type Props = {
@@ -285,6 +302,67 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       regionUndoStackRef.current = [];
       onRegionClear?.();
       setOverrideVersion((v) => v + 1);
+    },
+    getCroppedSnapshot(
+      cropRect: { x: number; y: number; w: number; h: number },
+      maxWidth?: number,
+      format: string = "png",
+      quality: number = 0.9,
+    ): string | null {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+
+      // Map native design coords → canvas buffer coords (DPR-scaled)
+      const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+      const rect = canvas.getBoundingClientRect();
+      const bufScaleX = canvas.width / (rect.width > 0 ? rect.width : width);
+      const bufScaleY = canvas.height / (rect.height > 0 ? rect.height : height);
+      const cssScaleX = (rect.width > 0 ? rect.width : width) / width;
+      const cssScaleY = (rect.height > 0 ? rect.height : height) / height;
+
+      const sx = Math.round(cropRect.x * cssScaleX * bufScaleX);
+      const sy = Math.round(cropRect.y * cssScaleY * bufScaleY);
+      const sw = Math.round(cropRect.w * cssScaleX * bufScaleX);
+      const sh = Math.round(cropRect.h * cssScaleY * bufScaleY);
+
+      // Output size
+      let outW = cropRect.w;
+      let outH = cropRect.h;
+      if (maxWidth && outW > maxWidth) {
+        const scale = maxWidth / outW;
+        outW = maxWidth;
+        outH = Math.round(outH * scale);
+      }
+
+      try {
+        const tmp = document.createElement("canvas");
+        tmp.width = outW;
+        tmp.height = outH;
+        const ctx = tmp.getContext("2d")!;
+        ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, outW, outH);
+        const mime = format === "jpeg" ? "image/jpeg" : "image/png";
+        return tmp.toDataURL(mime, quality);
+      } catch {
+        return null;
+      }
+    },
+    getCroppedOriginal(
+      cropRect: { x: number; y: number; w: number; h: number },
+    ): ImageData | null {
+      const pixels = originalPixels.current;
+      if (!pixels) return null;
+
+      const { x: cx, y: cy, w: cw, h: ch } = cropRect;
+      // Bounds check
+      if (cx < 0 || cy < 0 || cx + cw > width || cy + ch > height) return null;
+
+      const data = new Uint8ClampedArray(cw * ch * 4);
+      for (let row = 0; row < ch; row++) {
+        const srcOffset = ((cy + row) * width + cx) * 4;
+        const dstOffset = row * cw * 4;
+        data.set(pixels.subarray(srcOffset, srcOffset + cw * 4), dstOffset);
+      }
+      return new ImageData(data, cw, ch);
     },
   }));
 

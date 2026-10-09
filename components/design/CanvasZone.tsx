@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import RecolorCanvas, { type RecolorCanvasHandle, type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
+import CropOverlay, { type CropRect } from "./CropOverlay";
 import { textureShader } from "@/lib/texture-shader";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
@@ -55,6 +56,20 @@ type Props = {
   onUpdateCatalog?: () => void;
   /** True while catalog update is in progress. */
   updateCatalogBusy?: boolean;
+  /** Whether the crop tool is currently active. */
+  isCropping?: boolean;
+  /** Toggle crop mode on/off. */
+  onToggleCrop?: () => void;
+  /** Current crop selection in native design pixels, or null. */
+  cropRect?: CropRect | null;
+  /** Called when the crop selection changes. */
+  onCropChange?: (rect: CropRect | null) => void;
+  /** Called when user clicks "Save Cropped Design". */
+  onSaveCropped?: () => void;
+  /** Called when admin clicks "Upload Cropped to Catalog". */
+  onUploadCropped?: () => void;
+  /** True while cropped catalog upload is in progress. */
+  uploadCroppedBusy?: boolean;
 };
 
 function clampPan(
@@ -111,6 +126,13 @@ export default function CanvasZone({
   onAdditionalInstructionsChange,
   onUpdateCatalog,
   updateCatalogBusy,
+  isCropping,
+  onToggleCrop,
+  cropRect,
+  onCropChange,
+  onSaveCropped,
+  onUploadCropped,
+  uploadCroppedBusy,
 }: Props) {
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const [zoneSize, setZoneSize] = useState({ w: 0, h: 0 });
@@ -141,6 +163,19 @@ export default function CanvasZone({
   const hasPhotoColors =
     Object.values(colorMap).some((y) => y?.renderType === "photo") ||
     selectedFillYarn?.renderType === "photo";
+
+  // ESC key cancels crop mode
+  useEffect(() => {
+    if (!isCropping) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onCropChange?.(null);
+        onToggleCrop?.();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCropping, onCropChange, onToggleCrop]);
 
   // Refs to avoid stale closures in event listeners
   const zoomRef = useRef(1);
@@ -386,9 +421,11 @@ export default function CanvasZone({
     setIsDragging(false);
   }
 
+  // In crop mode the CropOverlay handles its own cursor.
   // In region mode always show crosshair (paint-bucket intent);
   // in global mode show grab when zoomed in for panning affordance.
   const cursor =
+    isCropping ? "default" :
     mode === "region" || zoom === 1 ? "crosshair" : isDragging ? "grabbing" : "grab";
 
   async function handleSaveScale() {
@@ -490,14 +527,39 @@ export default function CanvasZone({
               />
             </div>
 
-            {/* Pointer overlay for pan/tap detection */}
-            <div
-              className="absolute inset-0 z-10"
-              style={{ cursor }}
-              onPointerDown={handlePointerDownWithState}
-              onPointerMove={handlePointerMoveWithState}
-              onPointerUp={handlePointerUpWithState}
-            />
+            {/* Pointer overlay for pan/tap detection — disabled in crop mode */}
+            {!isCropping && (
+              <div
+                className="absolute inset-0 z-10"
+                style={{ cursor }}
+                onPointerDown={handlePointerDownWithState}
+                onPointerMove={handlePointerMoveWithState}
+                onPointerUp={handlePointerUpWithState}
+              />
+            )}
+
+            {/* Crop overlay — anchored to the canvas wrapper so it moves with pan/zoom */}
+            {isCropping && onCropChange && (
+              <div
+                className="absolute"
+                style={{
+                  left: "50%",
+                  top: "50%",
+                  transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`,
+                  width: fitW * zoom,
+                  height: fitH * zoom,
+                }}
+              >
+                <CropOverlay
+                  cropRect={cropRect ?? null}
+                  onCropChange={onCropChange}
+                  designWidth={design.width}
+                  designHeight={design.height}
+                  displayWidth={fitW * zoom}
+                  displayHeight={fitH * zoom}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -511,8 +573,33 @@ export default function CanvasZone({
           </div>
         )}
 
+        {/* Crop action buttons — shown when a valid crop selection exists */}
+        {isCropping && cropRect && cropRect.w >= 50 && cropRect.h >= 50 && (
+          <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2 items-end pointer-events-none">
+            {canSave && onSaveCropped && (
+              <button
+                onClick={onSaveCropped}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-stone-800 bg-white/90 text-stone-900 shadow hover:bg-stone-50 transition-colors whitespace-nowrap flex items-center gap-1.5"
+              >
+                <CropIcon className="w-3.5 h-3.5" />
+                Save Cropped Design
+              </button>
+            )}
+            {onUploadCropped && tierInfo.tier === "admin" && (
+              <button
+                onClick={onUploadCropped}
+                disabled={uploadCroppedBusy}
+                className="pointer-events-auto text-xs px-3 py-1.5 rounded-lg border border-amber-500 bg-amber-50/95 text-amber-800 shadow hover:bg-amber-100 disabled:opacity-50 disabled:cursor-wait transition-colors whitespace-nowrap flex items-center gap-1.5"
+              >
+                <CropIcon className="w-3.5 h-3.5" />
+                {uploadCroppedBusy ? "Uploading\u2026" : "Upload Cropped to Catalog"}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Floating action buttons — bottom-right of canvas area, above pointer overlay */}
-        {!isLoading && !colorwayLoading && (
+        {!isLoading && !colorwayLoading && !isCropping && (
           <div className="absolute bottom-4 right-4 z-30 flex flex-col gap-2 items-end pointer-events-none">
             {/* Save Scale — admin/owner only, visible when photo swatches are in use */}
             {tierInfo.tier === "admin" && hasPhotoColors && (
@@ -646,6 +733,19 @@ export default function CanvasZone({
           >
             Reset
           </button>
+          {onToggleCrop && (
+            <button
+              onClick={onToggleCrop}
+              title="Crop tool"
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
+                isCropping
+                  ? "border-stone-700 bg-stone-800 text-white hover:bg-stone-700"
+                  : "border-stone-200 text-stone-600 hover:bg-stone-100"
+              }`}
+            >
+              <CropIcon className="w-3.5 h-3.5" /> Crop
+            </button>
+          )}
         </div>
 
         {/* Centre: Flat/Textured toggle + tuning sliders.
@@ -853,6 +953,14 @@ function RedoIcon() {
   return (
     <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+    </svg>
+  );
+}
+
+function CropIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className ?? "w-3.5 h-3.5"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 2v4M6 6H2m4 0h10a2 2 0 012 2v10m0 4v-4m0 0h4m-4 0H8a2 2 0 01-2-2V6" />
     </svg>
   );
 }

@@ -4,6 +4,7 @@ import { useReducer, useState, useRef, useCallback, useEffect } from "react";
 import type { RecolorCanvasHandle } from "./RecolorCanvas";
 import { type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import CanvasZone from "./CanvasZone";
+import type { CropRect } from "./CropOverlay";
 import CompactPalette from "./CompactPalette";
 import InlineYarnPicker from "./InlineYarnPicker";
 import ColorPopover from "./ColorPopover";
@@ -208,6 +209,11 @@ export default function DesignViewer({
   const [recolorMode, setRecolorMode] = useState<"global" | "region">("global");
   // Yarn selected as the active region-fill color (region mode only)
   const [selectedFillYarn, setSelectedFillYarn] = useState<YarnOption | null>(null);
+
+  // ── Crop tool ────────────────────────────────────────────────────────────────
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [uploadCroppedBusy, setUploadCroppedBusy] = useState(false);
 
   // Palette sorted by coverage — used to derive 1-based rank for the popover
   const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);
@@ -492,20 +498,27 @@ export default function DesignViewer({
   // On success: closes the modal and shows a brief "Saved" toast.
   // Does NOT reset recolor state or navigate — the user continues editing.
   const handleSaveSubmit = useCallback(async (name: string, folderId: string | null) => {
-    // Capture snapshot of the current recolored canvas (not the original)
-    const snapshot = canvasRef.current?.getSnapshot() ?? null;
+    // If crop is active, capture cropped snapshot; otherwise full canvas
+    const snapshot = (isCropping && cropRect)
+      ? canvasRef.current?.getCroppedSnapshot(cropRect) ?? null
+      : canvasRef.current?.getSnapshot() ?? null;
+
     const operations = buildOperations();
+    // Include crop bounds in operations if cropping
+    const body: Record<string, unknown> = {
+      designId: design.id,
+      name,
+      operations: isCropping && cropRect
+        ? { ...operations, cropRect }
+        : operations,
+      folderId,
+      snapshotDataUrl: snapshot,
+    };
 
     const res = await fetch("/api/colorways", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        designId: design.id,
-        name,
-        operations,
-        folderId,
-        snapshotDataUrl: snapshot,
-      }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -514,7 +527,12 @@ export default function DesignViewer({
     // Show success toast — modal will close itself after this resolves
     setShowSavedToast(true);
     setTimeout(() => setShowSavedToast(false), 2500);
-  }, [design.id, buildOperations]);
+    // Exit crop mode after successful save
+    if (isCropping) {
+      setIsCropping(false);
+      setCropRect(null);
+    }
+  }, [design.id, buildOperations, isCropping, cropRect]);
 
   // ── Update Catalog (admin only) ──────────────────────────────────────────────
   const [updateCatalogBusy, setUpdateCatalogBusy] = useState(false);
@@ -564,6 +582,55 @@ export default function DesignViewer({
       setUpdateCatalogBusy(false);
     }
   }, [design.id, effectivePalette, recolor, canvasRef]);
+
+  // ── Crop → Save as colorway ─────────────────────────────────────────────────
+  const handleSaveCroppedColorway = useCallback(() => {
+    if (!cropRect) return;
+    // Store the crop rect so the save modal flow captures the cropped snapshot
+    setShowSaveModal(true);
+  }, [cropRect]);
+
+  // ── Crop → Upload to catalog (admin only) ──────────────────────────────────
+  const [showCropUploadDialog, setShowCropUploadDialog] = useState(false);
+  const [cropUploadName, setCropUploadName] = useState("");
+
+  const handleUploadCroppedCatalog = useCallback(() => {
+    if (!cropRect) return;
+    setCropUploadName(`${design.name}_cropped`);
+    setShowCropUploadDialog(true);
+  }, [cropRect, design.name]);
+
+  const handleCropUploadConfirm = useCallback(async () => {
+    if (!cropRect) return;
+    setShowCropUploadDialog(false);
+    setUploadCroppedBusy(true);
+    try {
+      const res = await fetch("/api/admin/designs/crop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceDesignId: design.id,
+          cropRect,
+          name: cropUploadName || `${design.name}_cropped`,
+          collectionId: design.collection?.id ?? null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Upload failed");
+      }
+      const data = await res.json() as { design: { id: string } };
+      // Exit crop mode and notify
+      setIsCropping(false);
+      setCropRect(null);
+      alert(`Cropped design created successfully! ID: ${data.design.id}`);
+    } catch (err) {
+      console.error("[CropUpload] Failed:", err);
+      alert(`Failed to upload cropped design: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setUploadCroppedBusy(false);
+    }
+  }, [design.id, design.name, design.collection?.id, cropRect, cropUploadName]);
 
   // ── Order sheet download (client-side PDF) ──────────────────────────────────
   const [orderSheetBusy, setOrderSheetBusy] = useState(false);
@@ -938,6 +1005,16 @@ export default function DesignViewer({
         orderSheetBusy={orderSheetBusy}
         onUpdateCatalog={tierInfo.tier === "admin" ? () => setShowUpdateCatalogConfirm(true) : undefined}
         updateCatalogBusy={updateCatalogBusy}
+        isCropping={isCropping}
+        onToggleCrop={() => {
+          setIsCropping((v) => !v);
+          if (isCropping) setCropRect(null); // exiting crop mode clears selection
+        }}
+        cropRect={cropRect}
+        onCropChange={setCropRect}
+        onSaveCropped={handleSaveCroppedColorway}
+        onUploadCropped={tierInfo.tier === "admin" ? handleUploadCroppedCatalog : undefined}
+        uploadCroppedBusy={uploadCroppedBusy}
       />
 
       {/* Zone C — compact palette. Mobile: max-h-40 overflow-hidden; desktop: full height */}
@@ -1062,6 +1139,45 @@ export default function DesignViewer({
                 className="text-xs px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors"
               >
                 Update Catalog
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crop → Upload to Catalog dialog (admin only) */}
+      {showCropUploadDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+            <h3 className="text-sm font-semibold text-stone-900 mb-2">
+              Upload Cropped Design to Catalog
+            </h3>
+            <p className="text-xs text-stone-600 leading-relaxed mb-3">
+              This will create a new catalog design from the cropped region
+              ({cropRect?.w} &times; {cropRect?.h} px).
+            </p>
+            <label className="block text-xs font-medium text-stone-700 mb-1">
+              Design Name
+            </label>
+            <input
+              type="text"
+              value={cropUploadName}
+              onChange={(e) => setCropUploadName(e.target.value)}
+              className="w-full rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-400 mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowCropUploadDialog(false)}
+                className="text-xs px-4 py-2 rounded-lg border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCropUploadConfirm}
+                disabled={!cropUploadName.trim()}
+                className="text-xs px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              >
+                Upload to Catalog
               </button>
             </div>
           </div>
