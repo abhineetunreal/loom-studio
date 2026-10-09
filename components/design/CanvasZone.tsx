@@ -771,54 +771,8 @@ export default function CanvasZone({
             {tileMultiplier.toFixed(2)}×
           </span>
         </div>
-        <div className={`flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200 ${textureEnabled ? "" : "invisible pointer-events-none"}`}>
-          <span className="text-xs text-stone-500 whitespace-nowrap">Strength</span>
-          <input
-            type="range"
-            min={0}
-            max={1.5}
-            step={0.05}
-            value={textureStrength}
-            onChange={(e) => setTextureStrength(parseFloat(e.target.value))}
-            className="w-20 accent-stone-700"
-            aria-label="Texture strength"
-          />
-          <span className="w-8 text-right text-xs text-stone-500 tabular-nums">
-            {textureStrength.toFixed(2)}
-          </span>
-        </div>
         {hasPhotoColors && (
           <>
-            <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
-              <span className="text-xs text-stone-500 whitespace-nowrap">Swatch Scale</span>
-              <input
-                type="range"
-                min={0.1}
-                max={3.0}
-                step={0.05}
-                value={swatchScale}
-                onChange={(e) => setSwatchScale(parseFloat(e.target.value))}
-                className="w-20 accent-stone-700"
-                aria-label="Swatch scale"
-              />
-              <input
-                type="number"
-                min={0.1}
-                max={3.0}
-                step={0.05}
-                value={swatchScale}
-                onChange={(e) => setSwatchScale(e.target.value === "" ? swatchScale : parseFloat(e.target.value))}
-                onBlur={(e) => {
-                  const v = parseFloat(e.target.value);
-                  if (!isNaN(v)) setSwatchScale(Math.min(3.0, Math.max(0.1, v)));
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                className="w-14 text-xs text-stone-700 tabular-nums border border-stone-200 rounded px-1 py-0.5 text-right"
-                aria-label="Swatch scale value"
-              />
-            </div>
             <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-stone-200">
               <span className="text-xs text-stone-500 whitespace-nowrap">Sharpness</span>
               <input
