@@ -304,7 +304,7 @@ export default function YarnPicker({
       {/* ── Photo swatch preview modal ─────────────────────────────────── */}
       {previewYarn && previewYarn.swatchImageUrl && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
+          className="fixed inset-0 z-[100] flex items-center justify-center"
           onClick={() => setPreviewYarn(null)}
         >
           <div className="absolute inset-0 bg-black/50" />
