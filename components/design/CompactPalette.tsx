@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 type Props = {
@@ -136,11 +137,15 @@ export default function CompactPalette({
                 }`}
               >
                 {/* Swatch */}
-                <span
-                  className="w-6 h-6 rounded shrink-0 border border-black/10"
-                  style={{ backgroundColor: swatchHex }}
-                  aria-hidden
-                />
+                {assignedYarn?.renderType === "photo" && assignedYarn.swatchImageUrl ? (
+                  <PhotoSwatch url={assignedYarn.swatchImageUrl} hex={swatchHex} />
+                ) : (
+                  <span
+                    className="w-6 h-6 rounded shrink-0 border border-black/10"
+                    style={{ backgroundColor: swatchHex }}
+                    aria-hidden
+                  />
+                )}
                 {/* Code / label */}
                 <span
                   className={`text-[14px] flex-1 min-w-0 truncate ${
@@ -176,6 +181,30 @@ export default function CompactPalette({
       </ul>
 
     </div>
+  );
+}
+
+function PhotoSwatch({ url, hex }: { url: string; hex: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <span
+        className="w-6 h-6 rounded shrink-0 border border-black/10"
+        style={{ backgroundColor: hex }}
+        aria-hidden
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      onError={() => setFailed(true)}
+      className="w-6 h-6 rounded shrink-0 border border-black/10 object-cover"
+    />
   );
 }
 
