@@ -52,6 +52,7 @@ export default function YarnPicker({
   const [query, setQuery] = useState("");
   const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
+  const [previewYarn, setPreviewYarn] = useState<YarnOption | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Focus search on open
@@ -160,10 +161,11 @@ export default function YarnPicker({
           <div className="flex gap-1.5">
             {similarYarns.map((yarn) => {
               const isCurrent = currentYarn?.id === yarn.id;
+              const isPhoto = yarn.renderType === "photo" && !!yarn.swatchImageUrl;
               return (
                 <button
                   key={yarn.id}
-                  onClick={() => onPick(yarn)}
+                  onClick={() => isPhoto ? setPreviewYarn(yarn) : onPick(yarn)}
                   onMouseEnter={() => setHoveredYarn(yarn)}
                   onMouseLeave={() => setHoveredYarn(null)}
                   title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
@@ -255,10 +257,11 @@ export default function YarnPicker({
             >
               {libraryYarns.map((yarn) => {
                 const isCurrent = currentYarn?.id === yarn.id;
+                const isPhoto = yarn.renderType === "photo" && !!yarn.swatchImageUrl;
                 return (
                   <button
                     key={yarn.id}
-                    onClick={() => onPick(yarn)}
+                    onClick={() => isPhoto ? setPreviewYarn(yarn) : onPick(yarn)}
                     onMouseEnter={() => setHoveredYarn(yarn)}
                     onMouseLeave={() => setHoveredYarn(null)}
                     title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
@@ -297,6 +300,48 @@ export default function YarnPicker({
           )}
         </div>
       </div>
+
+      {/* ── Photo swatch preview modal ─────────────────────────────────── */}
+      {previewYarn && previewYarn.swatchImageUrl && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          onClick={() => setPreviewYarn(null)}
+        >
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="relative bg-white rounded-xl shadow-2xl p-4 flex flex-col items-center gap-3 max-w-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewYarn.swatchImageUrl}
+              alt={previewYarn.name}
+              className="w-[250px] h-[250px] rounded-lg object-cover"
+            />
+            <p className="text-sm font-medium text-stone-800">{previewYarn.name}</p>
+            {previewYarn.library && (
+              <p className="text-xs text-stone-500 -mt-2">{previewYarn.library}</p>
+            )}
+            <div className="flex gap-2 w-full">
+              <button
+                onClick={() => setPreviewYarn(null)}
+                className="flex-1 text-sm px-3 py-2 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  onPick(previewYarn);
+                  setPreviewYarn(null);
+                }}
+                className="flex-1 text-sm px-3 py-2 rounded-lg bg-stone-800 text-white hover:bg-stone-700 transition-colors"
+              >
+                Select
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

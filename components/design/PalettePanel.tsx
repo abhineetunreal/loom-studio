@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 type Props = {
@@ -82,11 +83,15 @@ function PaletteRow({
         }`}
       >
         {/* Single swatch — current color */}
-        <span
-          className="w-7 h-7 rounded-md shrink-0 border border-black/10 shadow-sm"
-          style={{ backgroundColor: swatchHex }}
-          aria-hidden
-        />
+        {assignedYarn?.renderType === "photo" && assignedYarn.swatchImageUrl ? (
+          <PhotoSwatch url={assignedYarn.swatchImageUrl} hex={swatchHex} />
+        ) : (
+          <span
+            className="w-7 h-7 rounded-md shrink-0 border border-black/10 shadow-sm"
+            style={{ backgroundColor: swatchHex }}
+            aria-hidden
+          />
+        )}
 
         {/* Center: yarn name + library, or hex for unmatched */}
         <span className="flex-1 min-w-0">
@@ -155,6 +160,30 @@ function PaletteRow({
         </button>
       )}
     </li>
+  );
+}
+
+function PhotoSwatch({ url, hex }: { url: string; hex: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <span
+        className="w-7 h-7 rounded-md shrink-0 border border-black/10 shadow-sm"
+        style={{ backgroundColor: hex }}
+        aria-hidden
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt=""
+      onError={() => setFailed(true)}
+      className="w-7 h-7 rounded-md shrink-0 border border-black/10 shadow-sm object-cover"
+    />
   );
 }
 
