@@ -318,7 +318,9 @@ export default function YarnPicker({
               alt={previewYarn.name}
               className="w-[250px] h-[250px] rounded-lg object-cover"
             />
-            <p className="text-sm font-medium text-stone-800">{previewYarn.name}</p>
+            <p className="text-sm font-medium text-stone-800">
+              <span className="font-mono text-stone-500">{previewYarn.code}</span> · {previewYarn.name}
+            </p>
             {previewYarn.library && (
               <p className="text-xs text-stone-500 -mt-2">{previewYarn.library}</p>
             )}
