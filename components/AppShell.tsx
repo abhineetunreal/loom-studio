@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import LeftPanel from "@/components/catalog/LeftPanel";
+import AiPromptBar from "@/components/ai/AiPromptBar";
+import { AiProvider } from "@/components/ai/AiContext";
 import { signOutAction } from "@/app/actions/auth";
 import type { DesignSummary, TierInfo } from "@/types";
 
@@ -45,8 +47,10 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
 
   const showBanner = tierInfo.tier === "demo";
 
+  const Wrapper = isPlatformUser ? AiProvider : ({ children: c }: { children: React.ReactNode }) => <>{c}</>;
+
   return (
-    <>
+    <Wrapper>
       {/* Admin "View as user" preview banner */}
       {previewAsEmail && (
         <div className="shrink-0 px-4 py-2 text-xs flex items-center justify-center gap-3 bg-violet-50 text-violet-800 border-b border-violet-200">
@@ -133,6 +137,9 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
         )}
       </header>
 
+      {/* AI prompt bar — super admin only */}
+      {isPlatformUser && <AiPromptBar />}
+
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <LeftPanel
           designs={designs}
@@ -146,7 +153,7 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
         />
         <main className="flex-1 overflow-y-auto min-w-0">{children}</main>
       </div>
-    </>
+    </Wrapper>
   );
 }
 

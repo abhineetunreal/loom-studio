@@ -12,6 +12,7 @@ import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
 import SaveModal from "./SaveModal";
 import type { DesignDetail, PaletteEntry, TierInfo, YarnOption } from "@/types";
+import { useAiDesignBridge } from "@/hooks/useAiDesignBridge";
 
 // ─── Operations JSON types ────────────────────────────────────────────────────
 
@@ -214,6 +215,21 @@ export default function DesignViewer({
   const [isCropping, setIsCropping] = useState(false);
   const [cropRect, setCropRect] = useState<CropRect | null>(null);
   const [uploadCroppedBusy, setUploadCroppedBusy] = useState(false);
+
+  // ── AI design bridge (registers design + handles AI actions) ─────────────────
+  useAiDesignBridge(design.id, {
+    onRecolorPreview: (presetUrl) => {
+      // Navigate to the AI-proposed preset URL to render the recolor
+      window.location.href = presetUrl;
+    },
+    onNavigateDesign: (navDesignId) => {
+      window.location.href = `/designs/${navDesignId}`;
+    },
+    onColorwaySaved: () => {
+      // Reload to show the newly saved colorway
+      window.location.reload();
+    },
+  });
 
   // Palette sorted by coverage — used to derive 1-based rank for the popover
   const sortedPalette = [...design.palette].sort((a, b) => b.percentage - a.percentage);

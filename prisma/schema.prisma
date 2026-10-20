@@ -362,3 +362,23 @@ model ShareApproval {
 
   @@index([shareLinkId])
 }
+
+// ─── AI Chat Sessions (multi-turn conversation state) ───────────────────────
+
+model AiSession {
+  id             String   @id @default(cuid())
+  tenantId       String
+  platformUserId String   // PlatformUser who started this session
+  title          String   @default("New session")
+  designId       String?  // currently active design in this session
+  model          String   @default("claude-sonnet-4-20250514")
+  messages       Json     @default("[]") // Array of {role, content} for conversation history
+  // Extracted trend profile from image analysis — reusable across sessions
+  trendProfile   Json?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([platformUserId])
+  @@index([tenantId])
+}
