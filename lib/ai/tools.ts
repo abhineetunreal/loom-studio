@@ -97,14 +97,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_yarn_palette",
     description:
-      "Fetch available yarn colors from a physical wool library. Each yarn has a code, display hex color, and whether photorealistic swatch textures are available. Use the Wool Colors library for the richest texture rendering.",
+      "Fetch available yarn colors from the tenant's physical yarn libraries. Each yarn has a code, display hex color, and whether photorealistic swatch textures are available. The response includes `availableLibraries` (the real library names for this tenant with counts) — call this with no library first to see what exists, then narrow if needed.",
     input_schema: {
       type: "object" as const,
       properties: {
         library: {
           type: "string",
           description:
-            'Yarn library name to browse (default: "Wool Colors"). Other libraries may include "OneLoom", "BM Classics", etc.',
+            "Yarn library name to browse. Optional — omit to return yarns from ALL of the tenant's libraries. Matched case-insensitively; if it doesn't match a real library the tool returns all libraries instead of an empty list. Check `availableLibraries` in the response for valid names.",
         },
         limit: {
           type: "number",
@@ -127,7 +127,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         },
         library: {
           type: "string",
-          description: 'Yarn library to search within (default: "Wool Colors").',
+          description:
+            "Yarn library to search within. Optional — omit to search across ALL of the tenant's yarns. Matched case-insensitively; falls back to all libraries if it doesn't match a real one.",
         },
         limit: {
           type: "number",
@@ -420,14 +421,38 @@ async function handleGetYarnPalette(
     library?: string;
     limit?: number;
   };
-  const library = rawLibrary ?? "Wool Colors";
   const limit = Math.min(Math.max(rawLimit ?? 200, 1), 500);
+
+  // Discover the libraries this tenant actually has. Library names vary per
+  // tenant (e.g. "OneLoom", "Wool Colors") and some yarns have no material set,
+  // so we never hardcode a default — we resolve the request against real data.
+  const grouped = await db.yarnColor.groupBy({
+    by: ["material"],
+    where: { tenantId: ctx.tenantId, isActive: true },
+    _count: { _all: true },
+  });
+  const availableLibraries = grouped
+    .map((g) => ({ name: g.material ?? "(unnamed)", count: g._count._all }))
+    .sort((a, b) => b.count - a.count);
+
+  // Match the requested library case-insensitively; if it doesn't match any
+  // real library (or none was requested), return all libraries' yarns so the
+  // model always has colors to work with instead of an empty list.
+  let effectiveMaterial: string | null = null;
+  if (rawLibrary) {
+    const match = grouped.find(
+      (g) => (g.material ?? "").toLowerCase() === rawLibrary.toLowerCase(),
+    );
+    effectiveMaterial = match?.material ?? null;
+  }
+
+  const materialFilter = effectiveMaterial ? { material: effectiveMaterial } : {};
 
   const yarns = await db.yarnColor.findMany({
     where: {
       tenantId: ctx.tenantId,
       isActive: true,
-      material: library,
+      ...materialFilter,
     },
     select: {
       code: true,
@@ -442,7 +467,7 @@ async function handleGetYarnPalette(
   });
 
   const total = await db.yarnColor.count({
-    where: { tenantId: ctx.tenantId, isActive: true, material: library },
+    where: { tenantId: ctx.tenantId, isActive: true, ...materialFilter },
   });
 
   const result = yarns.map((y) => ({
@@ -455,7 +480,14 @@ async function handleGetYarnPalette(
   }));
 
   return JSON.stringify(
-    { library, yarns: result, total, showing: result.length },
+    {
+      requestedLibrary: rawLibrary ?? null,
+      library: effectiveMaterial, // null = showing all libraries
+      availableLibraries,
+      yarns: result,
+      total,
+      showing: result.length,
+    },
     null,
     2,
   );
@@ -476,15 +508,30 @@ async function handleSearchYarnsByColor(
   }
 
   const normalizedTarget = targetHex.startsWith("#") ? targetHex : `#${targetHex}`;
-  const library = rawLibrary ?? "Wool Colors";
   const limit = Math.min(Math.max(rawLimit ?? 10, 1), 50);
 
-  // Fetch all yarns from the library
+  // Resolve the requested library against real data (case-insensitive); if it
+  // doesn't match or none was given, search across ALL of the tenant's yarns so
+  // we never return an empty match set because of a library-name mismatch.
+  let effectiveMaterial: string | null = null;
+  if (rawLibrary) {
+    const match = await db.yarnColor.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        isActive: true,
+        material: { equals: rawLibrary, mode: "insensitive" },
+      },
+      select: { material: true },
+    });
+    effectiveMaterial = match?.material ?? null;
+  }
+
+  // Fetch candidate yarns (the resolved library, or all libraries)
   const yarns = await db.yarnColor.findMany({
     where: {
       tenantId: ctx.tenantId,
       isActive: true,
-      material: library,
+      ...(effectiveMaterial ? { material: effectiveMaterial } : {}),
     },
     select: {
       code: true,
@@ -511,7 +558,8 @@ async function handleSearchYarnsByColor(
   return JSON.stringify(
     {
       targetHex: normalizedTarget,
-      library,
+      requestedLibrary: rawLibrary ?? null,
+      library: effectiveMaterial, // null = searched all libraries
       matches: scored.slice(0, limit),
     },
     null,
