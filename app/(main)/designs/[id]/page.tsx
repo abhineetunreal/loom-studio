@@ -217,17 +217,27 @@ export default async function DesignPage({ params, searchParams }: Props) {
       const failures: { originalCode: string; replacementCode: string; reason: string }[] = [];
 
       for (const { originalCode, replacementCode } of pairs) {
-        // Find the renderedHex for the original yarn code
-        const renderedHex = codeLookup.get(originalCode);
-        if (!renderedHex) {
-          failures.push({ originalCode, replacementCode, reason: "color_lookup_not_found" });
-          continue;
+        // The original token may be a ColorLookup yarn code OR a raw palette
+        // hex. Accepting hex originals lets designs whose palette isn't mapped
+        // in ColorLookup (most imported designs) still be recolored.
+        let paletteHex: string | undefined;
+
+        const maybeHex = originalCode.startsWith("#")
+          ? originalCode.toLowerCase()
+          : `#${originalCode.toLowerCase()}`;
+        if (/^#[0-9a-f]{6}$/.test(maybeHex)) {
+          // Direct hex original — match it straight against the palette
+          paletteHex = palette.find((e) => e.hex.toLowerCase() === maybeHex)?.hex;
         }
 
-        // Find the palette entry that uses this renderedHex (case-insensitive)
-        const paletteHex = palette.find(
-          (e) => e.hex.toLowerCase() === renderedHex
-        )?.hex;
+        if (!paletteHex) {
+          // Otherwise treat it as a ColorLookup code → renderedHex → palette hex
+          const renderedHex = codeLookup.get(originalCode);
+          if (renderedHex) {
+            paletteHex = palette.find((e) => e.hex.toLowerCase() === renderedHex)?.hex;
+          }
+        }
+
         if (!paletteHex) {
           failures.push({ originalCode, replacementCode, reason: "original_not_found" });
           continue;

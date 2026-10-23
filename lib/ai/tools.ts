@@ -159,7 +159,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
               fromYarnCode: {
                 type: "string",
                 description:
-                  "Original yarn code from the design's palette (e.g. 'OU 49'). Use short codes from the design's colors list.",
+                  "The design color to replace, taken from get_design's colors list. Use that color's `yarnCode` when it is present; if `yarnCode` is null (the design isn't mapped in ColorLookup), use its `hex` instead (e.g. '#b3b8bb'). Both are accepted.",
               },
               toYarnCode: {
                 type: "string",
@@ -652,15 +652,6 @@ async function handleProposeRecolor(
       });
       continue;
     }
-    const canonicalFromCode = hexToCode.get(fromHex);
-    if (!canonicalFromCode) {
-      invalidSwaps.push({
-        from: swap.fromYarnCode,
-        to: swap.toYarnCode,
-        reason: `Design color '${swap.fromYarnCode}' has no ColorLookup yarn code, so it can't be swapped via preset.`,
-      });
-      continue;
-    }
     if (!validReplacementSet.has(swap.toYarnCode)) {
       invalidSwaps.push({
         from: swap.fromYarnCode,
@@ -669,10 +660,14 @@ async function handleProposeRecolor(
       });
       continue;
     }
+    // Prefer the ColorLookup code (compact and works everywhere); fall back to
+    // the raw palette hex for designs not mapped in ColorLookup — the preview
+    // resolver accepts hex originals too, so every design is recolorable.
+    const originalToken = hexToCode.get(fromHex) ?? fromHex;
     validPairs.push(
-      `${encodeURIComponent(canonicalFromCode)}>${encodeURIComponent(swap.toYarnCode)}`,
+      `${encodeURIComponent(originalToken)}>${encodeURIComponent(swap.toYarnCode)}`,
     );
-    validSwapDetails.push({ from: canonicalFromCode, to: swap.toYarnCode });
+    validSwapDetails.push({ from: originalToken, to: swap.toYarnCode });
   }
 
   const presetParam = validPairs.join(",");
