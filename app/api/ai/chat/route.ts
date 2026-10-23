@@ -86,6 +86,17 @@ export async function POST(request: NextRequest) {
     { role: "user", content: userContent },
   ];
 
+  // ── Inject the active design context ───────────────────────────────────────
+  // The editor sends the design currently open on screen. Tell the model about
+  // it so "this design" / "the same" / a bare recolor instruction resolves to
+  // the open design instead of making the model guess with list_designs.
+  const systemPrompt = body.designId
+    ? `${AI_SYSTEM_PROMPT}
+
+## Active Design (IMPORTANT)
+The user currently has design ID "${body.designId}" open in the editor right now. When they say "this design", "the same", "it", "this rug", or give a recolor/color instruction without naming a design, they mean THIS design. Before proposing any recolor, call get_design with id "${body.designId}" to load its current palette. Do NOT call list_designs to guess which design they mean — you already know it.`
+    : AI_SYSTEM_PROMPT;
+
   // ── Run the agentic loop (tool use) ────────────────────────────────────────
   // Stream the response with Server-Sent Events so the UI gets incremental updates
   const encoder = new TextEncoder();
@@ -113,7 +124,7 @@ export async function POST(request: NextRequest) {
           const response = await anthropic.messages.create({
             model: AI_MODEL,
             max_tokens: AI_MAX_TOKENS,
-            system: AI_SYSTEM_PROMPT,
+            system: systemPrompt,
             tools: AI_TOOLS as Anthropic.Tool[],
             messages: currentMessages,
           });
