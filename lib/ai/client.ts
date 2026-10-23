@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // Default model — Claude Sonnet for good reasoning about color theory & design
-export const AI_MODEL = "claude-sonnet-4-5-20250929";
+export const AI_MODEL = "claude-sonnet-4-6";
 
 // Max tokens per response
 export const AI_MAX_TOKENS = 4096;
