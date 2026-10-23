@@ -341,7 +341,11 @@ async function handleGetDesign(
       hex: c.hex,
       percentage: Math.round(c.percentage * 10) / 10,
       paletteIndex: c.index,
-      yarnCode: c.matchedYarnCode ?? hexToYarnCode.get(c.hex.toLowerCase()) ?? null,
+      // Prefer the ColorLookup code — that is the "original code" the preset
+      // resolver (/designs/[id]?preset=) understands. matchedYarnCode is only a
+      // fallback and may not exist in ColorLookup, which would make a swap
+      // silently fail to apply.
+      yarnCode: hexToYarnCode.get(c.hex.toLowerCase()) ?? c.matchedYarnCode ?? null,
     }));
 
   const wFt = design.width ? (design.width / 120).toFixed(1) : null;
@@ -540,23 +544,38 @@ async function handleProposeRecolor(
     return JSON.stringify({ error: "Design not found." });
   }
 
-  // Get all ColorLookup entries for this tenant to map yarn codes to rendered hex
+  // Build the maps the preset resolver (/designs/[id]?preset=) actually uses:
+  // the "original" side of each pair must be a ColorLookup yarn code, which the
+  // page maps code -> renderedHex -> palette hex. We canonicalize whatever the
+  // model passed (a ColorLookup code, a palette matchedYarnCode, or a raw hex)
+  // into the ColorLookup code, and reject anything that cannot resolve — so we
+  // never emit a preset URL that navigates but applies zero swaps.
   const lookups = await db.colorLookup.findMany({
     where: { tenantId: ctx.tenantId },
     select: { renderedHex: true, yarnCode: true },
   });
-  // Build yarn code → rendered hex (reverse lookup)
-  const yarnCodeToRenderedHex = new Map<string, string>();
+  const codeToHex = new Map<string, string>(); // ColorLookup code (lower) -> hex (lower)
+  const hexToCode = new Map<string, string>(); // hex (lower) -> ColorLookup code (original case)
   for (const l of lookups) {
-    yarnCodeToRenderedHex.set(l.yarnCode.toLowerCase(), l.renderedHex);
+    const hx = l.renderedHex.toLowerCase();
+    codeToHex.set(l.yarnCode.toLowerCase(), hx);
+    if (!hexToCode.has(hx)) hexToCode.set(hx, l.yarnCode);
   }
 
-  // Also check matchedYarnCode from palette entries
   const palette = (design.palette as PaletteEntry[]) ?? [];
+  const paletteHexes = new Set(palette.map((p) => p.hex.toLowerCase()));
+  const matchedToHex = new Map<string, string>();
   for (const p of palette) {
-    if (p.matchedYarnCode) {
-      yarnCodeToRenderedHex.set(p.matchedYarnCode.toLowerCase(), p.hex);
-    }
+    if (p.matchedYarnCode) matchedToHex.set(p.matchedYarnCode.toLowerCase(), p.hex.toLowerCase());
+  }
+
+  // Resolve the model's "from" reference to the hex of the design color it means.
+  function resolveFromHex(from: string): string | null {
+    const f = from.toLowerCase();
+    if (codeToHex.has(f)) return codeToHex.get(f)!; // a ColorLookup code
+    if (matchedToHex.has(f)) return matchedToHex.get(f)!; // a palette matchedYarnCode
+    if (paletteHexes.has(f)) return f; // a raw hex already in the palette
+    return null;
   }
 
   // Verify all replacement yarn codes exist
@@ -573,14 +592,24 @@ async function handleProposeRecolor(
 
   const validPairs: string[] = [];
   const invalidSwaps: Array<{ from: string; to: string; reason: string }> = [];
+  const validSwapDetails: Array<{ from: string; to: string }> = [];
 
   for (const swap of colorSwaps) {
-    const fromLower = swap.fromYarnCode.toLowerCase();
-    if (!yarnCodeToRenderedHex.has(fromLower)) {
+    const fromHex = resolveFromHex(swap.fromYarnCode);
+    if (!fromHex || !paletteHexes.has(fromHex)) {
       invalidSwaps.push({
         from: swap.fromYarnCode,
         to: swap.toYarnCode,
-        reason: `Original yarn code '${swap.fromYarnCode}' not found in this design's palette.`,
+        reason: `Original color '${swap.fromYarnCode}' not found in this design's palette.`,
+      });
+      continue;
+    }
+    const canonicalFromCode = hexToCode.get(fromHex);
+    if (!canonicalFromCode) {
+      invalidSwaps.push({
+        from: swap.fromYarnCode,
+        to: swap.toYarnCode,
+        reason: `Design color '${swap.fromYarnCode}' has no ColorLookup yarn code, so it can't be swapped via preset.`,
       });
       continue;
     }
@@ -593,22 +622,15 @@ async function handleProposeRecolor(
       continue;
     }
     validPairs.push(
-      `${encodeURIComponent(swap.fromYarnCode)}>${encodeURIComponent(swap.toYarnCode)}`,
+      `${encodeURIComponent(canonicalFromCode)}>${encodeURIComponent(swap.toYarnCode)}`,
     );
+    validSwapDetails.push({ from: canonicalFromCode, to: swap.toYarnCode });
   }
 
   const presetParam = validPairs.join(",");
   const presetUrl = validPairs.length
     ? `/designs/${designId}?preset=${presetParam}`
     : null;
-
-  // Build the validated swap list for the UI hook
-  const validSwapDetails = colorSwaps
-    .filter((swap) => {
-      const fromLower = swap.fromYarnCode.toLowerCase();
-      return yarnCodeToRenderedHex.has(fromLower) && validReplacementSet.has(swap.toYarnCode);
-    })
-    .map((swap) => ({ from: swap.fromYarnCode, to: swap.toYarnCode }));
 
   return JSON.stringify(
     {
