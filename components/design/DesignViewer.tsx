@@ -1161,6 +1161,7 @@ export default function DesignViewer({
             onOpenPicker={handlePopoverOpenPicker}
             onDismiss={() => setCanvasPick(null)}
             tierInfo={tierInfo}
+            yarnLibraryName={yarnLibraryName}
           />
         );
       })()}
