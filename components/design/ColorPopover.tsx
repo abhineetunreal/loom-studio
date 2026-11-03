@@ -128,8 +128,8 @@ export default function ColorPopover({
 
         {/* ── Current yarn body ────────────────────────────────────────────── */}
         <div className={`flex items-center gap-2 px-3 py-2.5 ${!isChanged ? "pt-3 pr-8" : ""}`}>
-          {/* Rank only in unchanged state (no reference line above) */}
-          {!isChanged && (
+          {/* Rank only in unchanged state (no reference line above); hide for region fills (rank 0) */}
+          {!isChanged && paletteRank > 0 && (
             <span className="text-xs font-semibold text-stone-400 w-5 shrink-0 tabular-nums">
               #{paletteRank}
             </span>

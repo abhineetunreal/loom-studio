@@ -123,6 +123,8 @@ export type RecolorCanvasHandle = {
   undoRegionFill: () => boolean;
   /** Clear all region-fill overrides and the undo stack. */
   clearRegionFills: () => void;
+  /** Add a hex value to the valid click-pick set (called when region fills introduce new colors). */
+  addToPaletteHexSet: (hex: string) => void;
   /**
    * Returns a data URL of the cropped region from the current rendered canvas
    * (with all recoloring and texture applied).
@@ -201,7 +203,8 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   const offscreenRef = useRef<OffscreenCanvas | null>(null);
   // Bumped when the image finishes loading so the render effect re-fires with real pixels.
   const [pixelsVersion, setPixelsVersion] = useState(0);
-  // Set of valid palette hex values for fast lookup on click
+  // Set of valid palette hex values for fast lookup on click.
+  // Initialized from original palette; updated via addToPaletteHexSet() after region fills.
   const paletteHexSet = useRef<Set<string>>(new Set(palette.map((e) => e.hex)));
   // Guard: only call onRenderComplete once per design load
   const renderCompleteFired = useRef(false);
@@ -302,6 +305,9 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       regionUndoStackRef.current = [];
       onRegionClear?.();
       setOverrideVersion((v) => v + 1);
+    },
+    addToPaletteHexSet(hex: string) {
+      paletteHexSet.current.add(hex);
     },
     getCroppedSnapshot(
       cropRect: { x: number; y: number; w: number; h: number },
@@ -687,7 +693,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
 
-  // ── Click/touch: pick color from original pixel data ────────────────────────
+  // ── Click/touch: pick color from pixel data (override-aware) ───────────────
   function pickColorAt(clientX: number, clientY: number) {
     const canvas = canvasRef.current;
     const pixels = originalPixels.current;
@@ -703,12 +709,25 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
     if (x < 0 || y < 0 || x >= width || y >= height) return;
 
-    const i = (y * width + x) * 4;
-    const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+    const pixelIdx = y * width + x;
+    const i = pixelIdx * 4;
     const a = pixels[i + 3];
     if (a === 0) return; // transparent pixel — ignore
 
-    const hex = rgbToHex(r, g, b);
+    // Check override layer first: if this pixel was region-filled, use the
+    // override color instead of the original palette color.
+    const overrideRgb = overrideLayerRef.current.get(pixelIdx);
+    let hex: string;
+    if (overrideRgb !== undefined) {
+      const or = (overrideRgb >> 16) & 0xFF;
+      const og = (overrideRgb >> 8) & 0xFF;
+      const ob = overrideRgb & 0xFF;
+      hex = rgbToHex(or, og, ob);
+    } else {
+      const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+      hex = rgbToHex(r, g, b);
+    }
+
     // Only pick colors that are in the design palette — ignore click misses
     if (paletteHexSet.current.has(hex)) {
       onColorPick(hex, clientX, clientY);

@@ -257,6 +257,13 @@ export default function DesignViewer({
 
   const totalPixels = design.palette.reduce((s, e) => s + e.pixelCount, 0);
 
+  /** Look up the yarn used for a region-fill color by its hex. */
+  function lookupRegionYarn(hex: string): YarnOption | null {
+    const { r, g, b } = hexToRgbLocal(hex);
+    const packed = (r << 16) | (g << 8) | b;
+    return overrideYarnByRgbRef.current.get(packed) ?? null;
+  }
+
   /** Convert a packed 24-bit RGB int to "#rrggbb". */
   function packedToHex(packed: number): string {
     const r = (packed >> 16) & 0xFF;
@@ -326,6 +333,11 @@ export default function DesignViewer({
     // All affected pixels now display newRgb
     overrideDisplayCount.set(delta.newRgb, (overrideDisplayCount.get(delta.newRgb) ?? 0) + delta.pixelCount);
     overrideYarnByRgbMap.set(delta.newRgb, delta.yarn);
+
+    // Ensure the new color's hex is in the canvas click-pick set so clicking
+    // on region-filled pixels is recognized (not silently ignored).
+    const newHex = packedToHex(delta.newRgb);
+    canvasRef.current?.addToPaletteHexSet(newHex);
 
     // Track operation for operations JSON
     regionFillHistoryRef.current.push({
@@ -1062,12 +1074,12 @@ export default function DesignViewer({
           targetEntry={
             recolorMode === "region"
               ? null // no palette-color context in region mode
-              : (selectedHex ? (design.palette.find((e) => e.hex === selectedHex) ?? null) : null)
+              : (selectedHex ? (effectivePalette.find((e) => e.hex === selectedHex) ?? design.palette.find((e) => e.hex === selectedHex) ?? null) : null)
           }
           currentYarn={
             recolorMode === "region"
               ? selectedFillYarn
-              : (selectedHex ? (recolor.current[selectedHex] ?? null) : null)
+              : (selectedHex ? (recolor.current[selectedHex] ?? lookupRegionYarn(selectedHex) ?? null) : null)
           }
           onPick={handleYarnPick}
           tierInfo={tierInfo}
@@ -1079,13 +1091,14 @@ export default function DesignViewer({
       {/* Mobile: YarnPicker bottom sheet */}
 
       {selectedHex && (() => {
-        const entry = design.palette.find((e) => e.hex === selectedHex);
+        const entry = effectivePalette.find((e) => e.hex === selectedHex)
+          ?? design.palette.find((e) => e.hex === selectedHex);
         return entry ? (
           <div className="md:hidden">
             <YarnPicker
               yarns={yarns}
               targetEntry={entry}
-              currentYarn={recolor.current[selectedHex] ?? null}
+              currentYarn={recolor.current[selectedHex] ?? lookupRegionYarn(selectedHex) ?? null}
               onPick={handleYarnPick}
               onClose={handlePickerClose}
               tierInfo={tierInfo}
@@ -1115,16 +1128,34 @@ export default function DesignViewer({
 
       {/* ColorPopover */}
       {canvasPick && (() => {
-        const entry = design.palette.find((e) => e.hex === canvasPick.hex);
+        // Search effectivePalette (includes region-fill entries) instead of
+        // design.palette so that clicking a region-filled area finds the entry.
+        const entry = effectivePalette.find((e) => e.hex === canvasPick.hex)
+          ?? design.palette.find((e) => e.hex === canvasPick.hex);
         if (!entry) return null;
+
+        const isRegionFillEntry = entry.index === -1;
+
+        // For region-fill entries, resolve the yarn from the override tracking ref
+        // instead of the global colorMap (which has no entry for region-fill colors).
+        let assignedYarn: YarnOption | null = null;
+        if (isRegionFillEntry) {
+          const { r, g, b } = hexToRgbLocal(canvasPick.hex);
+          const packed = (r << 16) | (g << 8) | b;
+          assignedYarn = overrideYarnByRgbRef.current.get(packed) ?? null;
+        } else {
+          assignedYarn = recolor.current[canvasPick.hex] ?? null;
+        }
+
         return (
           <ColorPopover
             entry={entry}
-            paletteRank={
-              sortedPalette.findIndex((e) => e.hex === canvasPick.hex) + 1
+            paletteRank={isRegionFillEntry
+              ? 0 // region-fill entries have no rank in the original palette
+              : sortedPalette.findIndex((e) => e.hex === canvasPick.hex) + 1
             }
-            assignedYarn={recolor.current[canvasPick.hex] ?? null}
-            initialYarn={initialColorMap?.[canvasPick.hex] ?? null}
+            assignedYarn={assignedYarn}
+            initialYarn={isRegionFillEntry ? null : (initialColorMap?.[canvasPick.hex] ?? null)}
             clientX={canvasPick.clientX}
             clientY={canvasPick.clientY}
             onOpenPicker={handlePopoverOpenPicker}
