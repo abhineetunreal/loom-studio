@@ -32,6 +32,7 @@ type Props = {
   onClose: () => void;
   tierInfo: TierInfo;
   yarnLibraryName: string;
+  initialLibrary?: string;
 };
 
 export default function YarnPicker({
@@ -42,13 +43,16 @@ export default function YarnPicker({
   onClose,
   tierInfo,
   yarnLibraryName,
+  initialLibrary,
 }: Props) {
   // Unique library values present in the yarn list (preserving first-seen order)
   const libraries = useMemo(
     () => [...new Set(yarns.map((y) => y.library ?? "").filter(Boolean))],
     [yarns]
   );
-  const [library, setLibrary] = useState<string>(() => libraries[0] ?? "");
+  const [library, setLibrary] = useState<string>(() =>
+    initialLibrary && libraries.includes(initialLibrary) ? initialLibrary : libraries[0] ?? ""
+  );
   const [query, setQuery] = useState("");
   const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);

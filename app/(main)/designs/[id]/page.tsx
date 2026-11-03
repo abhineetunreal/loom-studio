@@ -39,12 +39,12 @@ function loadRenderedLookup(): Map<string, string> {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ colorway?: string; preset?: string }>;
+  searchParams: Promise<{ colorway?: string; preset?: string; library?: string }>;
 };
 
 export default async function DesignPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { colorway: colorwayId, preset: presetRaw } = await searchParams;
+  const { colorway: colorwayId, preset: presetRaw, library: libraryParam } = await searchParams;
 
   // Resolve tenant first (cached after first call) so the yarn query can be scoped.
   const tenant = await getCurrentTenant();
@@ -303,6 +303,7 @@ export default async function DesignPage({ params, searchParams }: Props) {
         isUserUpload={!!design.uploadedById}
         tierInfo={tierInfo}
         yarnLibraryName={tenant?.displayName ?? tenant?.name ?? ""}
+        initialLibrary={libraryParam}
         brandLogoUrl={tenant?.logoUrl ?? undefined}
         viewProductUrl={viewProductUrl}
         customerName={(session?.user?.user_metadata?.full_name as string | undefined) ?? session?.user?.email ?? undefined}

@@ -141,6 +141,7 @@ type Props = {
   tierInfo: TierInfo;
   /** Display name for the yarn library — derived from the tenant's displayName/name. */
   yarnLibraryName: string;
+  initialLibrary?: string;
   /** Brand logo URL for PDF order sheets. */
   brandLogoUrl?: string;
   /** Full URL to the product page on the brand's website, if available. */
@@ -166,6 +167,7 @@ export default function DesignViewer({
   isUserUpload,
   tierInfo,
   yarnLibraryName,
+  initialLibrary,
   brandLogoUrl,
   viewProductUrl,
   customerName,
@@ -1070,10 +1072,12 @@ export default function DesignViewer({
           onPick={handleYarnPick}
           tierInfo={tierInfo}
           yarnLibraryName={yarnLibraryName}
+          initialLibrary={initialLibrary}
         />
       </div>
 
       {/* Mobile: YarnPicker bottom sheet */}
+
       {selectedHex && (() => {
         const entry = design.palette.find((e) => e.hex === selectedHex);
         return entry ? (
@@ -1086,10 +1090,28 @@ export default function DesignViewer({
               onClose={handlePickerClose}
               tierInfo={tierInfo}
               yarnLibraryName={yarnLibraryName}
+              initialLibrary={initialLibrary}
             />
           </div>
         ) : null;
       })()}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       {/* ColorPopover */}
       {canvasPick && (() => {
@@ -1108,7 +1130,6 @@ export default function DesignViewer({
             onOpenPicker={handlePopoverOpenPicker}
             onDismiss={() => setCanvasPick(null)}
             tierInfo={tierInfo}
-            yarnLibraryName={yarnLibraryName}
           />
         );
       })()}

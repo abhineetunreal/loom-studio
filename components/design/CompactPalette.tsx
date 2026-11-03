@@ -115,7 +115,7 @@ export default function CompactPalette({
           // Some yarn libraries store codes as "LibraryName:N_Code" (e.g. "OneLoom:5_BM-813").
           // Strip the library prefix and grid position so only the bare code is shown.
           const isRegionFillEntry = entry.index === -1;
-          const rawCode = !isRegionFillEntry && (isDemo || (isUserUpload && !assignedYarn))
+          const rawCode = !isRegionFillEntry && ((isDemo && !assignedYarn) || (isUserUpload && !assignedYarn))
             ? `Color ${i + 1}`
             : (assignedYarn?.code ?? entry.matchedYarnCode ?? entry.hex.toUpperCase());
           // Strip "Library:N_" or "Library:N_X " prefix if present

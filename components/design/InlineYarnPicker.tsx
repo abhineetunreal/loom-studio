@@ -23,6 +23,7 @@ type Props = {
   onPick: (yarn: YarnOption) => void;
   tierInfo: TierInfo;
   yarnLibraryName: string;
+  initialLibrary?: string;
 };
 
 export default function InlineYarnPicker({
@@ -32,13 +33,16 @@ export default function InlineYarnPicker({
   onPick,
   tierInfo,
   yarnLibraryName,
+  initialLibrary,
 }: Props) {
   // Unique library values present in the yarn list (preserving first-seen order)
   const libraries = useMemo(
     () => [...new Set(yarns.map((y) => y.library ?? "").filter(Boolean))],
     [yarns]
   );
-  const [library, setLibrary] = useState<string>(() => libraries[0] ?? "");
+  const [library, setLibrary] = useState<string>(() =>
+    initialLibrary && libraries.includes(initialLibrary) ? initialLibrary : libraries[0] ?? ""
+  );
   const [search, setSearch] = useState("");
   const isDemo = tierInfo.tier === "demo";
   const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
@@ -79,11 +83,9 @@ export default function InlineYarnPicker({
                 style={{ backgroundColor: targetEntry.hex }}
                 aria-hidden
               />
-              {!isDemo && (
-                <span className="text-[9px] font-mono text-stone-500">
-                  {targetEntry.hex.toUpperCase()}
-                </span>
-              )}
+              <span className="text-[9px] font-mono text-stone-500">
+                {targetEntry.hex.toUpperCase()}
+              </span>
               <span className="text-[9px] text-stone-400">
                 {targetEntry.percentage.toFixed(1)}%
               </span>
@@ -102,7 +104,7 @@ export default function InlineYarnPicker({
                   <button
                     key={yarn.id}
                     onClick={() => onPick(yarn)}
-                    title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
+                    title={`${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
                     className={`w-6 h-6 rounded-sm border-2 transition-colors overflow-hidden ${
@@ -129,40 +131,36 @@ export default function InlineYarnPicker({
           </div>
         )}
 
-        {/* Library selector — hidden in demo tier */}
-        {!isDemo && (
-          libraries.length > 1 ? (
-            <select
-              value={library}
-              onChange={(e) => {
-                setLibrary(e.target.value);
-                setSearch("");
-              }}
-              className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
-            >
-              {libraries.map((lib) => (
-                <option key={lib} value={lib}>
-                  {lib}
-                </option>
-              ))}
-            </select>
-          ) : yarnLibraryName ? (
-            <p className="text-[9px] px-2 py-0.5 text-stone-500 border-b border-stone-200 bg-stone-50">
-              {yarnLibraryName}
-            </p>
-          ) : null
-        )}
+        {/* Library selector */}
+        {libraries.length > 1 ? (
+          <select
+            value={library}
+            onChange={(e) => {
+              setLibrary(e.target.value);
+              setSearch("");
+            }}
+            className="text-[9px] px-1 py-0.5 w-full border-b border-stone-200 bg-stone-50 focus:outline-none"
+          >
+            {libraries.map((lib) => (
+              <option key={lib} value={lib}>
+                {lib}
+              </option>
+            ))}
+          </select>
+        ) : yarnLibraryName ? (
+          <p className="text-[9px] px-2 py-0.5 text-stone-500 border-b border-stone-200 bg-stone-50">
+            {yarnLibraryName}
+          </p>
+        ) : null}
 
-        {/* Search — hidden in demo tier */}
-        {!isDemo && (
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
-            className="text-[9px] px-2 py-1 border-b border-stone-200 w-full placeholder:text-stone-400 focus:outline-none bg-white"
-          />
-        )}
+        {/* Search */}
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search…"
+          className="text-[9px] px-2 py-1 border-b border-stone-200 w-full placeholder:text-stone-400 focus:outline-none bg-white"
+        />
       </div>
 
       {/* Scrollable swatch grid */}
@@ -179,7 +177,7 @@ export default function InlineYarnPicker({
                   onClick={() => onPick(yarn)}
                   onMouseEnter={() => setHoveredYarn(yarn)}
                   onMouseLeave={() => setHoveredYarn(null)}
-                  title={isDemo ? undefined : `${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
+                  title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                   aria-label={yarn.name}
                   aria-pressed={isCurrent}
                   className={`flex flex-col items-center gap-[1px] rounded-[2px] border-2 p-[2px] transition-colors ${
@@ -203,11 +201,9 @@ export default function InlineYarnPicker({
                       />
                     )}
                   </span>
-                  {!isDemo && (
-                    <span className="text-[7px] leading-tight text-stone-500 font-mono truncate w-full text-center">
-                      {yarn.code}
-                    </span>
-                  )}
+                  <span className="text-[7px] leading-tight text-stone-500 font-mono truncate w-full text-center">
+                    {yarn.code}
+                  </span>
                 </button>
               );
             })}
