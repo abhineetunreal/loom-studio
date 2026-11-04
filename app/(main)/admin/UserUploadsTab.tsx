@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
+// Plain <img> — avoids /_next/image 400s on Vercel cold starts
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -162,12 +162,13 @@ function UploadCard({
       {/* Original design thumbnail — links to the canvas */}
       <Link href={`/designs/${design.id}`} className="block group">
         <div className="aspect-square relative bg-stone-100">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={design.imageUrl}
             alt={design.name}
-            fill
-            sizes="220px"
+            loading="lazy"
             className="object-contain p-1.5 group-hover:opacity-90 transition-opacity"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           />
         </div>
       </Link>

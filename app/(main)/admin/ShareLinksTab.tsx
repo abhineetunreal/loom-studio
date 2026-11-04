@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Image from "next/image";
+// Plain <img> — avoids /_next/image 400s on Vercel cold starts
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -193,12 +193,14 @@ function ShareLinkRow({
     <div className={`bg-white border border-stone-200 rounded-lg px-4 py-3 flex items-center gap-4 ${busy ? "opacity-50" : ""}`}>
       {/* Design thumbnail */}
       <div className="w-10 h-10 rounded bg-stone-100 overflow-hidden shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         {link.primaryDesign.imageUrl && (
-          <Image
+          <img
             src={link.primaryDesign.imageUrl}
             alt={link.primaryDesign.name}
             width={40}
             height={40}
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         )}
@@ -563,11 +565,13 @@ function CreateShareLinkModal({
             {selectedPrimaryDesign ? (
               <div className="flex items-center gap-3 p-2 border border-stone-200 rounded-lg bg-stone-50">
                 <div className="w-8 h-8 rounded bg-stone-200 overflow-hidden shrink-0">
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={selectedPrimaryDesign.imageUrl}
                     alt={selectedPrimaryDesign.name}
                     width={32}
                     height={32}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -601,7 +605,8 @@ function CreateShareLinkModal({
                         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-stone-50 transition-colors"
                       >
                         <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
-                          <Image src={d.imageUrl} alt={d.name} width={24} height={24} className="w-full h-full object-cover" />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={d.imageUrl} alt={d.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                         </div>
                         <span className="text-sm text-stone-800 truncate">{d.name}</span>
                         {d.externalSku && (
@@ -663,7 +668,8 @@ function CreateShareLinkModal({
                     className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-stone-50 transition-colors"
                   >
                     <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
-                      <Image src={d.imageUrl} alt={d.name} width={24} height={24} className="w-full h-full object-cover" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={d.imageUrl} alt={d.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-sm text-stone-800 truncate">{d.name}</span>
                   </button>
@@ -729,11 +735,13 @@ function CreateShareLinkModal({
                         >
                           {cw?.snapshotUrl && (
                             <div className="w-8 h-8 rounded bg-stone-200 overflow-hidden shrink-0">
-                              <Image
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
                                 src={cw.snapshotUrl}
                                 alt={preset.displayName}
                                 width={32}
                                 height={32}
+                                loading="lazy"
                                 className="w-full h-full object-cover"
                               />
                             </div>
@@ -796,7 +804,8 @@ function CreateShareLinkModal({
                           >
                             {c.snapshotUrl && (
                               <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
-                                <Image src={c.snapshotUrl} alt={c.name} width={24} height={24} className="w-full h-full object-cover" />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={c.snapshotUrl} alt={c.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                               </div>
                             )}
                             <span className="text-sm text-stone-800 truncate">{c.name}</span>

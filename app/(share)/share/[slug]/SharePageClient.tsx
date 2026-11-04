@@ -1,7 +1,7 @@
 "use client";
 
 import { useReducer, useState, useRef, useCallback, useEffect } from "react";
-import Image from "next/image";
+// Plain <img> — avoids /_next/image 400s on Vercel cold starts
 import type { RecolorCanvasHandle } from "@/components/design/RecolorCanvas";
 import { type RegionFillDelta, type RegionUndoDelta } from "@/components/design/RecolorCanvas";
 import CanvasZone from "@/components/design/CanvasZone";
@@ -582,14 +582,14 @@ export default function SharePageClient({
       <div className="h-full flex items-center justify-center bg-stone-50">
         <div className="max-w-sm w-full mx-4 text-center">
           {/* Tenant logo */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           {tenant.logoUrl ? (
-            <Image
+            <img
               src={tenant.logoUrl}
               alt={tenant.displayName}
               width={160}
               height={48}
               className="h-12 w-auto mx-auto mb-6 object-contain"
-              priority
             />
           ) : (
             <h1 className="text-xl font-semibold text-stone-900 mb-6">
@@ -645,8 +645,9 @@ export default function SharePageClient({
 
       {/* Header */}
       <header className="shrink-0 border-b border-stone-200 px-4 py-2.5 flex items-center gap-3 bg-white">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         {tenant.logoUrl ? (
-          <Image
+          <img
             src={tenant.logoUrl}
             alt={tenant.displayName}
             width={100}
@@ -700,11 +701,13 @@ export default function SharePageClient({
                   >
                     {preset.snapshotUrl && (
                       <div className="w-10 h-10 rounded bg-stone-100 overflow-hidden shrink-0">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={preset.snapshotUrl}
                           alt={preset.displayName}
                           width={40}
                           height={40}
+                          loading="lazy"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -733,11 +736,13 @@ export default function SharePageClient({
                       : "border-transparent hover:border-stone-300"
                   }`}
                 >
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     src={primaryDesign.imageUrl}
                     alt={primaryDesign.name}
                     width={80}
                     height={80}
+                    loading="lazy"
                     className="w-full aspect-square object-cover"
                   />
                 </button>
@@ -751,11 +756,13 @@ export default function SharePageClient({
                         : "border-transparent hover:border-stone-300"
                     }`}
                   >
-                    <Image
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
                       src={d.imageUrl}
                       alt={d.name}
                       width={80}
                       height={80}
+                      loading="lazy"
                       className="w-full aspect-square object-cover"
                     />
                   </button>
@@ -779,11 +786,13 @@ export default function SharePageClient({
                   >
                     {a.thumbnail && (
                       <div className="w-10 h-10 rounded bg-stone-100 overflow-hidden shrink-0">
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={a.thumbnail}
                           alt="Saved colorway"
                           width={40}
                           height={40}
+                          loading="lazy"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -812,11 +821,13 @@ export default function SharePageClient({
           {presets.length === 0 && additionalDesigns.length === 0 && approvals.length === 0 && (
             <div className="p-3">
               <div className="rounded-lg overflow-hidden border border-stone-200">
-                <Image
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
                   src={primaryDesign.imageUrl}
                   alt={primaryDesign.name}
                   width={180}
                   height={180}
+                  loading="lazy"
                   className="w-full aspect-square object-cover"
                 />
               </div>

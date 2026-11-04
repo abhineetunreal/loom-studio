@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import Image from "next/image";
+// Plain <img> — avoids /_next/image 400s on Vercel cold starts
 
 // ─── Folder types ────────────────────────────────────────────────────────────
 type AdminFolder = {
@@ -418,12 +418,13 @@ function ColorwayAdminRow({
       {/* Thumbnail */}
       {colorway.snapshotUrl && (
         <div className="w-12 h-12 rounded border border-stone-200 overflow-hidden bg-stone-100 relative shrink-0">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={colorway.snapshotUrl}
             alt={colorway.name}
-            fill
-            sizes="48px"
+            loading="lazy"
             className="object-contain p-0.5"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           />
         </div>
       )}

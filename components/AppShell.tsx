@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
+// Removed next/image — plain <img> avoids /_next/image 400s on Vercel cold starts
 import LeftPanel from "@/components/catalog/LeftPanel";
 import AiPromptBar from "@/components/ai/AiPromptBar";
 import { AiProvider } from "@/components/ai/AiContext";
@@ -108,13 +108,11 @@ export default function AppShell({ designs, tierInfo, canUpload, user, tenant, p
         </button>
         <span className="flex-1 flex items-center min-w-0">
           {tenant?.logoUrl ? (
-            <Image
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
               src={tenant.logoUrl}
               alt={tenant.displayName}
-              width={120}
-              height={32}
               className="h-10 w-auto object-contain max-w-[180px]"
-              priority
             />
           ) : (
             <span className="font-semibold tracking-tight text-lg truncate">
@@ -192,11 +190,10 @@ function UserMenu({ user, isAdmin }: { user: UserInfo; isAdmin: boolean }) {
         {/* Avatar */}
         <span className="w-7 h-7 rounded-full bg-stone-200 flex items-center justify-center overflow-hidden shrink-0">
           {user.avatarUrl ? (
-            <Image
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
               src={user.avatarUrl}
               alt={user.name ?? user.email}
-              width={28}
-              height={28}
               className="object-cover w-full h-full"
             />
           ) : (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useTransition } from "react";
-import Image from "next/image";
+// Plain <img> — avoids /_next/image 400s on Vercel cold starts
 import { assignDesignCollectionAction } from "@/app/actions/collections";
 import type { CollectionSummary } from "./CollectionsTab";
 import type { CatalogDesign } from "@/app/api/admin/designs/route";
@@ -562,13 +562,13 @@ function DesignCard({
         className="block aspect-square relative bg-stone-100 shrink-0"
         title="Preview design"
       >
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={design.imageUrl}
           alt={design.name}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          loading="lazy"
           className="object-contain p-2"
-          unoptimized
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
         />
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/8 transition-colors flex items-center justify-center">

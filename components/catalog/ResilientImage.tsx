@@ -3,52 +3,50 @@
 /**
  * ResilientImage
  *
- * Drop-in replacement for next/image <Image> that handles transient load
- * failures gracefully.  On first error it retries once (the Next.js image
- * optimizer may 400 on cold starts); on a second failure it falls back to a
- * plain <img> that bypasses the optimizer entirely.
+ * Renders a plain <img> instead of next/image <Image>, bypassing the
+ * Next.js image optimizer.  This avoids intermittent 400 errors that occur
+ * on Vercel cold starts when the optimizer tries to fetch upstream images
+ * before the Supabase connection is warm.
  *
- * Accepts the same props as next/image <Image>.
+ * Accepts a subset of next/image props for drop-in compatibility.
  */
 
-import { useState, useCallback } from "react";
-import Image, { type ImageProps } from "next/image";
+import { useState } from "react";
 
-type Props = Omit<ImageProps, "onError"> & {
-  /** Extra className applied only to the <img> fallback (defaults to same as className). */
-  fallbackClassName?: string;
+type Props = {
+  src: string;
+  alt: string;
+  fill?: boolean;
+  sizes?: string;
+  priority?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 };
 
-export default function ResilientImage({ fallbackClassName, ...props }: Props) {
-  // 0 = first attempt (next/image), 1 = retry (next/image), 2 = fallback (<img>)
-  const [attempt, setAttempt] = useState(0);
+export default function ResilientImage({ src, alt, fill, className, style }: Props) {
+  const [failed, setFailed] = useState(false);
 
-  const handleError = useCallback(() => {
-    setAttempt((a) => Math.min(a + 1, 2));
-  }, []);
-
-  if (attempt >= 2) {
-    // Fallback: plain <img> bypasses the Next.js image optimizer entirely.
-    // This always works even when /_next/image returns 400.
-    const { fill, sizes, priority, quality, placeholder, blurDataURL, loading, ...rest } = props;
+  if (failed) {
+    // Show a neutral placeholder on failure
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        {...rest}
-        src={typeof props.src === "string" ? props.src : ""}
-        alt={props.alt ?? ""}
-        className={fallbackClassName ?? props.className}
-        style={fill ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" } : props.style}
-        onError={undefined}
+      <div
+        className={className}
+        style={fill ? { position: "absolute", inset: 0, width: "100%", height: "100%", ...style } : style}
+        aria-label={alt}
       />
     );
   }
 
   return (
-    <Image
-      key={attempt} // Force remount on retry so next/image refetches
-      {...props}
-      onError={handleError}
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className={className}
+      style={fill ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", ...style } : style}
     />
   );
 }

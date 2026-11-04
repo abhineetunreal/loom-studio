@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 type Props = {
   src: string;
   alt: string;
@@ -16,13 +14,15 @@ export default function DesignImage({ src, alt, width, height }: Props) {
         className="relative w-full rounded-xl overflow-hidden bg-stone-100 border border-stone-200"
         style={{ aspectRatio: `${width} / ${height}` }}
       >
-        <Image
+        {/* Plain <img> — bypasses Next.js image optimizer to avoid 400s on
+            Vercel cold starts.  The design images are already served at their
+            native resolution from Supabase and don't benefit from re-optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src={src}
           alt={alt}
-          fill
-          priority
-          sizes="(max-width: 768px) 100vw, 60vw"
-          className="object-contain"
+          fetchPriority="high"
+          className="absolute inset-0 w-full h-full object-contain"
         />
       </div>
     </div>
