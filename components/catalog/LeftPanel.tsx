@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import type { DesignSummary } from "@/types";
+import ResilientImage from "./ResilientImage";
 import UploadsTab from "./UploadsTab";
 import SavedColorwaysTab from "./SavedColorwaysTab";
 
@@ -348,7 +348,7 @@ function DesignThumb({
         }`}
       >
         <div className="aspect-square relative bg-stone-100">
-          <Image
+          <ResilientImage
             src={design.imageUrl}
             alt={design.name}
             fill

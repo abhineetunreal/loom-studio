@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import ResilientImage from "./ResilientImage";
 import type { DesignSummary } from "@/types";
 
 type Props = { designs: DesignSummary[] };
@@ -36,7 +36,7 @@ function DesignCard({ design }: { design: DesignSummary }) {
     >
       {/* Thumbnail — letterboxed to square so the grid stays uniform */}
       <div className="aspect-square relative bg-stone-100">
-        <Image
+        <ResilientImage
           src={design.imageUrl}
           alt={design.name}
           fill

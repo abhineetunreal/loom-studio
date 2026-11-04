@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
+import ResilientImage from "./ResilientImage";
 import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ function ColorwayThumb({
       >
         {/* Square thumbnail */}
         <div className="aspect-square relative bg-stone-100">
-          <Image
+          <ResilientImage
             src={thumb}
             alt={colorway.name}
             fill
