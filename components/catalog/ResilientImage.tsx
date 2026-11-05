@@ -44,6 +44,7 @@ export default function ResilientImage({ src, alt, fill, className, style }: Pro
       alt={alt}
       loading="lazy"
       decoding="async"
+      crossOrigin="anonymous"
       onError={() => setFailed(true)}
       className={className}
       style={fill ? { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", ...style } : style}

@@ -378,6 +378,7 @@ function QueueRow({ item }: { item: QueueItem }) {
           <img
             src={item.thumbnailUrl}
             alt={item.file.name}
+            crossOrigin="anonymous"
             className="w-full h-full object-contain"
           />
         ) : (
@@ -566,6 +567,7 @@ function DesignCard({
         <img
           src={design.imageUrl}
           alt={design.name}
+          crossOrigin="anonymous"
           loading="lazy"
           className="object-contain p-2"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}

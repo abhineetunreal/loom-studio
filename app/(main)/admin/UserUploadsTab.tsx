@@ -166,6 +166,7 @@ function UploadCard({
           <img
             src={design.imageUrl}
             alt={design.name}
+            crossOrigin="anonymous"
             loading="lazy"
             className="object-contain p-1.5 group-hover:opacity-90 transition-opacity"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
@@ -191,6 +192,7 @@ function UploadCard({
                 <img
                   src={sc.snapshotUrl}
                   alt="Saved colorway snapshot"
+                  crossOrigin="anonymous"
                   className="w-full h-full object-contain"
                 />
               </div>

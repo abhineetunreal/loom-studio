@@ -198,6 +198,7 @@ function ShareLinkRow({
           <img
             src={link.primaryDesign.imageUrl}
             alt={link.primaryDesign.name}
+            crossOrigin="anonymous"
             width={40}
             height={40}
             loading="lazy"
@@ -569,6 +570,7 @@ function CreateShareLinkModal({
                   <img
                     src={selectedPrimaryDesign.imageUrl}
                     alt={selectedPrimaryDesign.name}
+                    crossOrigin="anonymous"
                     width={32}
                     height={32}
                     loading="lazy"
@@ -606,7 +608,7 @@ function CreateShareLinkModal({
                       >
                         <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={d.imageUrl} alt={d.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
+                          <img src={d.imageUrl} alt={d.name} crossOrigin="anonymous" width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                         </div>
                         <span className="text-sm text-stone-800 truncate">{d.name}</span>
                         {d.externalSku && (
@@ -669,7 +671,7 @@ function CreateShareLinkModal({
                   >
                     <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={d.imageUrl} alt={d.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
+                      <img src={d.imageUrl} alt={d.name} crossOrigin="anonymous" width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                     </div>
                     <span className="text-sm text-stone-800 truncate">{d.name}</span>
                   </button>
@@ -739,6 +741,7 @@ function CreateShareLinkModal({
                               <img
                                 src={cw.snapshotUrl}
                                 alt={preset.displayName}
+                                crossOrigin="anonymous"
                                 width={32}
                                 height={32}
                                 loading="lazy"
@@ -805,7 +808,7 @@ function CreateShareLinkModal({
                             {c.snapshotUrl && (
                               <div className="w-6 h-6 rounded bg-stone-100 overflow-hidden shrink-0">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={c.snapshotUrl} alt={c.name} width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
+                                <img src={c.snapshotUrl} alt={c.name} crossOrigin="anonymous" width={24} height={24} loading="lazy" className="w-full h-full object-cover" />
                               </div>
                             )}
                             <span className="text-sm text-stone-800 truncate">{c.name}</span>

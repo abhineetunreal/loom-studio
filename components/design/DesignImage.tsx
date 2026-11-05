@@ -21,6 +21,7 @@ export default function DesignImage({ src, alt, width, height }: Props) {
         <img
           src={src}
           alt={alt}
+          crossOrigin="anonymous"
           fetchPriority="high"
           className="absolute inset-0 w-full h-full object-contain"
         />

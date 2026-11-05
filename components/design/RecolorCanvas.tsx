@@ -379,12 +379,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     // Check module-level cache first — avoids full image decode on revisit
     const cached = pixelCache.get(imageUrl);
     if (cached) {
-
+      console.log("[Canvas] pixel cache HIT for", imageUrl.substring(0, 60));
       originalPixels.current = cached.native;
       supersampledPixels.current = cached.supersampled;
       setPixelsVersion((v) => v + 1);
       return;
     }
+    console.log("[Canvas] pixel cache MISS — loading image:", imageUrl.substring(0, 60));
     // Clear stale pixel data so the render effect can't use old pixels
     // for a different design while the new image is in flight.
     originalPixels.current = null;
@@ -440,12 +441,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         cachePixels(imageUrl, native, supersampled);
         originalPixels.current = native;
         supersampledPixels.current = supersampled;
+        console.log("[Canvas] image loaded OK — pixels extracted:", native.length, "bytes");
         // Bump version — triggers the render effect with real pixels
         setPixelsVersion((v) => v + 1);
-      } catch {
+      } catch (corsErr) {
         // Canvas tainted by CORS — display still works, pixel ops won't.
         // The raw drawImage above already shows the design; signal completion.
-        console.warn("[Canvas] Canvas tainted: pixel operations disabled (CORS)");
+        console.warn("[Canvas] Canvas tainted: pixel operations disabled (CORS)", corsErr);
         if (!renderCompleteFired.current) {
           renderCompleteFired.current = true;
           onRenderComplete?.();
@@ -590,6 +592,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
         if (!cancelled && !renderCompleteFired.current) {
           renderCompleteFired.current = true;
+          console.log("[Canvas] onRenderComplete (flat path)");
           onRenderComplete?.();
         }
         return;
@@ -683,6 +686,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
 
       if (!cancelled && !renderCompleteFired.current) {
         renderCompleteFired.current = true;
+        console.log("[Canvas] onRenderComplete (textured path)");
         onRenderComplete?.();
       }
     }
@@ -739,7 +743,10 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   /** Core flood-fill logic operating on native pixel coordinates. */
   function doRegionFillNative(x: number, y: number, yarn: YarnOption) {
     const pixels = originalPixels.current;
-    if (!pixels) return;
+    if (!pixels) {
+      console.warn("[Canvas] doRegionFillNative: originalPixels is null — fill skipped", { x, y, yarnCode: yarn.code });
+      return;
+    }
 
     if (x < 0 || y < 0 || x >= width || y >= height) return;
 

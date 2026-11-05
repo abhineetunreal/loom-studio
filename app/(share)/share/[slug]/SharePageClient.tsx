@@ -705,6 +705,7 @@ export default function SharePageClient({
                         <img
                           src={preset.snapshotUrl}
                           alt={preset.displayName}
+                          crossOrigin="anonymous"
                           width={40}
                           height={40}
                           loading="lazy"
@@ -740,6 +741,7 @@ export default function SharePageClient({
                   <img
                     src={primaryDesign.imageUrl}
                     alt={primaryDesign.name}
+                    crossOrigin="anonymous"
                     width={80}
                     height={80}
                     loading="lazy"
@@ -760,6 +762,7 @@ export default function SharePageClient({
                     <img
                       src={d.imageUrl}
                       alt={d.name}
+                      crossOrigin="anonymous"
                       width={80}
                       height={80}
                       loading="lazy"
@@ -790,6 +793,7 @@ export default function SharePageClient({
                         <img
                           src={a.thumbnail}
                           alt="Saved colorway"
+                          crossOrigin="anonymous"
                           width={40}
                           height={40}
                           loading="lazy"
@@ -825,6 +829,7 @@ export default function SharePageClient({
                 <img
                   src={primaryDesign.imageUrl}
                   alt={primaryDesign.name}
+                  crossOrigin="anonymous"
                   width={180}
                   height={180}
                   loading="lazy"

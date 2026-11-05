@@ -422,6 +422,7 @@ function ColorwayAdminRow({
           <img
             src={colorway.snapshotUrl}
             alt={colorway.name}
+            crossOrigin="anonymous"
             loading="lazy"
             className="object-contain p-0.5"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}

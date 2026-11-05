@@ -172,6 +172,16 @@ export default function DesignViewer({
   viewProductUrl,
   customerName,
 }: Props) {
+  // ── Diagnostic logging for Bug 1 ──────────────────────────────────────────
+  console.log("[DesignViewer] mount/render:", {
+    designId: design.id,
+    hasSavedColorMap: !!savedColorMap,
+    savedColorMapKeys: savedColorMap ? Object.keys(savedColorMap).length : 0,
+    hasSavedOps: !!savedOperations,
+    regionFillCount: savedOperations?.regionFills.length ?? 0,
+    globalMapKeys: savedOperations ? Object.keys(savedOperations.globalMap).length : 0,
+  });
+
   // Priority: saved colorway > preset > initial color map (from rendered-color lookup)
   const startingColorMap = savedColorMap
     ?? (initialPreset ? { ...initialColorMap, ...initialPreset.colorMap } : null)
@@ -454,16 +464,19 @@ export default function DesignViewer({
   // We wait for `canvasReady` (set by the onRenderComplete callback) then replay.
   // colorwayLoading keeps the canvas covered until this effect completes.
   useEffect(() => {
+    console.log("[DesignViewer] canvasReady effect:", { canvasReady, hasOps: !!savedOperations, fillCount: savedOperations?.regionFills.length ?? 0, colorwayLoading });
     if (!canvasReady) return;
     if (savedOperations?.regionFills.length) {
       const yarnById = new Map(yarns.map((y) => [y.id, y]));
       for (const fill of savedOperations.regionFills) {
         const yarn = yarnById.get(fill.newYarnId);
+        console.log("[DesignViewer] replaying fill:", { seedX: fill.seedX, seedY: fill.seedY, yarnId: fill.newYarnId, resolved: !!yarn });
         if (yarn) canvasRef.current?.replayRegionFill(fill.seedX, fill.seedY, yarn);
       }
     }
     // Reveal the canvas only after all fills are applied
     setColorwayLoading(false);
+    console.log("[DesignViewer] colorwayLoading → false");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasReady]); // only fires once when canvas becomes ready
 
