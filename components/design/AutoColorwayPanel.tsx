@@ -36,6 +36,7 @@ export default function AutoColorwayPanel({
   const [spread, setSpread] = useState(0.5);
   const [results, setResults] = useState<GeneratedColorway[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [appliedId, setAppliedId] = useState<string | null>(null);
 
   // Sorted palette entries for the swatch strip (largest area first)
   const sortedPalette = useMemo(
@@ -158,11 +159,17 @@ export default function AutoColorwayPanel({
           </div>
         )}
 
-        {results.map((cw) => (
+        {results.map((cw) => {
+          const isActive = appliedId === cw.id;
+          return (
           <button
             key={cw.id}
-            onClick={() => onApply(cw.colorMap)}
-            className="w-full mb-2 rounded-lg border border-stone-200 hover:border-stone-400 hover:shadow-sm transition-all overflow-hidden group"
+            onClick={() => { onApply(cw.colorMap); setAppliedId(cw.id); }}
+            className={`w-full mb-2 rounded-lg border transition-all overflow-hidden group ${
+              isActive
+                ? "border-stone-800 ring-1 ring-stone-800 shadow-sm"
+                : "border-stone-200 hover:border-stone-400 hover:shadow-sm"
+            }`}
             title={`Apply ${cw.label}`}
           >
             {/* Swatch strip — shows the top palette colors with their assigned yarns */}
@@ -184,13 +191,14 @@ export default function AutoColorwayPanel({
 
             {/* Label */}
             <div className="px-2 py-1 bg-white flex items-center justify-between">
-              <span className="text-[10px] text-stone-500">{cw.label}</span>
-              <span className="text-[10px] text-stone-300 group-hover:text-stone-500 transition-colors">
-                Apply →
+              <span className={`text-[10px] ${isActive ? "text-stone-800 font-medium" : "text-stone-500"}`}>{cw.label}</span>
+              <span className={`text-[10px] transition-colors ${isActive ? "text-stone-800" : "text-stone-300 group-hover:text-stone-500"}`}>
+                {isActive ? "● Applied" : "Apply →"}
               </span>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

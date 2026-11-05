@@ -962,7 +962,7 @@ export default function DesignViewer({
     for (const [hex, yarn] of Object.entries(colorMap)) {
       dispatch({ type: "ASSIGN", hex, yarn });
     }
-    setShowAutoColorways(false);
+    // Panel stays open so user can click through variations
   }, []);
 
   // ── Snapshot for submission ──────────────────────────────────────────────────

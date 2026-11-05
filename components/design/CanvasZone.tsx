@@ -149,7 +149,7 @@ export default function CanvasZone({
   const tileMultiplier = 1.25 - knotSlider;
   // Photo-swatch scale: multiplicative factor on the physically-calculated tile size.
   // Separate from tileMultiplier — only affects photo-type colors.
-  const [swatchScale, setSwatchScale] = useState(1.0);
+  const [swatchScale, setSwatchScale] = useState(2.0);
   // Unsharp-mask sharpening strength for photo-swatch pixels (0 = off)
   const [sharpenStrength, setSharpenStrength] = useState(0.6);
   // Toast shown after "Save Scale" completes
