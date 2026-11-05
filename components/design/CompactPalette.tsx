@@ -19,6 +19,9 @@ type Props = {
   /** Current fill mode — global replaces everywhere, region flood-fills one area. */
   mode: "global" | "region";
   onToggleMode: () => void;
+  /** Whether the auto-colorway panel is currently showing */
+  showAutoColorways?: boolean;
+  onToggleAutoColorways?: () => void;
 };
 
 export default function CompactPalette({
@@ -34,6 +37,8 @@ export default function CompactPalette({
   viewProductUrl,
   mode,
   onToggleMode,
+  showAutoColorways,
+  onToggleAutoColorways,
 }: Props) {
   // Exclude entries that are effectively invisible (rounds to "0.0%")
   const sorted = [...palette]
@@ -92,6 +97,25 @@ export default function CompactPalette({
           >
             <RegionFillIcon />
           </button>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Auto Colorways toggle */}
+          {onToggleAutoColorways && (
+            <button
+              onClick={onToggleAutoColorways}
+              title="Auto Colorways — generate color variations"
+              aria-pressed={!!showAutoColorways}
+              className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${
+                showAutoColorways
+                  ? "bg-stone-800 text-white"
+                  : "text-stone-400 hover:text-stone-700 hover:bg-stone-100"
+              }`}
+            >
+              <AutoColorwayIcon />
+            </button>
+          )}
         </div>
       </div>
 
@@ -244,6 +268,16 @@ function RegionFillIcon() {
       <path d="M5.5 6l2-2 1 1-2 2-1-1z" />
       {/* mini droplet */}
       <path d="M9.5 9.5c0 .55-.45 1-1 1s-1-.45-1-1c0-.7 1-1.8 1-1.8s1 1.1 1 1.8z" />
+    </svg>
+  );
+}
+
+/** Sparkle/wand icon — auto-generate colorway variations */
+function AutoColorwayIcon() {
+  return (
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+      <path d="M18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456z" />
     </svg>
   );
 }

@@ -7,6 +7,7 @@ import CanvasZone from "./CanvasZone";
 import type { CropRect } from "./CropOverlay";
 import CompactPalette from "./CompactPalette";
 import InlineYarnPicker from "./InlineYarnPicker";
+import AutoColorwayPanel from "./AutoColorwayPanel";
 import ColorPopover from "./ColorPopover";
 import YarnPicker from "./YarnPicker";
 import SubmissionForm from "./SubmissionForm";
@@ -222,6 +223,9 @@ export default function DesignViewer({
   const [recolorMode, setRecolorMode] = useState<"global" | "region">("global");
   // Yarn selected as the active region-fill color (region mode only)
   const [selectedFillYarn, setSelectedFillYarn] = useState<YarnOption | null>(null);
+
+  // ── Auto colorway panel ─────────────────────────────────────────────────────
+  const [showAutoColorways, setShowAutoColorways] = useState(false);
 
   // ── Crop tool ────────────────────────────────────────────────────────────────
   const [isCropping, setIsCropping] = useState(false);
@@ -951,6 +955,16 @@ export default function DesignViewer({
     dispatch({ type: "REVERT", hex, yarn: initialColorMap?.[hex] ?? null });
   }
 
+  // ── Apply auto-generated colorway ──────────────────────────────────────────
+  const handleApplyAutoColorway = useCallback((colorMap: Record<string, YarnOption>) => {
+    // Push current state to undo stack, then apply the full new colorMap
+    dispatch({ type: "RESET" });
+    for (const [hex, yarn] of Object.entries(colorMap)) {
+      dispatch({ type: "ASSIGN", hex, yarn });
+    }
+    setShowAutoColorways(false);
+  }, []);
+
   // ── Snapshot for submission ──────────────────────────────────────────────────
   const getSnapshot = useCallback(() => {
     return canvasRef.current?.getSnapshot() ?? null;
@@ -1075,30 +1089,40 @@ export default function DesignViewer({
           viewProductUrl={viewProductUrl}
           mode={recolorMode}
           onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
+          showAutoColorways={showAutoColorways}
+          onToggleAutoColorways={() => setShowAutoColorways((v) => !v)}
         />
       </div>
 
-      {/* Zone D — inline yarn picker, desktop only.
-          In region mode: shows all yarns for fill-color selection; currentYarn is the
-          active fill yarn.  In global mode: shows closest matches for selectedHex. */}
+      {/* Zone D — inline yarn picker OR auto-colorway panel, desktop only. */}
       <div className="flex flex-col shrink-0 w-[16%] min-w-[200px] border-l border-stone-200 bg-white overflow-hidden">
-        <InlineYarnPicker
-          yarns={yarns}
-          targetEntry={
-            recolorMode === "region"
-              ? null // no palette-color context in region mode
-              : (selectedHex ? (effectivePalette.find((e) => e.hex === selectedHex) ?? design.palette.find((e) => e.hex === selectedHex) ?? null) : null)
-          }
-          currentYarn={
-            recolorMode === "region"
-              ? selectedFillYarn
-              : (selectedHex ? (recolor.current[selectedHex] ?? lookupRegionYarn(selectedHex) ?? null) : null)
-          }
-          onPick={handleYarnPick}
-          tierInfo={tierInfo}
-          yarnLibraryName={yarnLibraryName}
-          initialLibrary={initialLibrary}
-        />
+        {showAutoColorways ? (
+          <AutoColorwayPanel
+            palette={effectivePalette}
+            currentColorMap={recolor.current}
+            yarns={yarns}
+            onApply={handleApplyAutoColorway}
+            onClose={() => setShowAutoColorways(false)}
+          />
+        ) : (
+          <InlineYarnPicker
+            yarns={yarns}
+            targetEntry={
+              recolorMode === "region"
+                ? null // no palette-color context in region mode
+                : (selectedHex ? (effectivePalette.find((e) => e.hex === selectedHex) ?? design.palette.find((e) => e.hex === selectedHex) ?? null) : null)
+            }
+            currentYarn={
+              recolorMode === "region"
+                ? selectedFillYarn
+                : (selectedHex ? (recolor.current[selectedHex] ?? lookupRegionYarn(selectedHex) ?? null) : null)
+            }
+            onPick={handleYarnPick}
+            tierInfo={tierInfo}
+            yarnLibraryName={yarnLibraryName}
+            initialLibrary={initialLibrary}
+          />
+        )}
       </div>
 
       {/* Mobile: YarnPicker bottom sheet */}
