@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getDefaultTierInfo } from "@/lib/tier";
 import { getCurrentTenant } from "@/lib/tenant";
+import { getTenantYarns, getTenantColorLookup } from "@/lib/design-data";
 import DesignViewer from "@/components/design/DesignViewer";
 import type { ResolvedPreset } from "@/components/design/DesignViewer";
 import { resolveDesignImageUrl } from "@/lib/design-urls";
@@ -49,7 +50,10 @@ export default async function DesignPage({ params, searchParams }: Props) {
   // Resolve tenant first (cached after first call) so the yarn query can be scoped.
   const tenant = await getCurrentTenant();
 
-  const [design, rawYarns, tierInfo, session, dbColorLookupRows] = await Promise.all([
+  // Yarns and the color lookup are the same for every design in a tenant and
+  // rarely change — getTenantYarns / getTenantColorLookup serve them from a
+  // 5-minute cache so repeat design opens skip those DB queries entirely.
+  const [design, yarns, tierInfo, session, dbColorLookupRows] = await Promise.all([
     db.design.findUnique({
       where: { id },
       select: {
@@ -66,39 +70,16 @@ export default async function DesignPage({ params, searchParams }: Props) {
         externalSku: true,
       },
     }),
-    db.yarnColor.findMany({
-      where: { isActive: true, tenantId: tenant?.id },
-      select: { id: true, code: true, name: true, hex: true, swatchImageUrl: true, material: true, pileType: true, renderType: true, textureKpsi: true, swatchScale: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    }),
+    tenant ? getTenantYarns(tenant.id) : Promise.resolve([] as YarnOption[]),
     getDefaultTierInfo(),
     getSession(),
-    tenant
-      ? db.colorLookup.findMany({
-          where: { tenantId: tenant.id },
-          select: { renderedHex: true, yarnCode: true },
-        })
-      : Promise.resolve([]),
+    tenant ? getTenantColorLookup(tenant.id) : Promise.resolve([]),
   ]);
 
   if (!design) notFound();
 
   // Resolve display URL — user-uploaded designs need a signed URL
   const imageUrl = await resolveDesignImageUrl(design);
-
-  // Map DB `material` → `library` for the UI type
-  const yarns: YarnOption[] = rawYarns.map((y) => ({
-    id: y.id,
-    code: y.code,
-    name: y.name,
-    hex: y.hex,
-    library: y.material,
-    pileType: y.pileType,
-    swatchImageUrl: y.swatchImageUrl,
-    renderType: (y.renderType ?? "shader") as "shader" | "photo",
-    textureKpsi: y.textureKpsi ?? null,
-    swatchScale: y.swatchScale ?? 1.0,
-  }));
 
   const palette = design.palette as PaletteEntry[];
 

@@ -58,6 +58,84 @@ function cachePixels(url: string, native: Uint8ClampedArray, supersampled: Uint8
   pixelCacheOrder.push(url);
 }
 
+// ─── Render worker (singleton) ────────────────────────────────────────────────
+// Offloads the recolor+texture pixel loop to a Web Worker so it never blocks the
+// UI thread.  A single worker persists across design changes so the 16MB detail
+// map is fetched once, not per design open.  If anything about the worker fails
+// (unsupported, init error, render error), `failed` is set and RecolorCanvas
+// silently falls back to the existing synchronous path — no behavior change.
+type WorkerResult =
+  | { type: "rendered"; reqId: number; buffer: ArrayBuffer; ssW: number; ssH: number }
+  | { type: "error"; reqId?: number; message?: string };
+
+const renderWorker = {
+  worker: null as Worker | null,
+  ready: false,
+  failed: false,
+  initPromise: null as Promise<boolean> | null,
+  // The currently-mounted canvas sets this to receive render results.
+  resultHandler: null as ((d: WorkerResult) => void) | null,
+
+  init(detailMapUrl: string): Promise<boolean> {
+    if (this.failed) return Promise.resolve(false);
+    if (this.ready) return Promise.resolve(true);
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = new Promise<boolean>((resolve) => {
+      try {
+        if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined") {
+          this.failed = true; resolve(false); return;
+        }
+        const w = new Worker(new URL("./render.worker.ts", import.meta.url));
+        const timeout = setTimeout(() => {
+          if (!this.ready) { this.failed = true; resolve(false); }
+        }, 12000);
+        w.onmessage = (e: MessageEvent) => {
+          const d = e.data;
+          if (d?.type === "ready") {
+            clearTimeout(timeout);
+            this.ready = true;
+            resolve(true);
+          } else if (d?.type === "rendered" || d?.type === "error") {
+            this.resultHandler?.(d as WorkerResult);
+          }
+        };
+        w.onerror = () => { clearTimeout(timeout); this.failed = true; resolve(false); };
+        w.postMessage({ type: "init", detailMapUrl });
+        this.worker = w;
+      } catch {
+        this.failed = true; resolve(false);
+      }
+    });
+    return this.initPromise;
+  },
+
+  setPixels(ssPixels: Uint8ClampedArray, ssW: number, ssH: number, nativeWidth: number) {
+    if (!this.worker || !this.ready) return;
+    // Copy so the main thread keeps its own ssPixels for the fallback path.
+    const copy = ssPixels.slice();
+    this.worker.postMessage(
+      { type: "pixels", ssPixels: copy.buffer, ssW, ssH, nativeWidth },
+      [copy.buffer],
+    );
+  },
+
+  render(params: {
+    reqId: number;
+    lookup: Map<number, { r: number; g: number; b: number }>;
+    overrideLayer: Map<number, number> | null;
+    tileScaleX: number;
+    tileScaleY: number;
+    strength: number;
+  }) {
+    if (!this.worker || !this.ready) return;
+    this.worker.postMessage({ type: "render", ...params });
+  },
+};
+
+// Globally-monotonic render request id so results from a previous canvas
+// instance can never be mistaken for the current one's.
+let _renderReqCounter = 0;
+
 // ─── Region undo entry + exported delta types ─────────────────────────────────
 
 type RegionUndoEntry = {
@@ -208,6 +286,16 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   const paletteHexSet = useRef<Set<string>>(new Set(palette.map((e) => e.hex)));
   // Guard: only call onRenderComplete once per design load
   const renderCompleteFired = useRef(false);
+
+  // ── Render-worker instance state ─────────────────────────────────────────────
+  // True once this instance has handed its pixels to the worker and can route
+  // renders through it. Falls back to the sync path when false/broken.
+  const workerUsable = useRef(false);
+  // The most recent render request id posted to the worker — stale results
+  // (lower id) are ignored when drawing.
+  const latestReqId = useRef(0);
+  // Set true if the worker errors mid-session so we stop routing to it.
+  const workerBroken = useRef(false);
 
   // ── Region-fill state (internal — not exposed via props) ─────────────────────
   // Override layer: per-pixel color overrides that take priority over colorMap.
@@ -372,6 +460,36 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     },
   }));
 
+  // ── Worker: init + hand over this design's supersampled pixels ───────────────
+  // Called whenever pixels become available (fresh load or cache hit). Inits the
+  // singleton worker (once), then pushes pixels so renders can be routed to it.
+  const pushPixelsToWorker = (ssPixels: Uint8ClampedArray) => {
+    if (workerBroken.current) return;
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!base) return; // no texture host → stay on sync path
+    const detailMapUrl = `${base}/storage/v1/object/public/textures/422/wool_28kpsi_detail1.png`;
+    const ssW = width * SUPERSAMPLE_FACTOR;
+    const ssH = height * SUPERSAMPLE_FACTOR;
+
+    // Warm path: the worker is already up (e.g. switching between designs) —
+    // hand over pixels synchronously so the very first render of this design
+    // routes to the worker instead of blocking the main thread once.
+    if (renderWorker.ready) {
+      renderWorker.setPixels(ssPixels, ssW, ssH, width);
+      workerUsable.current = true;
+      return;
+    }
+
+    // Cold path: first use this session — init, then push pixels and re-render.
+    workerUsable.current = false;
+    renderWorker.init(detailMapUrl).then((ok) => {
+      if (!ok) return; // worker unavailable → sync path handles everything
+      renderWorker.setPixels(ssPixels, ssW, ssH, width);
+      workerUsable.current = true;
+      setPixelsVersion((v) => v + 1);
+    });
+  };
+
   // ── Load image → extract pixels (cache-first) ────────────────────────────────
   useEffect(() => {
     renderCompleteFired.current = false;
@@ -382,6 +500,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       console.log("[Canvas] pixel cache HIT for", imageUrl.substring(0, 60));
       originalPixels.current = cached.native;
       supersampledPixels.current = cached.supersampled;
+      pushPixelsToWorker(cached.supersampled);
       setPixelsVersion((v) => v + 1);
       return;
     }
@@ -442,6 +561,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         originalPixels.current = native;
         supersampledPixels.current = supersampled;
         console.log("[Canvas] image loaded OK — pixels extracted:", native.length, "bytes");
+        pushPixelsToWorker(supersampled);
         // Bump version — triggers the render effect with real pixels
         setPixelsVersion((v) => v + 1);
       } catch (corsErr) {
@@ -541,6 +661,48 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   //   Phase 2 — textured render at 2× supersampled resolution.
   //             Paints the final result (shader grain or photo swatch) directly.
   //
+  // ── Draw render-worker results ───────────────────────────────────────────────
+  // The worker posts back a finished supersampled ImageData buffer; we scale it
+  // onto the DPR-sized visible canvas. Stale results (from an earlier request)
+  // are ignored via the monotonic reqId. A worker error disables the worker and
+  // re-triggers a synchronous render so the user never sees a blank canvas.
+  useEffect(() => {
+    const draw = (d: WorkerResult) => {
+      if (d.type === "error") {
+        workerBroken.current = true;
+        workerUsable.current = false;
+        setPixelsVersion((v) => v + 1); // fall back to sync render
+        return;
+      }
+      if (d.type !== "rendered" || d.reqId !== latestReqId.current) return; // stale
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+      const canvasW = rect.width > 0 ? Math.round(rect.width * dpr) : width;
+      const canvasH = rect.height > 0 ? Math.round(rect.height * dpr) : height;
+      if (canvas.width !== canvasW) canvas.width = canvasW;
+      if (canvas.height !== canvasH) canvas.height = canvasH;
+      const img = new ImageData(new Uint8ClampedArray(d.buffer), d.ssW, d.ssH);
+      if (!offscreenRef.current || offscreenRef.current.width !== d.ssW || offscreenRef.current.height !== d.ssH) {
+        offscreenRef.current = new OffscreenCanvas(d.ssW, d.ssH);
+      }
+      const offCtx = offscreenRef.current.getContext("2d")!;
+      offCtx.putImageData(img, 0, 0);
+      ctx.drawImage(offscreenRef.current, 0, 0, canvasW, canvasH);
+      if (!renderCompleteFired.current) {
+        renderCompleteFired.current = true;
+        onRenderComplete?.();
+      }
+    };
+    renderWorker.resultHandler = draw;
+    return () => {
+      if (renderWorker.resultHandler === draw) renderWorker.resultHandler = null;
+    };
+  }, [width, height, onRenderComplete]);
+
   // Performance notes:
   //   • lookup uses integer keys (r<<16|g<<8|b) — no per-pixel string allocation
   //   • OffscreenCanvas is reused across renders (offscreenRef)
@@ -577,6 +739,29 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const hasPhotoColors =
         Object.values(colorMap).some((y) => y?.renderType === "photo" && y?.swatchImageUrl) ||
         photoUrlOverrideLayerRef.current.size > 0;
+
+      // ── Fast path: off-main-thread render via the worker ────────────────────
+      // Handles shader + flat (non-photo) renders. The worker holds this design's
+      // supersampled pixels and the detail map; we post only the small lookup +
+      // params and draw the result when it comes back (see the result handler
+      // effect). Photo-swatch renders fall through to the synchronous path below.
+      if (workerUsable.current && !workerBroken.current && !hasPhotoColors && ssPixels) {
+        const ss = SUPERSAMPLE_FACTOR;
+        const ssW = width * ss;
+        const ssH = height * ss;
+        const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
+        const reqId = ++_renderReqCounter;
+        latestReqId.current = reqId;
+        renderWorker.render({
+          reqId,
+          lookup,
+          overrideLayer: hasOverrides ? overrideLayer : null,
+          tileScaleX,
+          tileScaleY,
+          strength: textureEnabled ? textureStrength : 0,
+        });
+        return; // result is drawn by the worker result-handler effect
+      }
 
       // ── Phase 1: flat recolor at native resolution ─────────────────────────
       const flatData = applyRecolor(
