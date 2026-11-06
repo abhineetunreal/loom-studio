@@ -5,6 +5,7 @@ import Link from "next/link";
 import RecolorCanvas, { type RecolorCanvasHandle, type RegionFillDelta, type RegionUndoDelta } from "./RecolorCanvas";
 import CropOverlay, { type CropRect } from "./CropOverlay";
 import { textureShader } from "@/lib/texture-shader";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 
 type Props = {
@@ -152,6 +153,16 @@ export default function CanvasZone({
   const [swatchScale, setSwatchScale] = useState(2.0);
   // Unsharp-mask sharpening strength for photo-swatch pixels (0 = off)
   const [sharpenStrength, setSharpenStrength] = useState(0.6);
+
+  // ── Debounced render inputs ─────────────────────────────────────────────────
+  // The sliders above update their live state on every drag tick (so the thumb
+  // and number readout stay responsive), but the canvas render is expensive, so
+  // it reads debounced copies — a full re-render fires only once the user pauses
+  // (~140ms), not dozens of times across a single drag.
+  const dTileMultiplier = useDebouncedValue(1.25 - knotSlider, 140);
+  const dTextureStrength = useDebouncedValue(textureStrength, 140);
+  const dSwatchScale = useDebouncedValue(swatchScale, 140);
+  const dSharpenStrength = useDebouncedValue(sharpenStrength, 140);
   // Toast shown after "Save Scale" completes
   const [saveScaleToast, setSaveScaleToast] = useState<string | null>(null);
   // Per-yarn scale overrides set by Save Scale — lets calibrated values take effect
@@ -513,11 +524,11 @@ export default function CanvasZone({
                 onColorPick={onColorPick}
                 textureEnabled={textureEnabled}
                 designName={design.name}
-                tileMultiplier={tileMultiplier}
-                textureStrength={textureStrength}
-                swatchScale={swatchScale}
+                tileMultiplier={dTileMultiplier}
+                textureStrength={dTextureStrength}
+                swatchScale={dSwatchScale}
                 yarnScaleOverrides={savedYarnScales}
-                sharpenStrength={sharpenStrength}
+                sharpenStrength={dSharpenStrength}
                 onRenderComplete={() => { setIsLoading(false); onRenderComplete?.(); }}
                 mode={mode}
                 fillYarn={selectedFillYarn ?? undefined}

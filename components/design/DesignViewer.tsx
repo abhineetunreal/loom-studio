@@ -66,6 +66,7 @@ type RecolorState = {
 type RecolorAction =
   | { type: "ASSIGN"; hex: string; yarn: YarnOption }
   | { type: "REVERT"; hex: string; yarn: YarnOption | null } // yarn=null → remove assignment
+  | { type: "SET_ALL"; map: ColorMap } // replace the whole map in one step (one undo entry)
   | { type: "UNDO" }
   | { type: "REDO" }
   | { type: "RESET" };
@@ -105,6 +106,12 @@ function recolorReducer(state: RecolorState, action: RecolorAction): RecolorStat
         future: [],
       };
     }
+    case "SET_ALL":
+      return {
+        current: action.map,
+        past: [...state.past.slice(-49), state.current],
+        future: [],
+      };
     case "RESET":
       if (!Object.keys(state.current).length) return state;
       return {
@@ -957,11 +964,8 @@ export default function DesignViewer({
 
   // ── Apply auto-generated colorway ──────────────────────────────────────────
   const handleApplyAutoColorway = useCallback((colorMap: Record<string, YarnOption>) => {
-    // Push current state to undo stack, then apply the full new colorMap
-    dispatch({ type: "RESET" });
-    for (const [hex, yarn] of Object.entries(colorMap)) {
-      dispatch({ type: "ASSIGN", hex, yarn });
-    }
+    // Replace the entire map in a single dispatch → one render, one undo entry.
+    dispatch({ type: "SET_ALL", map: colorMap });
     // Panel stays open so user can click through variations
   }, []);
 
