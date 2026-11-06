@@ -45,7 +45,6 @@ export default function InlineYarnPicker({
   );
   const [search, setSearch] = useState("");
   const isDemo = tierInfo.tier === "demo";
-  const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
 
   // Top 6 closest RGB matches
   const closestYarns = useMemo(() => {
@@ -175,8 +174,6 @@ export default function InlineYarnPicker({
                 <button
                   key={yarn.id}
                   onClick={() => onPick(yarn)}
-                  onMouseEnter={() => setHoveredYarn(yarn)}
-                  onMouseLeave={() => setHoveredYarn(null)}
                   title={`${yarn.name}${yarn.library ? " · " + yarn.library : ""}`}
                   aria-label={yarn.name}
                   aria-pressed={isCurrent}

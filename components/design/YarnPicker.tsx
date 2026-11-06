@@ -55,7 +55,6 @@ export default function YarnPicker({
   );
   const [query, setQuery] = useState("");
   const isDemo = tierInfo.tier === "demo";
-  const [hoveredYarn, setHoveredYarn] = useState<YarnOption | null>(null);
   const [previewYarn, setPreviewYarn] = useState<YarnOption | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -170,8 +169,6 @@ export default function YarnPicker({
                 <button
                   key={yarn.id}
                   onClick={() => isPhoto ? setPreviewYarn(yarn) : onPick(yarn)}
-                  onMouseEnter={() => setHoveredYarn(yarn)}
-                  onMouseLeave={() => setHoveredYarn(null)}
                   title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                   aria-label={`${yarn.name}${yarnLibraryName ? " (" + yarnLibraryName + ")" : ""}`}
                   aria-pressed={isCurrent}
@@ -229,22 +226,15 @@ export default function YarnPicker({
           </div>
         )}
 
-        {/* ── Hover info / count bar — hidden in demo tier ─────────────────── */}
+        {/* ── Count bar — hidden in demo tier.  (The per-swatch name shows via
+             the native title tooltip on hover — kept out of React state so
+             hovering doesn't re-render the whole swatch grid.) ───────────── */}
         {!isDemo && (
           <div className="px-4 pb-1.5 shrink-0 h-5">
-            {hoveredYarn ? (
-              <p className="text-xs text-stone-600 truncate">
-                <span className="font-mono">{hoveredYarn.name}</span>
-                {yarnLibraryName && (
-                  <span className="text-stone-400"> · {yarnLibraryName}</span>
-                )}
-              </p>
-            ) : (
-              <p className="text-xs text-stone-400">
-                {libraryYarns.length} color{libraryYarns.length !== 1 ? "s" : ""}
-                {query && " matched"}
-              </p>
-            )}
+            <p className="text-xs text-stone-400">
+              {libraryYarns.length} color{libraryYarns.length !== 1 ? "s" : ""}
+              {query && " matched"}
+            </p>
           </div>
         )}
 
@@ -266,8 +256,6 @@ export default function YarnPicker({
                   <button
                     key={yarn.id}
                     onClick={() => isPhoto ? setPreviewYarn(yarn) : onPick(yarn)}
-                    onMouseEnter={() => setHoveredYarn(yarn)}
-                    onMouseLeave={() => setHoveredYarn(null)}
                     title={isDemo ? undefined : `${yarn.name}${yarnLibraryName ? " · " + yarnLibraryName : ""}`}
                     aria-label={yarn.name}
                     aria-pressed={isCurrent}
