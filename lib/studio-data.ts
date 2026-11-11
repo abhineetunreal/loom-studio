@@ -11,6 +11,7 @@ import { db } from "./db";
 import { getCurrentTenant } from "./tenant";
 import { getTenantYarns, getTenantColorLookup } from "./design-data";
 import { resolveDesignImageUrl } from "./design-urls";
+import { findNearestYarns } from "./color-distance";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 const LOOKUP_PATH = path.join(process.cwd(), "data", "oneloom-rendered-lookup.json");
@@ -88,8 +89,12 @@ export async function loadStudioDesign(id: string): Promise<StudioDesignData | n
   for (const entry of palette) {
     const hexLower = entry.hex.toLowerCase();
     const code = renderedLookup.get(hexLower) ?? dbLookup.get(hexLower) ?? entry.matchedYarnCode;
-    if (!code) continue;
-    const yarn = oneloomByCode.get(code);
+    let yarn = code ? oneloomByCode.get(code) : undefined;
+    // Fallback: nearest library yarn by colour (ΔE), so every design colour
+    // starts on a real wool instead of showing a blank in "In this rug".
+    if (!yarn && yarns.length > 0) {
+      yarn = findNearestYarns(entry.hex, yarns, 1)[0] as YarnOption | undefined;
+    }
     if (yarn) initialColorMap[entry.hex] = yarn;
   }
 

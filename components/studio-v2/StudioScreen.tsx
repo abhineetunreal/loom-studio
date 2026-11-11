@@ -3,25 +3,17 @@
 /**
  * StudioScreen — Loom Studio v2 colouring screen (spec: 10 Nov 2026).
  *
- * Layout (spec §3):
- *   ┌─────────────────────────────────────────────────────────────┐
- *   │ Header: product · design · Undo/Redo/Compare · Shortlist/Send │
- *   ├──────┬──────────────────────────────────┬────────────────────┤
- *   │ Film │  Stage: fill switch + 4 ideas    │ In this rug │ Library│
- *   │ strip│         large rug + texture + readout              │
- *   └──────┴──────────────────────────────────┴────────────────────┘
+ * Four zones (spec §3): header · left rail (fill / four options / shortlist) ·
+ * centre stage (rug + texture + caption) · right panel ("In this rug" grid +
+ * wool library). Warm editorial theme defined in the (studio-v2) layout.
  *
- * Working flows: select a colour (tap rug or list), whole-colour fill from the
- * library, area fill ("only what I tap") via region flood-fill, the four ideas
- * (slight / full / one family / shuffle) reusing the auto-colorway engine,
- * undo/redo across both whole-colour and area edits, and the texture toggle.
- *
- * Undo model: a single LIFO stack of ops spanning whole-colour commits (which
- * carry the previous colour map) and region fills (undone through the canvas
- * handle). Whole-colour ops are redoable; region fills are undo-only for now.
+ * Working flows: select a colour (tap rug or grid), whole-colour fill, area
+ * fill ("chosen areas"), the four options (slight / full / tone-to-tone /
+ * shuffle) with per-colour locks, shortlist with snapshot thumbnails, export,
+ * undo/redo across whole-colour and area edits, and the texture toggle.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { PaletteEntry, YarnOption } from "@/types";
 import type { RecolorCanvasHandle } from "@/components/design/RecolorCanvas";
@@ -33,25 +25,14 @@ import {
 import StudioHeader from "./StudioHeader";
 import InThisRug from "./InThisRug";
 import LibraryPanel from "./LibraryPanel";
-import FillSwitch from "./FillSwitch";
+import LeftRail, { type ShortlistItem } from "./LeftRail";
 
-// RecolorCanvas touches the DOM/canvas — load client-only.
 const RecolorCanvas = dynamic(() => import("@/components/design/RecolorCanvas"), { ssr: false });
 
 type ColorMap = Record<string, YarnOption | null>;
-
-// A single undo-stack entry: either a whole-colour map change (redoable, carries
-// the map as it was *before* the change) or a region fill (undone via the canvas
-// handle; not redoable yet).
 type Op = { type: "map"; prevMap: ColorMap } | { type: "region" };
 
-type IdeaKind = "slight" | "full" | "family" | "shuffle";
-const IDEAS: { kind: IdeaKind; label: string; hint: string }[] = [
-  { kind: "slight", label: "Slight", hint: "Nudge every colour to a near neighbour" },
-  { kind: "full", label: "Full", hint: "A bolder reshuffle of the whole palette" },
-  { kind: "family", label: "One family", hint: "Recast the rug into a single colour family" },
-  { kind: "shuffle", label: "Shuffle", hint: "Swap the current colours between areas" },
-];
+export type IdeaKind = "slight" | "full" | "family" | "shuffle";
 
 export type StudioScreenProps = {
   design: {
@@ -71,37 +52,36 @@ export type StudioScreenProps = {
 };
 
 export default function StudioScreen({
-  design,
-  palette,
-  yarns,
-  initialColorMap,
-  tenant,
+  design, palette, yarns, initialColorMap, tenant,
 }: StudioScreenProps) {
   const canvasRef = useRef<RecolorCanvasHandle>(null);
 
   // ── Recolor state + history ─────────────────────────────────────────────────
   const [colorMap, setColorMap] = useState<ColorMap>(() => ({ ...initialColorMap }));
   const past = useRef<Op[]>([]);
-  const future = useRef<Op[]>([]); // only "map" ops are redoable
+  const future = useRef<Op[]>([]);
   const [, forceTick] = useState(0);
   const bump = () => forceTick((t) => t + 1);
 
   const [selectedHex, setSelectedHex] = useState<string | null>(null);
   const [fillMode, setFillMode] = useState<"whole" | "area">("whole");
-  // Yarn to paint with in area ("only what I tap") mode.
   const [fillYarn, setFillYarn] = useState<YarnOption | null>(null);
   const [textureOn, setTextureOn] = useState(true);
   const [librarySearch, setLibrarySearch] = useState("");
+  const [lockedHexes, setLockedHexes] = useState<Set<string>>(() => new Set());
+  const [shortlist, setShortlist] = useState<ShortlistItem[]>([]);
+  const shortlistMaps = useRef<Map<string, ColorMap>>(new Map());
+  const [selectedShortlistId, setSelectedShortlistId] = useState<string | null>(null);
+  const [compareActive, setCompareActive] = useState(false);
 
-  // Whole-colour commit: replace the map, push the previous one for undo.
   const commit = useCallback((next: ColorMap) => {
     past.current = [...past.current.slice(-99), { type: "map", prevMap: colorMap }];
     future.current = [];
     setColorMap(next);
+    setSelectedShortlistId(null);
     bump();
   }, [colorMap]);
 
-  // A region fill just happened on the canvas — record it on the shared stack.
   const registerRegionOp = useCallback(() => {
     past.current = [...past.current.slice(-99), { type: "region" }];
     future.current = [];
@@ -115,8 +95,6 @@ export default function StudioScreen({
       future.current = [{ type: "map", prevMap: colorMap }, ...future.current.slice(0, 99)];
       setColorMap(op.prevMap);
     } else {
-      // Region fill — undo through the canvas. Region ops aren't redoable, so
-      // clear the redo stack to keep undo/redo coherent.
       canvasRef.current?.undoRegionFill();
       future.current = [];
     }
@@ -134,8 +112,7 @@ export default function StudioScreen({
   const canUndo = past.current.length > 0;
   const canRedo = future.current.length > 0;
 
-  // ── Current palette ("In this rug") — each design colour shows its current
-  // yarn colour, ordered by area, biggest first (spec fix). ────────────────────
+  // ── Derived ──────────────────────────────────────────────────────────────────
   const inThisRug = useMemo(() => {
     return palette
       .filter((e) => e.percentage >= 0.05)
@@ -150,29 +127,31 @@ export default function StudioScreen({
   }, [palette, colorMap]);
 
   const hasAssignments = useMemo(() => inThisRug.some((e) => e.current), [inThisRug]);
+  const inUseIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const y of Object.values(colorMap)) if (y) s.add(y.id);
+    return s;
+  }, [colorMap]);
 
   // ── Interactions ─────────────────────────────────────────────────────────────
-  const handleRugPick = useCallback((hex: string) => {
-    setSelectedHex(hex);
-  }, []);
+  const handleRugPick = useCallback((hex: string) => setSelectedHex(hex), []);
 
   const handleLibraryPick = useCallback(
     (yarn: YarnOption) => {
       if (fillMode === "whole") {
         if (!selectedHex) return;
-        // Replace the selected colour everywhere it appears.
         commit({ ...colorMap, [selectedHex]: yarn });
       } else {
-        // Area mode: arm this yarn; the next tap on the rug floods a region.
         setFillYarn(yarn);
       }
     },
     [selectedHex, fillMode, colorMap, commit]
   );
 
-  const handleInThisRugSelect = useCallback((hex: string) => {
-    setSelectedHex((cur) => (cur === hex ? null : hex));
-  }, []);
+  const handleInThisRugSelect = useCallback(
+    (hex: string) => setSelectedHex((cur) => (cur === hex ? null : hex)),
+    []
+  );
 
   const handleIdea = useCallback(
     (kind: IdeaKind) => {
@@ -181,31 +160,99 @@ export default function StudioScreen({
       else if (kind === "full") next = generateSlightVariation(colorMap, palette, yarns, 1.0);
       else if (kind === "family") next = generateOneFamily(colorMap, palette, yarns);
       else next = generateShuffle(colorMap, palette);
-      if (Object.keys(next).length === 0) return; // nothing applicable — no-op
-      commit({ ...colorMap, ...next });
+      if (Object.keys(next).length === 0) return;
+      // Respect locks — keep locked colours exactly as they are.
+      const merged: ColorMap = { ...colorMap, ...next };
+      for (const hex of lockedHexes) merged[hex] = colorMap[hex];
+      commit(merged);
     },
-    [colorMap, palette, yarns, commit]
+    [colorMap, palette, yarns, lockedHexes, commit]
   );
 
-  const handleFillModeChange = useCallback((m: "whole" | "area") => {
+  const handleFillMode = useCallback((m: "whole" | "area") => {
     setFillMode(m);
     if (m === "whole") setFillYarn(null);
   }, []);
 
-  // Readout (spec §10.1 — number only). Area mode shows what's armed to paint.
-  const readout =
+  const toggleLock = useCallback((hex: string) => {
+    setLockedHexes((prev) => {
+      const n = new Set(prev);
+      if (n.has(hex)) n.delete(hex); else n.add(hex);
+      return n;
+    });
+  }, []);
+
+  const handleShortlist = useCallback(() => {
+    const thumb = canvasRef.current?.getSnapshot(360, "jpeg", 0.82) ?? null;
+    const id = `sl-${Date.now()}`;
+    shortlistMaps.current.set(id, { ...colorMap });
+    setShortlist((prev) => [...prev, { id, thumb, label: `Option ${prev.length + 1}` }]);
+    setSelectedShortlistId(id);
+  }, [colorMap]);
+
+  const selectShortlist = useCallback((id: string) => {
+    const map = shortlistMaps.current.get(id);
+    if (!map) return;
+    commit({ ...map });
+    setSelectedShortlistId(id);
+  }, [commit]);
+
+  const removeShortlist = useCallback((id: string) => {
+    shortlistMaps.current.delete(id);
+    setShortlist((prev) => prev.filter((s) => s.id !== id));
+    setSelectedShortlistId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const url = canvasRef.current?.getSnapshot(1600, "png");
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${design.slug || "colourway"}.png`;
+    a.click();
+  }, [design.slug]);
+
+  // ── Stage sizing — fit the rug to the available area in both orientations ─────
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ar = design.width / design.height;
+    const measure = () => {
+      const cw = el.clientWidth, ch = el.clientHeight;
+      if (!cw || !ch) return;
+      let w = cw, h = cw / ar;
+      if (h > ch) { h = ch; w = ch * ar; }
+      setBox({ w: Math.floor(w), h: Math.floor(h) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [design.width, design.height]);
+
+  // ── Copy ─────────────────────────────────────────────────────────────────────
+  const activeName =
+    fillMode === "area"
+      ? fillYarn?.name ?? null
+      : selectedHex
+        ? colorMap[selectedHex]?.name ?? null
+        : null;
+
+  const caption =
     fillMode === "area"
       ? fillYarn
-        ? `${fillYarn.code} — tap an area to fill`
-        : "Pick a colour, then tap an area"
+        ? `Tap an area to fill it with ${fillYarn.name}.`
+        : "Pick a colour on the right, then tap an area of the rug."
       : selectedHex
-        ? (colorMap[selectedHex]?.code ?? selectedHex)
-        : "";
+        ? `Changing ${colorMap[selectedHex]?.name ?? "this colour"} everywhere it appears. Tap a swatch on the right.`
+        : "Tap a colour in the rug, then pick a wool on the right.";
 
   const libraryDisabled = fillMode === "whole" && !selectedHex;
 
   return (
-    <div className="flex flex-col h-dvh w-full overflow-hidden bg-white">
+    <div className="flex flex-col h-dvh w-full overflow-hidden bg-[var(--paper)]">
       <StudioHeader
         productName={tenant?.displayName ?? tenant?.name ?? "Loom Studio"}
         logoUrl={tenant?.logoUrl ?? null}
@@ -214,88 +261,86 @@ export default function StudioScreen({
         onRedo={redo}
         canUndo={canUndo}
         canRedo={canRedo}
+        onCompare={() => setCompareActive((v) => !v)}
+        compareActive={compareActive}
+        onShortlist={handleShortlist}
       />
 
       <div className="flex flex-1 min-h-0">
-        {/* ── Film strip (left) — idea options + shortlist. Stub for now. ──── */}
-        <aside className="w-[96px] shrink-0 border-r border-neutral-200 flex flex-col items-center py-3 gap-2">
-          <span className="text-[11px] text-neutral-400 text-center leading-tight px-1">
-            Ideas &amp; shortlist
-          </span>
-        </aside>
+        <LeftRail
+          fillMode={fillMode}
+          onFillMode={handleFillMode}
+          onIdea={handleIdea}
+          ideasEnabled={hasAssignments}
+          shortlist={shortlist}
+          selectedShortlistId={selectedShortlistId}
+          onSelectShortlist={selectShortlist}
+          onRemoveShortlist={removeShortlist}
+          onExport={handleExport}
+        />
 
-        {/* ── Stage (center) ──────────────────────────────────────────────── */}
-        <main className="flex-1 min-w-0 flex flex-col">
-          {/* Top controls row: fill switch + idea buttons */}
-          <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 border-b border-neutral-200">
-            <FillSwitch mode={fillMode} onChange={handleFillModeChange} />
-            <div className="flex items-center gap-1.5">
-              {IDEAS.map((idea) => (
-                <button
-                  key={idea.kind}
-                  onClick={() => handleIdea(idea.kind)}
-                  disabled={!hasAssignments}
-                  title={idea.hint}
-                  className="px-3 py-1.5 rounded-md text-[13px] text-neutral-600 border border-neutral-200 hover:border-neutral-400 hover:bg-neutral-50 disabled:opacity-40 disabled:hover:border-neutral-200 disabled:hover:bg-transparent transition-colors"
+        {/* ── Stage ───────────────────────────────────────────────────────────── */}
+        <main className="flex-1 min-w-0 flex flex-col bg-[var(--paper)]">
+          <div className="flex-1 min-h-0 p-8 flex">
+            <div ref={stageRef} className="relative flex-1 min-h-0 flex items-center justify-center">
+              {box && (
+                <div
+                  className="relative shadow-[0_6px_30px_rgba(44,42,36,0.14)]"
+                  style={{ width: box.w, height: box.h }}
                 >
-                  {idea.label}
-                </button>
-              ))}
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <label className="flex items-center gap-1.5 text-[13px] text-neutral-600 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={textureOn}
-                  onChange={(e) => setTextureOn(e.target.checked)}
-                  className="accent-neutral-800"
-                />
+                  <RecolorCanvas
+                    ref={canvasRef}
+                    imageUrl={design.imageUrl}
+                    width={design.width}
+                    height={design.height}
+                    palette={palette}
+                    colorMap={colorMap}
+                    selectedHex={selectedHex}
+                    onColorPick={handleRugPick}
+                    textureEnabled={textureOn}
+                    designName={design.name}
+                    mode={fillMode === "area" ? "region" : "global"}
+                    fillYarn={fillMode === "area" ? (fillYarn ?? undefined) : undefined}
+                    onRegionFillDelta={() => registerRegionOp()}
+                  />
+                </div>
+              )}
+              {/* Wool texture pill */}
+              <button
+                onClick={() => setTextureOn((v) => !v)}
+                className="absolute left-0 bottom-0 flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--raise)]/90 border border-[var(--line-strong)] backdrop-blur-sm text-[12.5px] text-[var(--ink)]"
+              >
+                <span className={`w-3 h-3 rounded-[2px] ${textureOn ? "bg-[var(--ink)]" : "bg-transparent border border-[var(--line-strong)]"}`} />
                 Wool texture
-              </label>
+              </button>
             </div>
           </div>
-
-          {/* Rug */}
-          <div className="flex-1 min-h-0 flex items-center justify-center p-4 bg-white">
-            <div className="relative h-full w-full flex items-center justify-center">
-              <RecolorCanvas
-                ref={canvasRef}
-                imageUrl={design.imageUrl}
-                width={design.width}
-                height={design.height}
-                palette={palette}
-                colorMap={colorMap}
-                selectedHex={selectedHex}
-                onColorPick={handleRugPick}
-                textureEnabled={textureOn}
-                designName={design.name}
-                mode={fillMode === "area" ? "region" : "global"}
-                fillYarn={fillMode === "area" ? (fillYarn ?? undefined) : undefined}
-                onRegionFillDelta={() => registerRegionOp()}
-              />
-            </div>
-          </div>
-
-          {/* Colour readout (number only — spec §10.1). */}
-          <div className="shrink-0 h-7 flex items-center justify-center text-[13px] text-neutral-500 border-t border-neutral-200">
-            {readout}
+          {/* Caption */}
+          <div className="shrink-0 h-9 flex items-center justify-center px-4 border-t border-[var(--line)] bg-[var(--panel)]">
+            <span className="u-mono text-[12px] text-[var(--ink-soft)] truncate">{caption}</span>
           </div>
         </main>
 
-        {/* ── Right panel — two columns: In this rug | Library ───────────────── */}
-        <aside className="w-[520px] shrink-0 border-l border-neutral-200 flex min-h-0">
+        {/* ── Right panel ─────────────────────────────────────────────────────── */}
+        <aside className="shrink-0 flex min-h-0 border-l border-[var(--line)]">
           <InThisRug
             entries={inThisRug}
             selectedHex={selectedHex}
             onSelect={handleInThisRugSelect}
+            lockedHexes={lockedHexes}
+            onToggleLock={toggleLock}
           />
-          <LibraryPanel
-            yarns={yarns}
-            search={librarySearch}
-            onSearch={setLibrarySearch}
-            onPick={handleLibraryPick}
-            disabled={libraryDisabled}
-          />
+          <div className="w-[340px] flex min-h-0">
+            <LibraryPanel
+              yarns={yarns}
+              search={librarySearch}
+              onSearch={setLibrarySearch}
+              onPick={handleLibraryPick}
+              disabled={libraryDisabled}
+              activeName={activeName}
+              inUseIds={inUseIds}
+            />
+          </div>
         </aside>
       </div>
     </div>
