@@ -12,7 +12,7 @@
  */
 
 import type { YarnOption, PaletteEntry } from "@/types";
-import { hexToLab, deltaE } from "./color-distance";
+import { hexToLab, deltaE, hexToRgbArr } from "./color-distance";
 
 export type GeneratedColorway = {
   id: string;               // unique identifier for this variation
@@ -143,6 +143,90 @@ export function generateShuffle(
     result[entry.hex] = shuffled[i];
   });
 
+  return result;
+}
+
+// ─── One colour family (tonal) ───────────────────────────────────────────────
+
+/** Coarse colour family key from a hex — mirrors the library panel's buckets. */
+function familyKey(hex: string): string {
+  const [r, g, b] = hexToRgbArr(hex);
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn), d = mx - mn;
+  const sat = mx === 0 ? 0 : d / mx;
+  if (sat < 0.12) return "neutral";
+  let h = 0;
+  if (d !== 0) {
+    if (mx === rn) h = ((gn - bn) / d) % 6;
+    else if (mx === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  if (h < 20 || h >= 345) return "red";
+  if (h < 45) return "orange";
+  if (h < 70) return "yellow";
+  if (h < 160) return "green";
+  if (h < 200) return "teal";
+  if (h < 255) return "blue";
+  if (h < 290) return "purple";
+  return "pink";
+}
+
+/**
+ * One-family recolour: recast the whole rug into a single colour family, keeping
+ * its light→dark structure. The dominant assigned family (by area, preferring a
+ * chromatic one over neutrals) becomes the target; each entry is matched to the
+ * yarn in that family whose lightness (LAB L*) is closest to the original's, so
+ * contrast between areas is preserved. Returns {} if the target family has no
+ * library yarns (caller should treat that as a no-op).
+ */
+export function generateOneFamily(
+  currentMap: Record<string, YarnOption | null>,
+  palette: PaletteEntry[],
+  yarns: YarnOption[],
+): Record<string, YarnOption> {
+  const entries = palette
+    .filter((e) => e.percentage >= 0.05 && currentMap[e.hex])
+    .sort((a, b) => b.percentage - a.percentage);
+  if (entries.length === 0) return {};
+
+  // Dominant family among assigned yarns, weighted by area; prefer chromatic.
+  const weight = new Map<string, number>();
+  for (const e of entries) {
+    const k = familyKey(currentMap[e.hex]!.hex);
+    weight.set(k, (weight.get(k) ?? 0) + e.percentage);
+  }
+  let target = "";
+  let best = -1;
+  for (const [k, w] of weight) if (k !== "neutral" && w > best) { best = w; target = k; }
+  if (!target) for (const [k, w] of weight) if (w > best) { best = w; target = k; }
+
+  const candidates = yarns
+    .filter((y) => familyKey(y.hex) === target)
+    .map((y) => ({ y, L: hexToLab(y.hex).L }));
+  if (candidates.length === 0) return {};
+
+  const used = new Set<string>();
+  const result: Record<string, YarnOption> = {};
+  for (const e of entries) {
+    const targetL = hexToLab(currentMap[e.hex]!.hex).L;
+    let pick: YarnOption | null = null;
+    let bestD = Infinity;
+    for (const c of candidates) {
+      if (used.has(c.y.id)) continue;
+      const dd = Math.abs(c.L - targetL);
+      if (dd < bestD) { bestD = dd; pick = c.y; }
+    }
+    if (!pick) {
+      // Pool exhausted (more areas than family yarns) — allow reuse by nearest L.
+      for (const c of candidates) {
+        const dd = Math.abs(c.L - targetL);
+        if (dd < bestD) { bestD = dd; pick = c.y; }
+      }
+    }
+    if (pick) { result[e.hex] = pick; used.add(pick.id); }
+  }
   return result;
 }
 
