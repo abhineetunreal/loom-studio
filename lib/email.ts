@@ -4,7 +4,23 @@
 import { Resend } from "resend";
 import type { DesignDetail, SubmissionColorMappingInput, YarnOption } from "@/types";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Construct the Resend client lazily, NOT at module load: `new Resend(undefined)`
+// throws "Missing API key", which breaks `next build` page-data collection for
+// routes that merely import this module. Deferring to first use means the key is
+// only needed when an email is actually sent. The Proxy keeps existing
+// `resend.emails.send(...)` call sites unchanged.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
+const resend = new Proxy({} as Resend, {
+  get(_target, prop, receiver) {
+    const client = getResend();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 
 type NotifyParams = {
   customerName: string;
