@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase";
 import { getCurrentTenant } from "@/lib/tenant";
+import { getUser } from "@/lib/auth";
 
 // Bug reports from the in-app "Report a problem" widget.
 //
@@ -99,13 +100,39 @@ export async function POST(req: NextRequest) {
     if (t) tenantName = t.slug ?? t.name ?? "unknown";
   } catch { /* ignore */ }
 
+  // Best-effort signed-in reporter identity. Most reporters are authenticated
+  // (they reach the studio through their account), so capture who filed this
+  // from the validated session rather than relying on them re-typing an email.
+  // The endpoint is public, so this must never throw — signed-out users just
+  // leave it empty and we fall back to the optional email field below.
+  let account: { name: string | null; email: string | null } | null = null;
+  try {
+    const user = await getUser();
+    if (user) {
+      const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string };
+      const name = (meta.full_name ?? meta.name ?? "").trim() || null;
+      account = { name, email: user.email ?? null };
+    }
+  } catch { /* signed out or auth unavailable — leave account null */ }
+
+  // Reporter line: prefer the authenticated identity; append the typed email as
+  // a follow-up contact when it differs; fall back to the typed email, then "—".
+  const accountLabel = account
+    ? [account.name, account.email ? `<${account.email}>` : null].filter(Boolean).join(" ") || null
+    : null;
+  const followUp = email && email !== account?.email ? email : null;
+  const reporterLine =
+    [accountLabel, followUp ? `(follow-up: ${followUp})` : null].filter(Boolean).join(" ") ||
+    email ||
+    "—";
+
   const shotUrl = body.screenshot ? await uploadScreenshot(body.screenshot) : null;
   const sha = process.env.VERCEL_GIT_COMMIT_SHA ?? "local";
 
   const title = `[Bug] ${description.split("\n")[0].slice(0, 80)}`;
   const issueBody =
     `${description}\n\n---\n` +
-    `**Reporter:** ${email ?? "—"}\n` +
+    `**Reporter:** ${reporterLine}\n` +
     `**Tenant:** ${tenantName}\n` +
     `**Page:** ${ctx.url ?? "—"}\n` +
     (ctx.target ? `**Item:** ${ctx.target.kind}/${ctx.target.id}\n` : "") +
@@ -120,7 +147,7 @@ export async function POST(req: NextRequest) {
   const key = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   if (!TOKEN) {
-    await parkReport(key, { title, issueBody, email, tenantName });
+    await parkReport(key, { title, issueBody, email, account, tenantName });
     return NextResponse.json({ ok: true });
   }
 
