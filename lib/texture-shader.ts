@@ -35,6 +35,18 @@ export type PhotoSwatchEntry = PhotoSwatchData & {
 
 const FALLBACK_FEET = { widthFeet: 8, heightFeet: 10 };
 
+// computeTileScales / parseRugDimensions run on every render pass (once per
+// color per render cycle), so an un-guarded console.warn here spams the console
+// 50+ times per design load. Dedupe so each distinct message logs once per
+// session. Keyed by design name so a different design still surfaces its own
+// warning. See issue #10.
+const _warnedDimensionNames = new Set<string>();
+function warnDimensionsOnce(key: string, message: string): void {
+  if (_warnedDimensionNames.has(key)) return;
+  _warnedDimensionNames.add(key);
+  console.warn(message);
+}
+
 /**
  * Parse physical rug dimensions (feet) from a design name string.
  *
@@ -57,7 +69,8 @@ export function parseRugDimensions(
   const b = parseFloat(match[2]);
 
   if (a >= 30 || b >= 30) {
-    console.warn(
+    warnDimensionsOnce(
+      `ambiguous:${name}`,
       `[TextureShader] Ambiguous dimensions in "${name}" (${a} × ${b} — ` +
         `inches or tenths-of-feet?). Using ${FALLBACK_FEET.widthFeet}×${FALLBACK_FEET.heightFeet} ft fallback. ` +
         `Confirm convention with Abhineet.`
@@ -86,7 +99,8 @@ export function computeTileScales(
 ): { tileScaleX: number; tileScaleY: number } {
   const dims = parseRugDimensions(designName) ?? (() => {
     if (!/\d\s*[xX]\s*\d/.test(designName)) {
-      console.warn(
+      warnDimensionsOnce(
+        `nodims:${designName}`,
         `[TextureShader] No dimensions found in "${designName}". ` +
           `Using ${FALLBACK_FEET.widthFeet}×${FALLBACK_FEET.heightFeet} ft fallback.`
       );
