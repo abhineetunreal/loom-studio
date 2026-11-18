@@ -3,7 +3,21 @@
 
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy Resend client — `new Resend(undefined)` throws at module load, which
+// breaks `next build` for routes importing this module. Defer to first use; the
+// Proxy keeps existing `resend.emails.send(...)` call sites unchanged.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
+const resend = new Proxy({} as Resend, {
+  get(_target, prop, receiver) {
+    const client = getResend();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});
 const FROM = "Loom Studio <noreply@loomstudio.com>";
 
 type ApprovalParams = {
