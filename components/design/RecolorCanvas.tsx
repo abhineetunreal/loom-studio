@@ -312,6 +312,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // Bumped after each region fill / undo to trigger a re-render
   const [overrideVersion, setOverrideVersion] = useState(0);
   const [swatchVersion, setSwatchVersion] = useState(0);
+  // Bumped when the canvas's displayed (CSS) size changes — e.g. the user zooms
+  // in, which grows the wrapper and so the canvas box, or the window/layout
+  // reflows. The render effect owns DPR-aware buffer sizing from the live rect,
+  // so it must re-run on these changes; otherwise the buffer stays sized for the
+  // old (smaller) box and the browser upscales it to fill the larger box, which
+  // reads as blur at zoom levels above the device pixel ratio.
+  const [displayVersion, setDisplayVersion] = useState(0);
 
   // ── Expose handle methods to parent ─────────────────────────────────────────
   useImperativeHandle(ref, () => ({
@@ -703,6 +710,52 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     };
   }, [width, height, onRenderComplete]);
 
+  // ── Re-render when the canvas's displayed size changes (zoom, reflow) ────────
+  // The render effect sizes the pixel buffer to (CSS size × devicePixelRatio)
+  // from the live getBoundingClientRect(). That read only happens when the effect
+  // runs, and zoom is driven by the parent growing the canvas wrapper — it does
+  // not change any render-effect dependency. Without this observer the buffer
+  // would stay at its pre-zoom size and the browser would stretch it to fill the
+  // zoomed box, blurring the result until some unrelated change forced a redraw.
+  //
+  // We bump displayVersion only when the DPR-scaled target width/height actually
+  // changes, so ordinary ResizeObserver chatter doesn't trigger needless renders.
+  // Resizing the buffer never alters the canvas's CSS box (it is sized by the
+  // parent via width/height styles), so this cannot feed back into a loop.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof ResizeObserver === "undefined") return;
+
+    const targetBufferSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+      return {
+        w: rect.width > 0 ? Math.round(rect.width * dpr) : width,
+        h: rect.height > 0 ? Math.round(rect.height * dpr) : height,
+      };
+    };
+
+    let last = targetBufferSize();
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      // Coalesce bursts (e.g. a continuous pinch/wheel zoom) into one bump.
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const next = targetBufferSize();
+        if (next.w !== last.w || next.h !== last.h) {
+          last = next;
+          setDisplayVersion((v) => v + 1);
+        }
+      });
+    });
+    ro.observe(canvas);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [width, height]);
+
   // Performance notes:
   //   • lookup uses integer keys (r<<16|g<<8|b) — no per-pixel string allocation
   //   • OffscreenCanvas is reused across renders (offscreenRef)
@@ -880,7 +933,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     return () => { cancelled = true; };
   // pixelsVersion triggers this effect after image load; overrideVersion after region fills; swatchVersion after photo swatch loads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion]);
+  }, [colorMap, width, height, textureEnabled, designName, tileMultiplier, textureStrength, swatchScale, yarnScaleOverrides, sharpenStrength, pixelsVersion, overrideVersion, swatchVersion, displayVersion]);
 
   // ── Click/touch: pick color from pixel data (override-aware) ───────────────
   function pickColorAt(clientX: number, clientY: number) {
