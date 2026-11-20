@@ -470,31 +470,14 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // ── Worker: init + hand over this design's supersampled pixels ───────────────
   // Called whenever pixels become available (fresh load or cache hit). Inits the
   // singleton worker (once), then pushes pixels so renders can be routed to it.
-  const pushPixelsToWorker = (ssPixels: Uint8ClampedArray) => {
-    if (workerBroken.current) return;
-    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!base) return; // no texture host → stay on sync path
-    const detailMapUrl = `${base}/storage/v1/object/public/textures/422/wool_28kpsi_detail1.png`;
-    const ssW = width * SUPERSAMPLE_FACTOR;
-    const ssH = height * SUPERSAMPLE_FACTOR;
-
-    // Warm path: the worker is already up (e.g. switching between designs) —
-    // hand over pixels synchronously so the very first render of this design
-    // routes to the worker instead of blocking the main thread once.
-    if (renderWorker.ready) {
-      renderWorker.setPixels(ssPixels, ssW, ssH, width);
-      workerUsable.current = true;
-      return;
-    }
-
-    // Cold path: first use this session — init, then push pixels and re-render.
-    workerUsable.current = false;
-    renderWorker.init(detailMapUrl).then((ok) => {
-      if (!ok) return; // worker unavailable → sync path handles everything
-      renderWorker.setPixels(ssPixels, ssW, ssH, width);
-      workerUsable.current = true;
-      setPixelsVersion((v) => v + 1);
-    });
+  // ⚠ Render worker temporarily disabled (issue #18). The off-main-thread
+  // worker can stall on the 16 MB detail-map load and return no result, which
+  // left `onRenderComplete` unfired and the canvas spinner hanging forever with
+  // no fallback. Until the worker has its own timeout/health-check, this is a
+  // no-op so `workerUsable` never flips true and every render takes the proven
+  // synchronous path (which now has its own texture-load timeout below).
+  const pushPixelsToWorker = (_ssPixels: Uint8ClampedArray) => {
+    return;
   };
 
   // ── Load image → extract pixels (cache-first) ────────────────────────────────
@@ -843,8 +826,25 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const ssW = width * ss;
       const ssH = height * ss;
 
-      await textureShader.load("422");
+      // Load the wool detail map, but never hang on it. If it stalls (slow or
+      // unreachable Supabase asset), paint the flat recolor so the rug still
+      // shows instead of an endless spinner. See issue #18.
+      const textureReady = await Promise.race([
+        textureShader.load("422").then(() => true).catch(() => false),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 6000)),
+      ]);
       if (cancelled) return;
+      if (!textureReady) {
+        const flatOffscreen = new OffscreenCanvas(width, height);
+        flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
+        ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
+        if (!cancelled && !renderCompleteFired.current) {
+          renderCompleteFired.current = true;
+          console.log("[Canvas] onRenderComplete (flat fallback — texture load timed out)");
+          onRenderComplete?.();
+        }
+        return;
+      }
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
 
