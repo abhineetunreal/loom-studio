@@ -1091,7 +1091,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   }
 
   return (
-    <div className="relative">
+    // w-full h-full makes this wrapper fill the sized box its parent gives it
+    // (CanvasZone / ZoomStage both hand it an explicit fitW×fitH box). Without a
+    // definite height here the canvas's `h-full` can't resolve, so its height was
+    // left to settle circularly via the ResizeObserver — which lands on the wrong
+    // value after a remount (e.g. switching Manual→Auto→Manual), leaving the rug
+    // shrunk with dead space. A definite box makes the canvas size deterministic.
+    <div className="relative w-full h-full">
       <canvas
         ref={canvasRef}
         onClick={handleClick}

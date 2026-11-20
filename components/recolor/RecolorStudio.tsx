@@ -216,6 +216,7 @@ export default function RecolorStudio({
                 onColorPick={handleCanvasPick}
                 textureEnabled={s.textureEnabled}
                 designName={design.name}
+                swatchScale={2}
                 mode="global"
               />
             </ZoomStage>
