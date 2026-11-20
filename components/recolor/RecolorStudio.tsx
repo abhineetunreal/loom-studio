@@ -196,7 +196,15 @@ export default function RecolorStudio({
         {/* STAGE */}
         <main className="flex-1 min-w-0 min-h-0 relative flex flex-col" style={{ padding: mode === "auto" ? 20 : 30, background: "#efe9dd" }}>
           {mode === "manual" ? (
-            <Contain aspect={design.width / design.height} boxStyle={{ boxShadow: "0 10px 36px rgba(44,42,36,.15)", borderRadius: 4 }}>
+            <ZoomStage
+              aspect={design.width / design.height}
+              canvasRef={canvasRef}
+              footerLeft={
+                <button onClick={() => s.setTextureEnabled((v) => !v)} className="flex items-center gap-2" style={{ padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
+                </button>
+              }
+            >
               <RecolorCanvas
                 ref={canvasRef}
                 imageUrl={design.imageUrl}
@@ -210,10 +218,7 @@ export default function RecolorStudio({
                 designName={design.name}
                 mode="global"
               />
-              <button onClick={() => s.setTextureEnabled((v) => !v)} className="absolute flex items-center gap-2" style={{ left: 12, bottom: 12, padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12, zIndex: 2 }}>
-                <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
-              </button>
-            </Contain>
+            </ZoomStage>
           ) : (
             <div className="w-full h-full flex flex-col min-h-0">
               <div className="shrink-0 flex items-center justify-center gap-2" style={{ marginBottom: 14, fontSize: 13, color: SOFT }}>
@@ -304,6 +309,128 @@ function rowsFromMap(map: StudioColorMap, palette: PaletteEntry[]): string[] {
   const sorted = palette.filter((e) => e.percentage >= 0.05).slice().sort((a, b) => b.percentage - a.percentage);
   const out = sorted.map((e) => map[e.hex]?.hex ?? e.hex);
   return out.length ? out : ["#DDDDD3"];
+}
+
+// Keep the panned rug inside the viewport once zoomed in.
+function clampPan(panX: number, panY: number, zoom: number, fitW: number, fitH: number, zoneW: number, zoneH: number) {
+  if (zoom <= 1) return { x: 0, y: 0 };
+  const maxX = Math.max(0, (fitW * zoom - zoneW) / 2);
+  const maxY = Math.max(0, (fitH * zoom - zoneH) / 2);
+  return { x: Math.max(-maxX, Math.min(maxX, panX)), y: Math.max(-maxY, Math.min(maxY, panY)) };
+}
+
+/**
+ * ZoomStage — the Manual rug stage with object-contain fit, scroll/pinch zoom,
+ * drag-to-pan and a zoom slider. The rug is laid out at its contain-fit size
+ * (×zoom) and centred, so it never shrinks or top-aligns; a transparent overlay
+ * distinguishes a pan-drag from a tap (which forwards to the canvas colour pick).
+ */
+function ZoomStage({
+  aspect,
+  canvasRef,
+  children,
+  footerLeft,
+}: {
+  aspect: number;
+  canvasRef: React.RefObject<RecolorCanvasHandle | null>;
+  children: React.ReactNode;
+  footerLeft?: React.ReactNode;
+}) {
+  const HAIR = "#e7e0d2", INK = "#2c2a24", FAINT = "#9a9484";
+  const zoneRef = useRef<HTMLDivElement>(null);
+  const [zone, setZone] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const zoomRef = useRef(1), panRef = useRef({ x: 0, y: 0 }), zoneR = useRef({ w: 0, h: 0 });
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+  useEffect(() => { zoneR.current = zone; }, [zone]);
+
+  useEffect(() => {
+    const el = zoneRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setZone((p) => (Math.round(p.w) === Math.round(r.width) && Math.round(p.h) === Math.round(r.height) ? p : { w: r.width, h: r.height }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const fitOf = (zw: number, zh: number) => (zw > 0 && zh > 0 ? (zw / zh > aspect ? { fw: zh * aspect, fh: zh } : { fw: zw, fh: zw / aspect }) : { fw: 0, fh: 0 });
+  const fit = fitOf(zone.w, zone.h);
+
+  // wheel zoom toward the cursor
+  useEffect(() => {
+    const el = zoneRef.current;
+    if (!el) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      const { w: zw, h: zh } = zoneR.current;
+      const cz = zoomRef.current, cp = panRef.current;
+      const f = zw / zh > aspect ? { fw: zh * aspect, fh: zh } : { fw: zw, fh: zw / aspect };
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const nz = Math.max(1, Math.min(4, cz * factor));
+      const r = el!.getBoundingClientRect();
+      const mx = e.clientX - r.left - zw / 2, my = e.clientY - r.top - zh / 2;
+      const ratio = nz / cz;
+      const np = clampPan(mx * (1 - ratio) + cp.x * ratio, my * (1 - ratio) + cp.y * ratio, nz, f.fw, f.fh, zw, zh);
+      zoomRef.current = nz; panRef.current = np; setZoom(nz); setPan(np);
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [aspect]);
+
+  // drag-to-pan / tap-to-pick
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+  const draggingRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const down = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.setPointerCapture(e.pointerId); startRef.current = { x: e.clientX, y: e.clientY }; draggingRef.current = false; setDragging(false); };
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!startRef.current) return;
+    const dx = e.clientX - startRef.current.x, dy = e.clientY - startRef.current.y;
+    if (!draggingRef.current && Math.hypot(dx, dy) > 4) { draggingRef.current = true; setDragging(true); }
+    if (draggingRef.current && zoomRef.current > 1) {
+      const { w: zw, h: zh } = zoneR.current;
+      const np = clampPan(panRef.current.x + dx, panRef.current.y + dy, zoomRef.current, fit.fw, fit.fh, zw, zh);
+      startRef.current = { x: e.clientX, y: e.clientY }; panRef.current = np; setPan(np);
+    }
+  };
+  const up = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) canvasRef.current?.pickColorAt(e.clientX, e.clientY);
+    startRef.current = null; draggingRef.current = false; setDragging(false);
+  };
+
+  const setZoomTo = (z: number) => {
+    const nz = Math.max(1, Math.min(4, z));
+    const np = clampPan(panRef.current.x, panRef.current.y, nz, fit.fw, fit.fh, zone.w, zone.h);
+    zoomRef.current = nz; panRef.current = np; setZoom(nz); setPan(np);
+  };
+
+  const cursor = zoom === 1 ? "crosshair" : dragging ? "grabbing" : "grab";
+
+  return (
+    <div ref={zoneRef} className="flex-1 min-h-0 min-w-0 w-full relative overflow-hidden">
+      {fit.fw > 0 && (
+        <div
+          className="absolute"
+          style={{ left: "50%", top: "50%", transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px))`, width: fit.fw * zoom, height: fit.fh * zoom, boxShadow: "0 10px 36px rgba(44,42,36,.15)", borderRadius: 4, overflow: "hidden" }}
+        >
+          {children}
+        </div>
+      )}
+      {/* transparent overlay: pan when zoomed, tap to pick */}
+      <div className="absolute inset-0" style={{ cursor, zIndex: 1, touchAction: "none" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} />
+      {footerLeft && <div className="absolute" style={{ left: 12, bottom: 12, zIndex: 2 }}>{footerLeft}</div>}
+      {/* zoom control */}
+      <div className="absolute flex items-center gap-1.5" style={{ right: 12, bottom: 12, zIndex: 2, background: "rgba(255,255,255,.94)", border: `1px solid ${HAIR}`, borderRadius: 9, padding: "5px 9px" }}>
+        <button aria-label="Zoom out" onClick={() => setZoomTo(zoom - 0.25)} style={{ width: 18, height: 18, border: 0, background: "transparent", color: INK, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>−</button>
+        <input type="range" min={1} max={4} step={0.1} value={zoom} onChange={(e) => setZoomTo(parseFloat(e.target.value))} aria-label="Zoom level" style={{ width: 92, accentColor: INK }} />
+        <button aria-label="Zoom in" onClick={() => setZoomTo(zoom + 0.25)} style={{ width: 18, height: 18, border: 0, background: "transparent", color: INK, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>+</button>
+        <span style={{ width: 30, textAlign: "right", fontSize: 11, color: FAINT, fontVariantNumeric: "tabular-nums" }}>{zoom.toFixed(1)}×</span>
+      </div>
+    </div>
+  );
 }
 
 /**
