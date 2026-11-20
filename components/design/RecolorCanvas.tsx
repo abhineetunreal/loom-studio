@@ -719,22 +719,30 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     };
 
     let last = targetBufferSize();
-    let frame = 0;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
     const ro = new ResizeObserver(() => {
-      // Coalesce bursts (e.g. a continuous pinch/wheel zoom) into one bump.
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
+      // Smooth zoom: a wheel/pinch zoom grows the parent wrapper every frame, so
+      // this observer fires continuously. Re-rasterizing the full recolor+texture
+      // pipeline on each frame is what made zoom feel sticky — the expensive
+      // renders pile up and lag behind the gesture. Instead we do nothing while
+      // the size is actively changing: the canvas CSS-fills its box, so the
+      // browser GPU-scales the existing bitmap to fit, which is instant and
+      // smooth (momentarily soft at high zoom, like Figma/Maps). Only once the
+      // size has held steady for a beat do we bump displayVersion for a single
+      // crisp re-render at the final zoom level.
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = undefined;
         const next = targetBufferSize();
         if (next.w !== last.w || next.h !== last.h) {
           last = next;
           setDisplayVersion((v) => v + 1);
         }
-      });
+      }, 160);
     });
     ro.observe(canvas);
     return () => {
-      if (frame) cancelAnimationFrame(frame);
+      if (settleTimer) clearTimeout(settleTimer);
       ro.disconnect();
     };
   }, [width, height]);
