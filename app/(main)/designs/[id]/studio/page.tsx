@@ -7,6 +7,7 @@ import { getCurrentTenant } from "@/lib/tenant";
 import { getTenantYarns, getTenantColorLookup } from "@/lib/design-data";
 import { resolveDesignImageUrl } from "@/lib/design-urls";
 import RecolorStudio from "@/components/recolor/RecolorStudio";
+import { hexToLab, deltaE } from "@/lib/color-distance";
 import type { PaletteEntry, YarnOption } from "@/types";
 
 // New colour-tool screen (Manual / Auto). Preview route — the production design
@@ -58,19 +59,38 @@ export default async function DesignStudioPage({ params, searchParams }: Props) 
   const imageUrl = await resolveDesignImageUrl(design);
   const palette = design.palette as PaletteEntry[];
 
-  const renderedLookup = loadRenderedLookup();
-  const dbLookup = new Map(dbColorLookupRows.map((r) => [r.renderedHex.toLowerCase(), r.yarnCode]));
-  const oneloomByCode = new Map<string, YarnOption>(
-    yarns.filter((y) => y.library === "OneLoom").map((y) => [y.code, y])
-  );
+  // Initial colourway: map every palette colour to its nearest yarn in the
+  // Wool_Colors library (by ΔE in LAB). Falls back to the rendered-lookup /
+  // OneLoom resolution if the tenant has no Wool_Colors yarns.
+  const normLib = (s: string) => s.toLowerCase().replace(/[_\s]+/g, " ").trim();
+  const woolYarns = yarns.filter((y) => normLib(y.library ?? "") === "wool colors");
 
   const initialColorMap: Record<string, YarnOption> = {};
-  for (const entry of palette) {
-    const hexLower = entry.hex.toLowerCase();
-    const code = renderedLookup.get(hexLower) ?? dbLookup.get(hexLower) ?? entry.matchedYarnCode;
-    if (!code) continue;
-    const yarn = oneloomByCode.get(code);
-    if (yarn) initialColorMap[entry.hex] = yarn;
+  if (woolYarns.length) {
+    const woolLab = woolYarns.map((y) => ({ y, lab: hexToLab(y.hex) }));
+    for (const entry of palette) {
+      const lab = hexToLab(entry.hex);
+      let best = woolLab[0];
+      let bestD = Infinity;
+      for (const c of woolLab) {
+        const d = deltaE(lab, c.lab);
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      if (best) initialColorMap[entry.hex] = best.y;
+    }
+  } else {
+    const renderedLookup = loadRenderedLookup();
+    const dbLookup = new Map(dbColorLookupRows.map((r) => [r.renderedHex.toLowerCase(), r.yarnCode]));
+    const oneloomByCode = new Map<string, YarnOption>(
+      yarns.filter((y) => y.library === "OneLoom").map((y) => [y.code, y])
+    );
+    for (const entry of palette) {
+      const hexLower = entry.hex.toLowerCase();
+      const code = renderedLookup.get(hexLower) ?? dbLookup.get(hexLower) ?? entry.matchedYarnCode;
+      if (!code) continue;
+      const yarn = oneloomByCode.get(code);
+      if (yarn) initialColorMap[entry.hex] = yarn;
+    }
   }
 
   return (
@@ -86,7 +106,7 @@ export default async function DesignStudioPage({ params, searchParams }: Props) 
         tierInfo={tierInfo}
         productName={tenant?.displayName ?? tenant?.name ?? "Loom Studio"}
         logoUrl={tenant?.logoUrl ?? null}
-        initialLibrary={libraryParam}
+        initialLibrary={libraryParam ?? woolYarns[0]?.library ?? undefined}
       />
     </div>
   );
