@@ -220,7 +220,7 @@ export default function RecolorStudio({
                 Four ways to colour {design.name} — tap the one you like to open it and edit
               </div>
               <div className="flex-1 min-h-0 grid" style={{ gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 18, justifyItems: "center" }}>
-                {(autoOptions.length ? autoOptions : s.generateFour(autoKind)).slice(0, 4).map((opt, i) => (
+                {autoOptions.slice(0, 4).map((opt, i) => (
                   <button key={i} onClick={() => openOption(opt)} className="relative" style={{ height: "100%", aspectRatio: `${design.width}/${design.height}`, maxWidth: "100%", borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 22px rgba(44,42,36,.14)", background: "#fff" }}>
                     <span className="flex flex-col w-full h-full">
                       {chunk(rowsFromMap(opt, design.palette), 1).map((hex, r) => (

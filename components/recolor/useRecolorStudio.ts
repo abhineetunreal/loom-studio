@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import type { PaletteEntry, YarnOption } from "@/types";
-import { generateShuffle, generateSlightVariation, generateBatch } from "@/lib/auto-colorways";
+import { generateShuffle, generateSlightVariation, generateBatch, generateOneFamily, topFamilies } from "@/lib/auto-colorways";
 
 export type StudioColorMap = Record<string, YarnOption | null>;
 
@@ -209,6 +209,22 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
   // Four options for Auto mode (maps only; previews rendered by the caller).
   const generateFour = useCallback(
     (kind: "full" | "slight" | "family" | "shuffle"): StudioColorMap[] => {
+      if (kind === "family") {
+        // Four tone-on-tone options, each in a different colour family.
+        const fams = topFamilies(pool, 4);
+        const maps = fams
+          .map((f) => generateOneFamily(colorMap, palette, pool, f))
+          .filter((m) => Object.keys(m).length > 0)
+          .map((m) => withLocks(m));
+        if (maps.length >= 1) {
+          // pad to 4 with slight variations if a family came up empty
+          while (maps.length < 4) {
+            const v = generateSlightVariation(colorMap, palette, pool, 0.4);
+            maps.push(withLocks(v));
+          }
+          return maps.slice(0, 4);
+        }
+      }
       const mode = kind === "shuffle" ? "shuffle" : "variation";
       const spread = kind === "full" ? 1.0 : kind === "slight" ? 0.3 : 0.6;
       const batch = generateBatch(mode, 4, colorMap, palette, pool, spread);
