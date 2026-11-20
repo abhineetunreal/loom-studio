@@ -13,7 +13,7 @@
  * engine — mountable here or anywhere a design needs colouring.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 import type { RecolorCanvasHandle } from "@/components/design/RecolorCanvas";
@@ -194,9 +194,9 @@ export default function RecolorStudio({
         </aside>
 
         {/* STAGE */}
-        <main className="flex-1 min-w-0 relative flex items-center justify-center" style={{ padding: mode === "auto" ? 20 : 30, background: "#efe9dd" }}>
+        <main className="flex-1 min-w-0 min-h-0 relative flex flex-col" style={{ padding: mode === "auto" ? 20 : 30, background: "#efe9dd" }}>
           {mode === "manual" ? (
-            <div className="relative" style={{ height: "100%", aspectRatio: `${design.width}/${design.height}`, maxWidth: "100%", boxShadow: "0 10px 36px rgba(44,42,36,.15)", borderRadius: 4 }}>
+            <Contain aspect={design.width / design.height} boxStyle={{ boxShadow: "0 10px 36px rgba(44,42,36,.15)", borderRadius: 4 }}>
               <RecolorCanvas
                 ref={canvasRef}
                 imageUrl={design.imageUrl}
@@ -210,25 +210,40 @@ export default function RecolorStudio({
                 designName={design.name}
                 mode="global"
               />
-              <button onClick={() => s.setTextureEnabled((v) => !v)} className="absolute flex items-center gap-2" style={{ left: 12, bottom: 12, padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12 }}>
+              <button onClick={() => s.setTextureEnabled((v) => !v)} className="absolute flex items-center gap-2" style={{ left: 12, bottom: 12, padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12, zIndex: 2 }}>
                 <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
               </button>
-            </div>
+            </Contain>
           ) : (
-            <div className="w-full h-full flex flex-col">
+            <div className="w-full h-full flex flex-col min-h-0">
               <div className="shrink-0 flex items-center justify-center gap-2" style={{ marginBottom: 14, fontSize: 13, color: SOFT }}>
                 Four ways to colour {design.name} — tap the one you like to open it and edit
               </div>
-              <div className="flex-1 min-h-0 grid" style={{ gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 18, justifyItems: "center" }}>
+              <div className="flex-1 min-h-0 grid" style={{ gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 18 }}>
                 {autoOptions.slice(0, 4).map((opt, i) => (
-                  <button key={i} onClick={() => openOption(opt)} className="relative" style={{ height: "100%", aspectRatio: `${design.width}/${design.height}`, maxWidth: "100%", borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 22px rgba(44,42,36,.14)", background: "#fff" }}>
-                    <span className="flex flex-col w-full h-full">
-                      {chunk(rowsFromMap(opt, design.palette), 1).map((hex, r) => (
-                        <span key={r} style={{ flex: 1, background: hex[0] }} />
-                      ))}
-                    </span>
-                    <span className="absolute" style={{ left: 10, bottom: 10, background: "rgba(44,42,36,.8)", color: "#fff", fontSize: 11, padding: "3px 9px", borderRadius: 7 }}>Option {i + 1}</span>
-                  </button>
+                  <Contain
+                    key={i}
+                    aspect={design.width / design.height}
+                    onClick={() => openOption(opt)}
+                    boxStyle={{ borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 22px rgba(44,42,36,.14)", background: "#fff", cursor: "pointer", border: 0, padding: 0 }}
+                  >
+                    {/* real recoloured rug preview (flat — no wool texture — for speed) */}
+                    <div className="w-full h-full" style={{ pointerEvents: "none" }}>
+                      <RecolorCanvas
+                        imageUrl={design.imageUrl}
+                        width={design.width}
+                        height={design.height}
+                        palette={design.palette}
+                        colorMap={opt}
+                        selectedHex={null}
+                        onColorPick={() => {}}
+                        textureEnabled={false}
+                        designName={design.name}
+                        mode="global"
+                      />
+                    </div>
+                    <span className="absolute" style={{ left: 10, bottom: 10, background: "rgba(44,42,36,.8)", color: "#fff", fontSize: 11, padding: "3px 9px", borderRadius: 7, zIndex: 2 }}>Option {i + 1}</span>
+                  </Contain>
                 ))}
               </div>
             </div>
@@ -290,10 +305,53 @@ function rowsFromMap(map: StudioColorMap, palette: PaletteEntry[]): string[] {
   const out = sorted.map((e) => map[e.hex]?.hex ?? e.hex);
   return out.length ? out : ["#DDDDD3"];
 }
-function chunk<T>(arr: T[], n: number): T[][] {
-  const r: T[][] = [];
-  for (let i = 0; i < arr.length; i += n) r.push(arr.slice(i, i + n));
-  return r;
+
+/**
+ * Contain — measures its area and renders a centred box that fits a given
+ * aspect ratio inside it (object-contain), so the rug fills the stage without
+ * dead space or distortion. Mirrors the fit maths the production CanvasZone
+ * uses, but as a reusable wrapper for the single Manual stage and each Auto tile.
+ */
+function Contain({
+  aspect,
+  onClick,
+  boxStyle,
+  children,
+}: {
+  aspect: number;
+  onClick?: () => void;
+  boxStyle?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setBox((prev) => (Math.round(prev.w) === Math.round(r.width) && Math.round(prev.h) === Math.round(r.height) ? prev : { w: r.width, h: r.height }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  let fw = 0, fh = 0;
+  if (box.w > 0 && box.h > 0 && aspect > 0) {
+    if (box.w / box.h > aspect) { fh = box.h; fw = fh * aspect; }
+    else { fw = box.w; fh = fw / aspect; }
+  }
+
+  const Box: React.ElementType = onClick ? "button" : "div";
+  return (
+    <div ref={ref} className="flex-1 min-h-0 min-w-0 w-full flex items-center justify-center">
+      {fw > 0 && (
+        <Box onClick={onClick} style={{ width: fw, height: fh, position: "relative", padding: 0, ...boxStyle }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
 }
 
 function Seg({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
