@@ -1091,6 +1091,7 @@ export default function DesignViewer({
           tierInfo={tierInfo}
           isUserUpload={isUserUpload}
           viewProductUrl={viewProductUrl}
+          studioHref={`/designs/${design.id}/studio`}
           mode={recolorMode}
           onToggleMode={() => setRecolorMode((m) => m === "global" ? "region" : "global")}
           showAutoColorways={showAutoColorways}

@@ -127,6 +127,15 @@ export default function RecolorStudio({
           <span style={{ fontSize: 14, fontWeight: 500 }} className="truncate">{design.name}</span>
           {design.externalSku && <span style={{ fontSize: 11, color: FAINT, fontFamily: "ui-monospace, monospace" }}>{design.externalSku}</span>}
         </div>
+        <a
+          href={`/designs/${design.id}`}
+          title="Back to the classic editor"
+          className="flex items-center gap-1"
+          style={{ marginLeft: 10, fontSize: 12.5, color: FAINT, textDecoration: "none", whiteSpace: "nowrap" }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" /></svg>
+          Classic editor
+        </a>
         <div className="ml-auto flex items-center gap-1">
           <IconBtn label="Undo" disabled={!s.canUndo} onClick={s.undo}><UndoI /></IconBtn>
           <IconBtn label="Redo" disabled={!s.canRedo} onClick={s.redo}><RedoI /></IconBtn>

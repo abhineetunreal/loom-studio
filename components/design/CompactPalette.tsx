@@ -16,6 +16,8 @@ type Props = {
   isUserUpload: boolean;
   /** Full URL to the product page on the brand's website. Only shown when set. */
   viewProductUrl?: string;
+  /** When set, shows a button that opens the new colour studio for this design. */
+  studioHref?: string;
   /** Current fill mode — global replaces everywhere, region flood-fills one area. */
   mode: "global" | "region";
   onToggleMode: () => void;
@@ -35,6 +37,7 @@ export default function CompactPalette({
   tierInfo,
   isUserUpload,
   viewProductUrl,
+  studioHref,
   mode,
   onToggleMode,
   showAutoColorways,
@@ -68,6 +71,18 @@ export default function CompactPalette({
             </a>
           )}
         </div>
+        {studioHref && (
+          <a
+            href={studioHref}
+            title="Open the Colour Studio for this design"
+            className="mt-1.5 flex items-center justify-center gap-1 w-full rounded-md bg-stone-800 text-white text-[11px] font-medium py-1.5 hover:bg-stone-700 transition-colors"
+          >
+            <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5L13 3z" />
+            </svg>
+            Colour Studio
+          </a>
+        )}
       </div>
 
       {/* Fill mode toggle */}
