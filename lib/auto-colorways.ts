@@ -12,7 +12,100 @@
  */
 
 import type { YarnOption, PaletteEntry } from "@/types";
-import { hexToLab, deltaE } from "./color-distance";
+import { hexToLab, deltaE, hexToRgbArr } from "./color-distance";
+
+// ─── Colour families (for tone-on-tone) ──────────────────────────────────────
+
+/** Coarse colour family key for a hex — neutrals, then hue buckets. */
+export function familyKey(hex: string): string {
+  const [r, g, b] = hexToRgbArr(hex);
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  const mx = Math.max(rn, gn, bn), mn = Math.min(rn, gn, bn), d = mx - mn;
+  const sat = mx === 0 ? 0 : d / mx;
+  if (sat < 0.12) return "neutral";
+  let h = 0;
+  if (d !== 0) {
+    if (mx === rn) h = ((gn - bn) / d) % 6;
+    else if (mx === gn) h = (bn - rn) / d + 2;
+    else h = (rn - gn) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  if (h < 20 || h >= 345) return "red";
+  if (h < 45) return "orange";
+  if (h < 70) return "yellow";
+  if (h < 160) return "green";
+  if (h < 200) return "teal";
+  if (h < 255) return "blue";
+  if (h < 290) return "purple";
+  return "pink";
+}
+
+/** The colour families present in a yarn library, by number of yarns, richest first. */
+export function topFamilies(yarns: YarnOption[], n: number): string[] {
+  const count = new Map<string, number>();
+  for (const y of yarns) count.set(familyKey(y.hex), (count.get(familyKey(y.hex)) ?? 0) + 1);
+  return [...count.entries()]
+    .filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([k]) => k);
+}
+
+/**
+ * Tone-on-tone: recast the rug into a single colour family, preserving its
+ * light→dark structure by matching each area's lightness. When `targetFamily`
+ * is given the rug is cast into that family; otherwise the dominant assigned
+ * family is used. Returns {} if the family has no library yarns.
+ */
+export function generateOneFamily(
+  currentMap: Record<string, YarnOption | null>,
+  palette: PaletteEntry[],
+  yarns: YarnOption[],
+  targetFamily?: string,
+  jitter: number = 0,
+): Record<string, YarnOption> {
+  const entries = palette
+    .filter((e) => e.percentage >= 0.05 && currentMap[e.hex])
+    .sort((a, b) => b.percentage - a.percentage);
+  if (entries.length === 0) return {};
+
+  let target = targetFamily ?? "";
+  if (!target) {
+    const weight = new Map<string, number>();
+    for (const e of entries) {
+      const k = familyKey(currentMap[e.hex]!.hex);
+      weight.set(k, (weight.get(k) ?? 0) + e.percentage);
+    }
+    let best = -1;
+    for (const [k, w] of weight) if (k !== "neutral" && w > best) { best = w; target = k; }
+    if (!target) for (const [k, w] of weight) if (w > best) { best = w; target = k; }
+  }
+
+  const candidates = yarns.filter((y) => familyKey(y.hex) === target).map((y) => ({ y, L: hexToLab(y.hex).L }));
+  if (candidates.length === 0) return {};
+
+  const used = new Set<string>();
+  const result: Record<string, YarnOption> = {};
+  for (const e of entries) {
+    const targetL = hexToLab(currentMap[e.hex]!.hex).L;
+    // Rank this family's yarns by how close their lightness is to the target,
+    // preferring unused ones. With jitter>0 we pick randomly among the closest
+    // few instead of always the single nearest, so repeated generations yield
+    // fresh-but-valid tone-on-tone variants.
+    const ranked = candidates
+      .slice()
+      .sort((a, b) => Math.abs(a.L - targetL) - Math.abs(b.L - targetL));
+    const avail = ranked.filter((c) => !used.has(c.y.id));
+    const fromList = avail.length ? avail : ranked;
+    if (!fromList.length) continue;
+    const window = Math.max(1, Math.min(Math.round(1 + jitter * 4), fromList.length));
+    const pick = fromList[Math.floor(Math.random() * window)].y;
+    result[e.hex] = pick;
+    used.add(pick.id);
+  }
+  return result;
+}
 
 export type GeneratedColorway = {
   id: string;               // unique identifier for this variation
@@ -50,6 +143,11 @@ export function generateSlightVariation(
   palette: PaletteEntry[],
   yarns: YarnOption[],
   spread: number = 0.5,
+  // When true (default), a yarn is only replaced by one from its own library
+  // (a Wool_Colors yarn won't become a OneLoom). When false, the whole provided
+  // `yarns` pool is eligible — used by the studio's library picker, where the
+  // pool has already been narrowed to the libraries the user chose to draw from.
+  restrictLibrary: boolean = true,
 ): Record<string, YarnOption> {
   const result: Record<string, YarnOption> = {};
   const usedYarnIds = new Set<string>();
@@ -60,9 +158,11 @@ export function generateSlightVariation(
     .filter((e) => e.percentage >= 0.05)
     .sort((a, b) => b.percentage - a.percentage);
 
-  // Pre-compute LAB for all yarns
+  // Pre-compute LAB for all yarns, grouped by library (for same-library mode)
+  // and as a flat list (for cross-library / pool mode).
+  const allLab = precomputeLabs(yarns);
   const yarnsByLibrary = new Map<string, YarnWithLab[]>();
-  for (const y of precomputeLabs(yarns)) {
+  for (const y of allLab) {
     const lib = y.library ?? "__default__";
     if (!yarnsByLibrary.has(lib)) yarnsByLibrary.set(lib, []);
     yarnsByLibrary.get(lib)!.push(y);
@@ -76,7 +176,8 @@ export function generateSlightVariation(
     }
 
     const lib = currentYarn.library ?? "__default__";
-    const candidates = (yarnsByLibrary.get(lib) ?? []).filter(
+    const source = restrictLibrary ? (yarnsByLibrary.get(lib) ?? []) : allLab;
+    const candidates = source.filter(
       (y) => y.id !== currentYarn.id && !usedYarnIds.has(y.id)
     );
 
@@ -155,6 +256,7 @@ export function generateBatch(
   palette: PaletteEntry[],
   yarns: YarnOption[],
   spread?: number,
+  restrictLibrary: boolean = true,
 ): GeneratedColorway[] {
   const results: GeneratedColorway[] = [];
   const seenKeys = new Set<string>();
@@ -167,7 +269,7 @@ export function generateBatch(
     attempts++;
     const colorMap =
       mode === "variation"
-        ? generateSlightVariation(currentMap, palette, yarns, spread ?? 0.5)
+        ? generateSlightVariation(currentMap, palette, yarns, spread ?? 0.5, restrictLibrary)
         : generateShuffle(currentMap, palette);
 
     // Deduplicate by sorted yarn-id string

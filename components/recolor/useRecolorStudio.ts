@@ -1,0 +1,309 @@
+"use client";
+
+/**
+ * useRecolorStudio — the reusable core of the colour tool.
+ *
+ * Owns the colour map (with undo/redo), per-colour locks, the version History,
+ * and the generators (scheme stepper, Shuffle, Randomise) that sit on top of the
+ * existing auto-colorway engine. UI components consume this hook; it holds no
+ * markup, so the same brain drives the design-page studio and any future screen.
+ */
+
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
+import type { PaletteEntry, YarnOption } from "@/types";
+import { generateShuffle, generateSlightVariation, generateBatch, generateOneFamily, topFamilies } from "@/lib/auto-colorways";
+
+export type StudioColorMap = Record<string, YarnOption | null>;
+
+type RState = { current: StudioColorMap; past: StudioColorMap[]; future: StudioColorMap[] };
+type RAction =
+  | { type: "SET_ALL"; map: StudioColorMap }
+  | { type: "ASSIGN"; hex: string; yarn: YarnOption }
+  | { type: "UNDO" }
+  | { type: "REDO" }
+  | { type: "RESET"; map: StudioColorMap };
+
+function reducer(s: RState, a: RAction): RState {
+  switch (a.type) {
+    case "ASSIGN":
+      return { current: { ...s.current, [a.hex]: a.yarn }, past: [...s.past.slice(-49), s.current], future: [] };
+    case "SET_ALL":
+      return { current: a.map, past: [...s.past.slice(-49), s.current], future: [] };
+    case "UNDO":
+      if (!s.past.length) return s;
+      return { current: s.past[s.past.length - 1], past: s.past.slice(0, -1), future: [s.current, ...s.future] };
+    case "REDO":
+      if (!s.future.length) return s;
+      return { current: s.future[0], past: [...s.past, s.current], future: s.future.slice(1) };
+    case "RESET":
+      return { current: a.map, past: [...s.past.slice(-49), s.current], future: [] };
+  }
+}
+
+export type HistoryEntry = { id: string; label: string; map: StudioColorMap; source: "edit" | "scheme" | "shuffle" | "randomise" | "auto" };
+
+export type ColourRow = {
+  hex: string;
+  current: YarnOption | null;
+  displayHex: string;
+  percentage: number;
+};
+
+type Params = {
+  palette: PaletteEntry[];
+  yarns: YarnOption[];
+  initialColorMap: StudioColorMap;
+  initialLibrary?: string;
+};
+
+const MIN_PCT = 0.05;
+
+export function useRecolorStudio({ palette, yarns, initialColorMap, initialLibrary }: Params) {
+  const [state, dispatch] = useReducer(
+    reducer,
+    { current: { ...initialColorMap }, past: [], future: [] }
+  );
+  const [lockedHexes, setLockedHexes] = useState<Set<string>>(() => new Set());
+  const [availableOnly, setAvailableOnly] = useState(true);
+  const [textureEnabled, setTextureEnabled] = useState(true);
+
+  // Which yarn libraries the generators (scheme / shuffle / randomise / auto)
+  // draw from. Every distinct library present in the tenant's yarns, and the
+  // selected subset. Defaults to the library the design opened in (so
+  // generations stay consistent with the initial colourway), or all of them.
+  const allLibraries = useMemo(
+    () => [...new Set(yarns.map((y) => y.library).filter((l): l is string => !!l))].sort(),
+    [yarns]
+  );
+  const [libraries, setLibraries] = useState<Set<string>>(() =>
+    new Set(initialLibrary && allLibraries.includes(initialLibrary) ? [initialLibrary] : allLibraries)
+  );
+
+  const colorMap = state.current;
+
+  // Keep locked colours fixed when a generator rewrites the map.
+  const withLocks = useCallback(
+    (next: Record<string, YarnOption>): StudioColorMap => {
+      const merged: StudioColorMap = { ...colorMap, ...next };
+      for (const hex of lockedHexes) merged[hex] = colorMap[hex] ?? null;
+      return merged;
+    },
+    [colorMap, lockedHexes]
+  );
+
+  // ── History ──────────────────────────────────────────────────────────────────
+  const [history, setHistory] = useState<HistoryEntry[]>(() => [
+    { id: "v0", label: "Start", map: { ...initialColorMap }, source: "edit" },
+  ]);
+  const [currentVersionId, setCurrentVersionId] = useState("v0");
+  const vCounter = useRef(0);
+
+  const pushHistory = useCallback((map: StudioColorMap, source: HistoryEntry["source"], label?: string) => {
+    vCounter.current += 1;
+    const id = `v${vCounter.current}`;
+    setHistory((h) => [{ id, label: label ?? labelFor(source, vCounter.current), map: { ...map }, source }, ...h].slice(0, 40));
+    setCurrentVersionId(id);
+  }, []);
+
+  // ── Commit helpers ───────────────────────────────────────────────────────────
+  const applyMap = useCallback(
+    (map: StudioColorMap, source: HistoryEntry["source"] = "edit", label?: string) => {
+      dispatch({ type: "SET_ALL", map });
+      pushHistory(map, source, label);
+    },
+    [pushHistory]
+  );
+
+  const assign = useCallback(
+    (hex: string, yarn: YarnOption) => {
+      const next = { ...colorMap, [hex]: yarn };
+      dispatch({ type: "ASSIGN", hex, yarn });
+      pushHistory(next, "edit");
+    },
+    [colorMap, pushHistory]
+  );
+
+  const toggleLock = useCallback((hex: string) => {
+    setLockedHexes((prev) => {
+      const n = new Set(prev);
+      if (n.has(hex)) n.delete(hex); else n.add(hex);
+      return n;
+    });
+  }, []);
+
+  const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
+  const redo = useCallback(() => dispatch({ type: "REDO" }), []);
+  const canUndo = state.past.length > 0;
+  const canRedo = state.future.length > 0;
+
+  const restoreVersion = useCallback(
+    (id: string) => {
+      const entry = history.find((h) => h.id === id);
+      if (!entry) return;
+      dispatch({ type: "SET_ALL", map: { ...entry.map } });
+      setCurrentVersionId(id);
+    },
+    [history]
+  );
+
+  // ── Derived: colours used, sorted by area ────────────────────────────────────
+  const coloursUsed: ColourRow[] = useMemo(
+    () =>
+      palette
+        .filter((e) => e.percentage >= MIN_PCT)
+        .slice()
+        .sort((a, b) => b.percentage - a.percentage)
+        .map((e) => ({
+          hex: e.hex,
+          current: colorMap[e.hex] ?? null,
+          displayHex: colorMap[e.hex]?.hex ?? e.hex,
+          percentage: e.percentage,
+        })),
+    [palette, colorMap]
+  );
+
+  const inUseIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const y of Object.values(colorMap)) if (y) s.add(y.id);
+    return s;
+  }, [colorMap]);
+
+  const hasAssignments = useMemo(() => coloursUsed.some((e) => e.current), [coloursUsed]);
+
+  // ── Generators ───────────────────────────────────────────────────────────────
+  const pool = useMemo(() => {
+    let ys = availableOnly ? yarns.filter((y) => (y.library ?? "").length > 0) : yarns;
+    // Restrict to the chosen libraries (unless all/none are selected → no filter).
+    if (libraries.size > 0 && libraries.size < allLibraries.length) {
+      ys = ys.filter((y) => libraries.has(y.library ?? ""));
+    }
+    return ys;
+  }, [yarns, availableOnly, libraries, allLibraries]);
+
+  const shuffle = useCallback(() => {
+    const next = generateShuffle(colorMap, palette);
+    if (!Object.keys(next).length) return;
+    applyMap(withLocks(next), "shuffle");
+  }, [colorMap, palette, withLocks, applyMap]);
+
+  const randomise = useCallback(() => {
+    // New yarns for each unlocked, assigned colour — a bolder jump than Shuffle.
+    const next: Record<string, YarnOption> = {};
+    for (const row of coloursUsed) {
+      if (!row.current) continue;
+      const pick = pool.length ? pool[Math.floor(Math.random() * pool.length)] : row.current;
+      next[row.hex] = pick;
+    }
+    if (!Object.keys(next).length) return;
+    applyMap(withLocks(next), "randomise");
+  }, [coloursUsed, pool, withLocks, applyMap]);
+
+  // Scheme stepper — a pre-generated library of full variations to flip through.
+  const schemes = useMemo(
+    () => generateBatch("variation", 48, initialColorMap, palette, pool, 1.0, false).map((g) => g.colorMap),
+    // regenerate only if the design/pool identity changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [palette, pool.length]
+  );
+  const [schemeIndex, setSchemeIndex] = useState(-1); // -1 = original, not yet stepped
+
+  const applyScheme = useCallback(
+    (idx: number) => {
+      if (!schemes.length) return;
+      const wrapped = ((idx % schemes.length) + schemes.length) % schemes.length;
+      setSchemeIndex(wrapped);
+      applyMap(withLocks(schemes[wrapped]), "scheme", `Scheme ${wrapped + 1}`);
+    },
+    [schemes, withLocks, applyMap]
+  );
+  const schemeNext = useCallback(() => applyScheme(schemeIndex + 1), [applyScheme, schemeIndex]);
+  const schemePrev = useCallback(() => applyScheme(schemeIndex - 1), [applyScheme, schemeIndex]);
+  const schemeRandom = useCallback(
+    () => applyScheme(Math.floor(Math.random() * Math.max(1, schemes.length))),
+    [applyScheme, schemes.length]
+  );
+
+  // Four options for Auto mode (maps only; previews rendered by the caller).
+  const generateFour = useCallback(
+    (kind: "full" | "slight" | "family" | "shuffle"): StudioColorMap[] => {
+      if (kind === "family") {
+        // Tone-on-tone: explore ALL qualifying colour families (not just the top
+        // four), shuffled each click, and generate with jitter so pressing
+        // "Generate four" keeps yielding fresh, valid tone-on-tone options
+        // instead of the same deterministic set every time.
+        const fams = topFamilies(pool, 99);
+        if (fams.length) {
+          const shuffled = [...fams];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          const maps: StudioColorMap[] = [];
+          const seen = new Set<string>();
+          const keyOf = (m: Record<string, YarnOption>) =>
+            Object.entries(m).sort(([a], [b]) => a.localeCompare(b)).map(([h, y]) => `${h}:${y.id}`).join("|");
+          let attempts = 0;
+          while (maps.length < 4 && attempts < 48) {
+            const fam = shuffled[attempts % shuffled.length];
+            attempts++;
+            const m = generateOneFamily(colorMap, palette, pool, fam, 0.6);
+            if (!Object.keys(m).length) continue;
+            const key = keyOf(m);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            maps.push(withLocks(m));
+          }
+          while (maps.length < 4) {
+            const v = generateSlightVariation(colorMap, palette, pool, 0.4);
+            maps.push(withLocks(v));
+          }
+          return maps.slice(0, 4);
+        }
+      }
+      const mode = kind === "shuffle" ? "shuffle" : "variation";
+      const spread = kind === "full" ? 1.0 : kind === "slight" ? 0.3 : 0.6;
+      const batch = generateBatch(mode, 4, colorMap, palette, pool, spread, false);
+      return batch.map((g) => withLocks(g.colorMap));
+    },
+    [colorMap, palette, pool, withLocks]
+  );
+
+  return {
+    colorMap,
+    coloursUsed,
+    inUseIds,
+    hasAssignments,
+    lockedHexes,
+    toggleLock,
+    assign,
+    applyMap,
+    shuffle,
+    randomise,
+    generateFour,
+    scheme: { index: schemeIndex, total: schemes.length, next: schemeNext, prev: schemePrev, random: schemeRandom, apply: applyScheme },
+    history,
+    currentVersionId,
+    restoreVersion,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    availableOnly,
+    setAvailableOnly,
+    textureEnabled,
+    setTextureEnabled,
+    allLibraries,
+    libraries,
+    setLibraries,
+  };
+}
+
+function labelFor(source: HistoryEntry["source"], n: number): string {
+  switch (source) {
+    case "scheme": return `Scheme`;
+    case "shuffle": return `Shuffle`;
+    case "randomise": return `Randomise`;
+    case "auto": return `Auto`;
+    default: return `v${n}`;
+  }
+}

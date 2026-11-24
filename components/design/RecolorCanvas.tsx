@@ -470,31 +470,14 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   // ── Worker: init + hand over this design's supersampled pixels ───────────────
   // Called whenever pixels become available (fresh load or cache hit). Inits the
   // singleton worker (once), then pushes pixels so renders can be routed to it.
-  const pushPixelsToWorker = (ssPixels: Uint8ClampedArray) => {
-    if (workerBroken.current) return;
-    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!base) return; // no texture host → stay on sync path
-    const detailMapUrl = `${base}/storage/v1/object/public/textures/422/wool_28kpsi_detail1.png`;
-    const ssW = width * SUPERSAMPLE_FACTOR;
-    const ssH = height * SUPERSAMPLE_FACTOR;
-
-    // Warm path: the worker is already up (e.g. switching between designs) —
-    // hand over pixels synchronously so the very first render of this design
-    // routes to the worker instead of blocking the main thread once.
-    if (renderWorker.ready) {
-      renderWorker.setPixels(ssPixels, ssW, ssH, width);
-      workerUsable.current = true;
-      return;
-    }
-
-    // Cold path: first use this session — init, then push pixels and re-render.
-    workerUsable.current = false;
-    renderWorker.init(detailMapUrl).then((ok) => {
-      if (!ok) return; // worker unavailable → sync path handles everything
-      renderWorker.setPixels(ssPixels, ssW, ssH, width);
-      workerUsable.current = true;
-      setPixelsVersion((v) => v + 1);
-    });
+  // ⚠ Render worker temporarily disabled (issue #18). The off-main-thread
+  // worker can stall on the 16 MB detail-map load and return no result, which
+  // left `onRenderComplete` unfired and the canvas spinner hanging forever with
+  // no fallback. Until the worker has its own timeout/health-check, this is a
+  // no-op so `workerUsable` never flips true and every render takes the proven
+  // synchronous path (which now has its own texture-load timeout below).
+  const pushPixelsToWorker = (_ssPixels: Uint8ClampedArray) => {
+    return;
   };
 
   // ── Load image → extract pixels (cache-first) ────────────────────────────────
@@ -736,22 +719,30 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     };
 
     let last = targetBufferSize();
-    let frame = 0;
+    let settleTimer: ReturnType<typeof setTimeout> | undefined;
     const ro = new ResizeObserver(() => {
-      // Coalesce bursts (e.g. a continuous pinch/wheel zoom) into one bump.
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
+      // Smooth zoom: a wheel/pinch zoom grows the parent wrapper every frame, so
+      // this observer fires continuously. Re-rasterizing the full recolor+texture
+      // pipeline on each frame is what made zoom feel sticky — the expensive
+      // renders pile up and lag behind the gesture. Instead we do nothing while
+      // the size is actively changing: the canvas CSS-fills its box, so the
+      // browser GPU-scales the existing bitmap to fit, which is instant and
+      // smooth (momentarily soft at high zoom, like Figma/Maps). Only once the
+      // size has held steady for a beat do we bump displayVersion for a single
+      // crisp re-render at the final zoom level.
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = undefined;
         const next = targetBufferSize();
         if (next.w !== last.w || next.h !== last.h) {
           last = next;
           setDisplayVersion((v) => v + 1);
         }
-      });
+      }, 160);
     });
     ro.observe(canvas);
     return () => {
-      if (frame) cancelAnimationFrame(frame);
+      if (settleTimer) clearTimeout(settleTimer);
       ro.disconnect();
     };
   }, [width, height]);
@@ -843,8 +834,25 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
       const ssW = width * ss;
       const ssH = height * ss;
 
-      await textureShader.load("422");
+      // Load the wool detail map, but never hang on it. If it stalls (slow or
+      // unreachable Supabase asset), paint the flat recolor so the rug still
+      // shows instead of an endless spinner. See issue #18.
+      const textureReady = await Promise.race([
+        textureShader.load("422").then(() => true).catch(() => false),
+        new Promise<boolean>((r) => setTimeout(() => r(false), 6000)),
+      ]);
       if (cancelled) return;
+      if (!textureReady) {
+        const flatOffscreen = new OffscreenCanvas(width, height);
+        flatOffscreen.getContext("2d")!.putImageData(flatData, 0, 0);
+        ctx.drawImage(flatOffscreen, 0, 0, canvasW, canvasH);
+        if (!cancelled && !renderCompleteFired.current) {
+          renderCompleteFired.current = true;
+          console.log("[Canvas] onRenderComplete (flat fallback — texture load timed out)");
+          onRenderComplete?.();
+        }
+        return;
+      }
 
       const { tileScaleX, tileScaleY } = computeTileScales(ssW, ssH, designName ?? "", tileMultiplier);
 
@@ -1083,7 +1091,13 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
   }
 
   return (
-    <div className="relative">
+    // w-full h-full makes this wrapper fill the sized box its parent gives it
+    // (CanvasZone / ZoomStage both hand it an explicit fitW×fitH box). Without a
+    // definite height here the canvas's `h-full` can't resolve, so its height was
+    // left to settle circularly via the ResizeObserver — which lands on the wrong
+    // value after a remount (e.g. switching Manual→Auto→Manual), leaving the rug
+    // shrunk with dead space. A definite box makes the canvas size deterministic.
+    <div className="relative w-full h-full">
       <canvas
         ref={canvasRef}
         onClick={handleClick}
