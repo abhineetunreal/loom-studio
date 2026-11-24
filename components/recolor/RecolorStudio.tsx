@@ -78,12 +78,21 @@ export default function RecolorStudio({
     autoReady.current += 1;
     if (autoReady.current >= autoExpected.current) setAutoBusy(false);
   }, []);
-  // Stage loader: shown while the Manual canvas does its first render — on
-  // initial open and whenever we return to Manual from Auto. That first render
-  // includes the one-time wool-texture load (~2–3s); RecolorCanvas fires
-  // onRenderComplete once per instance to clear it. Also blocks rage-clicks.
+  // Stage loader: shown while the Manual canvas renders — on open, on returning
+  // to Manual, and on every recolour action (scheme / shuffle / randomise /
+  // assign / texture / undo / redo). RecolorCanvas fires onRenderComplete only
+  // once per instance, so we bump a key to remount it on each colour change;
+  // the fresh instance fires onRenderComplete again, clearing the loader. The
+  // overlay also swallows clicks so nothing gets rage-clicked mid-render.
   const [canvasBusy, setCanvasBusy] = useState(true);
+  const [manualGen, setManualGen] = useState(0);
   useEffect(() => { if (mode === "manual") setCanvasBusy(true); }, [mode]);
+  const didMountManual = useRef(false);
+  useEffect(() => {
+    if (!didMountManual.current) { didMountManual.current = true; return; }
+    setCanvasBusy(true);
+    setManualGen((g) => g + 1);
+  }, [s.colorMap, s.textureEnabled]);
 
   const handleCanvasPick = useCallback((hex: string) => setSelectedHex(hex), []);
   const handleYarnPick = useCallback(
@@ -245,6 +254,7 @@ export default function RecolorStudio({
               }
             >
               <RecolorCanvas
+                key={manualGen}
                 ref={canvasRef}
                 imageUrl={design.imageUrl}
                 width={design.width}
