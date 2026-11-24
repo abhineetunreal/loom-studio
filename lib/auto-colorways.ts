@@ -63,6 +63,7 @@ export function generateOneFamily(
   palette: PaletteEntry[],
   yarns: YarnOption[],
   targetFamily?: string,
+  jitter: number = 0,
 ): Record<string, YarnOption> {
   const entries = palette
     .filter((e) => e.percentage >= 0.05 && currentMap[e.hex])
@@ -88,15 +89,20 @@ export function generateOneFamily(
   const result: Record<string, YarnOption> = {};
   for (const e of entries) {
     const targetL = hexToLab(currentMap[e.hex]!.hex).L;
-    let pick: YarnOption | null = null;
-    let bestD = Infinity;
-    for (const c of candidates) {
-      if (used.has(c.y.id)) continue;
-      const dd = Math.abs(c.L - targetL);
-      if (dd < bestD) { bestD = dd; pick = c.y; }
-    }
-    if (!pick) for (const c of candidates) { const dd = Math.abs(c.L - targetL); if (dd < bestD) { bestD = dd; pick = c.y; } }
-    if (pick) { result[e.hex] = pick; used.add(pick.id); }
+    // Rank this family's yarns by how close their lightness is to the target,
+    // preferring unused ones. With jitter>0 we pick randomly among the closest
+    // few instead of always the single nearest, so repeated generations yield
+    // fresh-but-valid tone-on-tone variants.
+    const ranked = candidates
+      .slice()
+      .sort((a, b) => Math.abs(a.L - targetL) - Math.abs(b.L - targetL));
+    const avail = ranked.filter((c) => !used.has(c.y.id));
+    const fromList = avail.length ? avail : ranked;
+    if (!fromList.length) continue;
+    const window = Math.max(1, Math.min(Math.round(1 + jitter * 4), fromList.length));
+    const pick = fromList[Math.floor(Math.random() * window)].y;
+    result[e.hex] = pick;
+    used.add(pick.id);
   }
   return result;
 }

@@ -210,14 +210,32 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
   const generateFour = useCallback(
     (kind: "full" | "slight" | "family" | "shuffle"): StudioColorMap[] => {
       if (kind === "family") {
-        // Four tone-on-tone options, each in a different colour family.
-        const fams = topFamilies(pool, 4);
-        const maps = fams
-          .map((f) => generateOneFamily(colorMap, palette, pool, f))
-          .filter((m) => Object.keys(m).length > 0)
-          .map((m) => withLocks(m));
-        if (maps.length >= 1) {
-          // pad to 4 with slight variations if a family came up empty
+        // Tone-on-tone: explore ALL qualifying colour families (not just the top
+        // four), shuffled each click, and generate with jitter so pressing
+        // "Generate four" keeps yielding fresh, valid tone-on-tone options
+        // instead of the same deterministic set every time.
+        const fams = topFamilies(pool, 99);
+        if (fams.length) {
+          const shuffled = [...fams];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          const maps: StudioColorMap[] = [];
+          const seen = new Set<string>();
+          const keyOf = (m: Record<string, YarnOption>) =>
+            Object.entries(m).sort(([a], [b]) => a.localeCompare(b)).map(([h, y]) => `${h}:${y.id}`).join("|");
+          let attempts = 0;
+          while (maps.length < 4 && attempts < 48) {
+            const fam = shuffled[attempts % shuffled.length];
+            attempts++;
+            const m = generateOneFamily(colorMap, palette, pool, fam, 0.6);
+            if (!Object.keys(m).length) continue;
+            const key = keyOf(m);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            maps.push(withLocks(m));
+          }
           while (maps.length < 4) {
             const v = generateSlightVariation(colorMap, palette, pool, 0.4);
             maps.push(withLocks(v));

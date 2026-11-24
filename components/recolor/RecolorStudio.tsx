@@ -58,6 +58,12 @@ export default function RecolorStudio({
   const [mode, setMode] = useState<"manual" | "auto">("manual");
   const [autoKind, setAutoKind] = useState<"full" | "slight" | "family" | "shuffle">("full");
   const [autoOptions, setAutoOptions] = useState<StudioColorMap[]>([]);
+  // Stage loader: shown while the Manual canvas does its first render — on
+  // initial open and whenever we return to Manual from Auto. That first render
+  // includes the one-time wool-texture load (~2–3s); RecolorCanvas fires
+  // onRenderComplete once per instance to clear it. Also blocks rage-clicks.
+  const [canvasBusy, setCanvasBusy] = useState(true);
+  useEffect(() => { if (mode === "manual") setCanvasBusy(true); }, [mode]);
 
   const handleCanvasPick = useCallback((hex: string) => setSelectedHex(hex), []);
   const handleYarnPick = useCallback(
@@ -199,6 +205,7 @@ export default function RecolorStudio({
             <ZoomStage
               aspect={design.width / design.height}
               canvasRef={canvasRef}
+              busy={canvasBusy}
               footerLeft={
                 <button onClick={() => s.setTextureEnabled((v) => !v)} className="flex items-center gap-2" style={{ padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12 }}>
                   <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
@@ -217,6 +224,7 @@ export default function RecolorStudio({
                 textureEnabled={s.textureEnabled}
                 designName={design.name}
                 swatchScale={2}
+                onRenderComplete={() => setCanvasBusy(false)}
                 mode="global"
               />
             </ZoomStage>
@@ -331,11 +339,13 @@ function ZoomStage({
   canvasRef,
   children,
   footerLeft,
+  busy,
 }: {
   aspect: number;
   canvasRef: React.RefObject<RecolorCanvasHandle | null>;
   children: React.ReactNode;
   footerLeft?: React.ReactNode;
+  busy?: boolean;
 }) {
   const HAIR = "#e7e0d2", INK = "#2c2a24", FAINT = "#9a9484";
   const zoneRef = useRef<HTMLDivElement>(null);
@@ -430,6 +440,19 @@ function ZoomStage({
         <button aria-label="Zoom in" onClick={() => setZoomTo(zoom + 0.25)} style={{ width: 18, height: 18, border: 0, background: "transparent", color: INK, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>+</button>
         <span style={{ width: 30, textAlign: "right", fontSize: 11, color: FAINT, fontVariantNumeric: "tabular-nums" }}>{zoom.toFixed(1)}×</span>
       </div>
+      {/* loading overlay — covers the stage while the first render runs, and
+          swallows clicks so nothing gets rage-clicked during the ~2–3s wait */}
+      {busy && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 4, background: "rgba(239,233,221,.72)", cursor: "default" }}>
+          <svg width="34" height="34" viewBox="0 0 50 50" aria-label="Loading">
+            <circle cx="25" cy="25" r="20" fill="none" stroke="#d8d0be" strokeWidth="5" />
+            <circle cx="25" cy="25" r="20" fill="none" stroke={INK} strokeWidth="5" strokeLinecap="round" strokeDasharray="90 160">
+              <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.9s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+          <span style={{ marginTop: 12, fontSize: 12.5, color: "#6f685a" }}>Loading colours…</span>
+        </div>
+      )}
     </div>
   );
 }
