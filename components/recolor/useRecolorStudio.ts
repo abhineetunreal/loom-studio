@@ -53,11 +53,12 @@ type Params = {
   palette: PaletteEntry[];
   yarns: YarnOption[];
   initialColorMap: StudioColorMap;
+  initialLibrary?: string;
 };
 
 const MIN_PCT = 0.05;
 
-export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
+export function useRecolorStudio({ palette, yarns, initialColorMap, initialLibrary }: Params) {
   const [state, dispatch] = useReducer(
     reducer,
     { current: { ...initialColorMap }, past: [], future: [] }
@@ -65,6 +66,18 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
   const [lockedHexes, setLockedHexes] = useState<Set<string>>(() => new Set());
   const [availableOnly, setAvailableOnly] = useState(true);
   const [textureEnabled, setTextureEnabled] = useState(true);
+
+  // Which yarn libraries the generators (scheme / shuffle / randomise / auto)
+  // draw from. Every distinct library present in the tenant's yarns, and the
+  // selected subset. Defaults to the library the design opened in (so
+  // generations stay consistent with the initial colourway), or all of them.
+  const allLibraries = useMemo(
+    () => [...new Set(yarns.map((y) => y.library).filter((l): l is string => !!l))].sort(),
+    [yarns]
+  );
+  const [libraries, setLibraries] = useState<Set<string>>(() =>
+    new Set(initialLibrary && allLibraries.includes(initialLibrary) ? [initialLibrary] : allLibraries)
+  );
 
   const colorMap = state.current;
 
@@ -158,10 +171,14 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
   const hasAssignments = useMemo(() => coloursUsed.some((e) => e.current), [coloursUsed]);
 
   // ── Generators ───────────────────────────────────────────────────────────────
-  const pool = useMemo(
-    () => (availableOnly ? yarns.filter((y) => (y.library ?? "").length > 0) : yarns),
-    [yarns, availableOnly]
-  );
+  const pool = useMemo(() => {
+    let ys = availableOnly ? yarns.filter((y) => (y.library ?? "").length > 0) : yarns;
+    // Restrict to the chosen libraries (unless all/none are selected → no filter).
+    if (libraries.size > 0 && libraries.size < allLibraries.length) {
+      ys = ys.filter((y) => libraries.has(y.library ?? ""));
+    }
+    return ys;
+  }, [yarns, availableOnly, libraries, allLibraries]);
 
   const shuffle = useCallback(() => {
     const next = generateShuffle(colorMap, palette);
@@ -183,7 +200,7 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
 
   // Scheme stepper — a pre-generated library of full variations to flip through.
   const schemes = useMemo(
-    () => generateBatch("variation", 48, initialColorMap, palette, pool, 1.0).map((g) => g.colorMap),
+    () => generateBatch("variation", 48, initialColorMap, palette, pool, 1.0, false).map((g) => g.colorMap),
     // regenerate only if the design/pool identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [palette, pool.length]
@@ -245,7 +262,7 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
       }
       const mode = kind === "shuffle" ? "shuffle" : "variation";
       const spread = kind === "full" ? 1.0 : kind === "slight" ? 0.3 : 0.6;
-      const batch = generateBatch(mode, 4, colorMap, palette, pool, spread);
+      const batch = generateBatch(mode, 4, colorMap, palette, pool, spread, false);
       return batch.map((g) => withLocks(g.colorMap));
     },
     [colorMap, palette, pool, withLocks]
@@ -275,6 +292,9 @@ export function useRecolorStudio({ palette, yarns, initialColorMap }: Params) {
     setAvailableOnly,
     textureEnabled,
     setTextureEnabled,
+    allLibraries,
+    libraries,
+    setLibraries,
   };
 }
 

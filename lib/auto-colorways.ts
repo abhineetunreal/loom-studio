@@ -143,6 +143,11 @@ export function generateSlightVariation(
   palette: PaletteEntry[],
   yarns: YarnOption[],
   spread: number = 0.5,
+  // When true (default), a yarn is only replaced by one from its own library
+  // (a Wool_Colors yarn won't become a OneLoom). When false, the whole provided
+  // `yarns` pool is eligible — used by the studio's library picker, where the
+  // pool has already been narrowed to the libraries the user chose to draw from.
+  restrictLibrary: boolean = true,
 ): Record<string, YarnOption> {
   const result: Record<string, YarnOption> = {};
   const usedYarnIds = new Set<string>();
@@ -153,9 +158,11 @@ export function generateSlightVariation(
     .filter((e) => e.percentage >= 0.05)
     .sort((a, b) => b.percentage - a.percentage);
 
-  // Pre-compute LAB for all yarns
+  // Pre-compute LAB for all yarns, grouped by library (for same-library mode)
+  // and as a flat list (for cross-library / pool mode).
+  const allLab = precomputeLabs(yarns);
   const yarnsByLibrary = new Map<string, YarnWithLab[]>();
-  for (const y of precomputeLabs(yarns)) {
+  for (const y of allLab) {
     const lib = y.library ?? "__default__";
     if (!yarnsByLibrary.has(lib)) yarnsByLibrary.set(lib, []);
     yarnsByLibrary.get(lib)!.push(y);
@@ -169,7 +176,8 @@ export function generateSlightVariation(
     }
 
     const lib = currentYarn.library ?? "__default__";
-    const candidates = (yarnsByLibrary.get(lib) ?? []).filter(
+    const source = restrictLibrary ? (yarnsByLibrary.get(lib) ?? []) : allLab;
+    const candidates = source.filter(
       (y) => y.id !== currentYarn.id && !usedYarnIds.has(y.id)
     );
 
@@ -248,6 +256,7 @@ export function generateBatch(
   palette: PaletteEntry[],
   yarns: YarnOption[],
   spread?: number,
+  restrictLibrary: boolean = true,
 ): GeneratedColorway[] {
   const results: GeneratedColorway[] = [];
   const seenKeys = new Set<string>();
@@ -260,7 +269,7 @@ export function generateBatch(
     attempts++;
     const colorMap =
       mode === "variation"
-        ? generateSlightVariation(currentMap, palette, yarns, spread ?? 0.5)
+        ? generateSlightVariation(currentMap, palette, yarns, spread ?? 0.5, restrictLibrary)
         : generateShuffle(currentMap, palette);
 
     // Deduplicate by sorted yarn-id string

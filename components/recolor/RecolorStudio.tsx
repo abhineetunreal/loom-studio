@@ -52,12 +52,32 @@ function isLight(hex: string): boolean {
 export default function RecolorStudio({
   design, yarns, initialColorMap, tierInfo, productName, logoUrl, initialLibrary,
 }: Props) {
-  const s = useRecolorStudio({ palette: design.palette, yarns, initialColorMap });
+  const s = useRecolorStudio({ palette: design.palette, yarns, initialColorMap, initialLibrary });
   const canvasRef = useRef<RecolorCanvasHandle | null>(null);
   const [selectedHex, setSelectedHex] = useState<string | null>(null);
   const [mode, setMode] = useState<"manual" | "auto">("manual");
   const [autoKind, setAutoKind] = useState<"full" | "slight" | "family" | "shuffle">("full");
   const [autoOptions, setAutoOptions] = useState<StudioColorMap[]>([]);
+  // Auto-mode loader: generating + rendering the four preview rugs takes a
+  // moment. genId forces the tiles to remount each generation so each one fires
+  // onRenderComplete again; we count them and clear the loader when all are done.
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [genId, setGenId] = useState(0);
+  const autoReady = useRef(0);
+  const autoExpected = useRef(0);
+  const runAuto = useCallback((kind: "full" | "slight" | "family" | "shuffle") => {
+    const opts = s.generateFour(kind);
+    autoReady.current = 0;
+    autoExpected.current = Math.min(4, opts.length);
+    setAutoKind(kind);
+    setAutoBusy(true);
+    setGenId((g) => g + 1);
+    setAutoOptions(opts);
+  }, [s]);
+  const onTileRendered = useCallback(() => {
+    autoReady.current += 1;
+    if (autoReady.current >= autoExpected.current) setAutoBusy(false);
+  }, []);
   // Stage loader: shown while the Manual canvas does its first render — on
   // initial open and whenever we return to Manual from Auto. That first render
   // includes the one-time wool-texture load (~2–3s); RecolorCanvas fires
@@ -71,7 +91,7 @@ export default function RecolorStudio({
     [selectedHex, s]
   );
 
-  const generate = useCallback(() => setAutoOptions(s.generateFour(autoKind)), [s, autoKind]);
+  const generate = useCallback(() => runAuto(autoKind), [runAuto, autoKind]);
   const openOption = useCallback(
     (map: StudioColorMap) => { s.applyMap(map, "auto"); setMode("manual"); },
     [s]
@@ -115,7 +135,7 @@ export default function RecolorStudio({
             <div style={{ fontSize: 11, fontWeight: 600, color: FAINT, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 7 }}>Colour mode</div>
             <div className="flex" style={{ background: "#ece5d6", borderRadius: 11, padding: 3 }}>
               <Seg active={mode === "manual"} onClick={() => setMode("manual")}><PencilI /> Manual</Seg>
-              <Seg active={mode === "auto"} onClick={() => { setMode("auto"); if (!autoOptions.length) setAutoOptions(s.generateFour(autoKind)); }}><SparkI /> Auto</Seg>
+              <Seg active={mode === "auto"} onClick={() => { setMode("auto"); if (!autoOptions.length) runAuto(autoKind); }}><SparkI /> Auto</Seg>
             </div>
           </div>
 
@@ -158,6 +178,14 @@ export default function RecolorStudio({
 
               <div style={{ height: 1, background: HAIR }} />
 
+              {/* colours from — which yarn libraries the generators pull from */}
+              <section>
+                <h3 style={h3}>Colours from</h3>
+                <LibraryPicker all={s.allLibraries} selected={s.libraries} onChange={s.setLibraries} />
+              </section>
+
+              <div style={{ height: 1, background: HAIR }} />
+
               {/* history */}
               <section>
                 <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
@@ -186,12 +214,16 @@ export default function RecolorStudio({
                 <h3 style={h3}>Style of change</h3>
                 <div className="flex flex-col gap-1.5">
                   {([["full", "Full variation", "bold, all-new palette"], ["slight", "Slight variation", "keeps it recognisable"], ["family", "Tone on tone", "one colour family"], ["shuffle", "Shuffle", "same colours, new places"]] as const).map(([k, t, d]) => (
-                    <button key={k} onClick={() => { setAutoKind(k); setAutoOptions(s.generateFour(k)); }} className="flex items-center gap-2.5 text-left" style={{ padding: "11px 12px", border: `1px solid ${autoKind === k ? INK : HAIR}`, background: "#fff", borderRadius: 11 }}>
+                    <button key={k} onClick={() => runAuto(k)} className="flex items-center gap-2.5 text-left" style={{ padding: "11px 12px", border: `1px solid ${autoKind === k ? INK : HAIR}`, background: "#fff", borderRadius: 11 }}>
                       <span style={{ width: 15, height: 15, borderRadius: "50%", border: autoKind === k ? `5px solid ${INK}` : `1.5px solid #cfc6b2`, flex: "none" }} />
                       <span><span className="block" style={{ fontSize: 13, fontWeight: autoKind === k ? 600 : 500 }}>{t}</span><span className="block" style={{ fontSize: 11, color: FAINT }}>{d}</span></span>
                     </button>
                   ))}
                 </div>
+              </section>
+              <section>
+                <h3 style={h3}>Colours from</h3>
+                <LibraryPicker all={s.allLibraries} selected={s.libraries} onChange={s.setLibraries} />
               </section>
               <button onClick={generate} style={{ padding: 12, border: 0, background: INK, color: "#fff", borderRadius: 11, fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><SparkI /> Generate four</button>
               <p style={{ margin: "auto 2px 0", fontSize: 11.5, lineHeight: 1.5, color: FAINT }}>Tap an option in the middle to open it full-size and keep editing in Manual.</p>
@@ -229,14 +261,14 @@ export default function RecolorStudio({
               />
             </ZoomStage>
           ) : (
-            <div className="w-full h-full flex flex-col min-h-0">
+            <div className="w-full h-full flex flex-col min-h-0 relative">
               <div className="shrink-0 flex items-center justify-center gap-2" style={{ marginBottom: 14, fontSize: 13, color: SOFT }}>
                 Four ways to colour {design.name} — tap the one you like to open it and edit
               </div>
               <div className="flex-1 min-h-0 grid" style={{ gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 18 }}>
                 {autoOptions.slice(0, 4).map((opt, i) => (
                   <Contain
-                    key={i}
+                    key={`${genId}-${i}`}
                     aspect={design.width / design.height}
                     onClick={() => openOption(opt)}
                     boxStyle={{ borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 22px rgba(44,42,36,.14)", background: "#fff", cursor: "pointer", border: 0, padding: 0 }}
@@ -253,6 +285,7 @@ export default function RecolorStudio({
                         onColorPick={() => {}}
                         textureEnabled={false}
                         designName={design.name}
+                        onRenderComplete={onTileRendered}
                         mode="global"
                       />
                     </div>
@@ -260,6 +293,7 @@ export default function RecolorStudio({
                   </Contain>
                 ))}
               </div>
+              {autoBusy && <LoaderOverlay label="Generating options…" />}
             </div>
           )}
         </main>
@@ -312,6 +346,75 @@ export default function RecolorStudio({
 // ── small style helpers ─────────────────────────────────────────────────────────
 const h3: React.CSSProperties = { margin: "0 0 9px", fontSize: 12, fontWeight: 600, color: "#6f6a5d" };
 const softBtn: React.CSSProperties = { display: "flex", alignItems: "center", gap: 7, padding: "9px 6px", border: "1px solid #e7e0d2", background: "#fff", borderRadius: 10, fontSize: 12.5, cursor: "pointer" };
+
+function ChevI() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9a9484" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>;
+}
+function Check({ on }: { on: boolean }) {
+  return (
+    <span style={{ width: 15, height: 15, flex: "none", borderRadius: 4, border: on ? "none" : "1.5px solid #cfc6b2", background: on ? "#2c2a24" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {on && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><path d="M20 6L9 17l-5-5" /></svg>}
+    </span>
+  );
+}
+
+/**
+ * LibraryPicker — choose which yarn libraries the generators draw from:
+ * "Any library" (all), one library only ("current palette"), or a chosen few.
+ */
+function LibraryPicker({ all, selected, onChange }: { all: string[]; selected: Set<string>; onChange: (s: Set<string>) => void }) {
+  const [open, setOpen] = useState(false);
+  if (all.length <= 1) {
+    return <div style={{ ...softBtn, width: "100%", justifyContent: "space-between", cursor: "default", color: "#6f6a5d" }}>{all[0] ?? "—"}</div>;
+  }
+  const isAll = selected.size === 0 || selected.size >= all.length;
+  const label = isAll ? "Any library" : selected.size === 1 ? [...selected][0] : `${selected.size} libraries`;
+  const toggle = (lib: string) => {
+    if (isAll) { onChange(new Set([lib])); return; }
+    const next = new Set(selected);
+    if (next.has(lib)) { if (next.size > 1) next.delete(lib); } else next.add(lib);
+    onChange(next.size >= all.length ? new Set(all) : next);
+  };
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between" style={{ ...softBtn, width: "100%" }}>
+        <span className="truncate" style={{ fontSize: 12.5 }}>{label}</span>
+        <ChevI />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0" style={{ zIndex: 19 }} onClick={() => setOpen(false)} />
+          <div className="absolute" style={{ zIndex: 20, top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: "1px solid #e7e0d2", borderRadius: 10, boxShadow: "0 10px 30px rgba(44,42,36,.16)", padding: 6, maxHeight: 240, overflowY: "auto" }}>
+            <button onClick={() => onChange(new Set(all))} className="w-full flex items-center gap-2 text-left" style={{ padding: "8px 9px", borderRadius: 8, border: 0, background: isAll ? "#f3eee2" : "transparent", fontSize: 12.5, cursor: "pointer" }}>
+              <Check on={isAll} /> Any library
+            </button>
+            <div style={{ height: 1, background: "#efe9dd", margin: "4px 2px" }} />
+            {all.map((lib) => (
+              <button key={lib} onClick={() => toggle(lib)} className="w-full flex items-center gap-2 text-left" style={{ padding: "8px 9px", borderRadius: 8, border: 0, background: "transparent", fontSize: 12.5, cursor: "pointer" }}>
+                <Check on={!isAll && selected.has(lib)} /> <span className="truncate">{lib}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Full-cover loading overlay with a spinner; swallows clicks (no rage-clicking).
+function LoaderOverlay({ label }: { label: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 5, background: "rgba(239,233,221,.72)", cursor: "default" }}>
+      <svg width="34" height="34" viewBox="0 0 50 50" aria-label="Loading">
+        <circle cx="25" cy="25" r="20" fill="none" stroke="#d8d0be" strokeWidth="5" />
+        <circle cx="25" cy="25" r="20" fill="none" stroke="#2c2a24" strokeWidth="5" strokeLinecap="round" strokeDasharray="90 160">
+          <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.9s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+      <span style={{ marginTop: 12, fontSize: 12.5, color: "#6f685a" }}>{label}</span>
+    </div>
+  );
+}
 
 function rowsFromMap(map: StudioColorMap, palette: PaletteEntry[]): string[] {
   // distinct display colours, ordered by area, for lightweight previews/strips
@@ -442,17 +545,7 @@ function ZoomStage({
       </div>
       {/* loading overlay — covers the stage while the first render runs, and
           swallows clicks so nothing gets rage-clicked during the ~2–3s wait */}
-      {busy && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 4, background: "rgba(239,233,221,.72)", cursor: "default" }}>
-          <svg width="34" height="34" viewBox="0 0 50 50" aria-label="Loading">
-            <circle cx="25" cy="25" r="20" fill="none" stroke="#d8d0be" strokeWidth="5" />
-            <circle cx="25" cy="25" r="20" fill="none" stroke={INK} strokeWidth="5" strokeLinecap="round" strokeDasharray="90 160">
-              <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.9s" repeatCount="indefinite" />
-            </circle>
-          </svg>
-          <span style={{ marginTop: 12, fontSize: 12.5, color: "#6f685a" }}>Loading colours…</span>
-        </div>
-      )}
+      {busy && <LoaderOverlay label="Loading colours…" />}
     </div>
   );
 }
