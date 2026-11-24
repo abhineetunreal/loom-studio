@@ -18,6 +18,8 @@ import dynamic from "next/dynamic";
 import type { PaletteEntry, TierInfo, YarnOption } from "@/types";
 import type { RecolorCanvasHandle } from "@/components/design/RecolorCanvas";
 import InlineYarnPicker from "@/components/design/InlineYarnPicker";
+import SaveModal from "@/components/design/SaveModal";
+import SubmissionForm from "@/components/design/SubmissionForm";
 import { useRecolorStudio, type StudioColorMap } from "./useRecolorStudio";
 
 const RecolorCanvas = dynamic(() => import("@/components/design/RecolorCanvas"), { ssr: false });
@@ -110,6 +112,43 @@ export default function RecolorStudio({
     ? design.palette.find((e) => e.hex === selectedHex) ?? null
     : null;
 
+  // ── Shortlist (save) + Request colourway modals ────────────────────────────
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showSubmissionForm, setShowSubmissionForm] = useState(false);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+
+  const getSnapshot = useCallback((): string | null => {
+    return canvasRef.current?.getSnapshot(1200, "png") ?? null;
+  }, []);
+
+  const handleSaveSubmit = useCallback(async (name: string, folderId: string | null) => {
+    const snapshot = getSnapshot();
+    // Build the operations payload matching the classic save format
+    const globalMap: Record<string, { hex: string; yarnCode: string; yarnId: string }> = {};
+    for (const row of s.coloursUsed) {
+      if (row.current) {
+        globalMap[row.hex] = { hex: row.current.hex, yarnCode: row.current.code, yarnId: row.current.id };
+      }
+    }
+    const res = await fetch("/api/colorways", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        designId: design.id,
+        name,
+        operations: { globalMap },
+        folderId,
+        snapshotDataUrl: snapshot,
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error((data as { error?: string }).error ?? "Save failed");
+    }
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 2500);
+  }, [getSnapshot, s.coloursUsed, design.id]);
+
   const INK = "#2c2a24", SOFT = "#6f6a5d", FAINT = "#9a9484", HAIR = "#e7e0d2", PANEL = "#f6f2ea";
 
   return (
@@ -140,8 +179,8 @@ export default function RecolorStudio({
           <IconBtn label="Undo" disabled={!s.canUndo} onClick={s.undo}><UndoI /></IconBtn>
           <IconBtn label="Redo" disabled={!s.canRedo} onClick={s.redo}><RedoI /></IconBtn>
           <div style={{ width: 1, height: 24, background: HAIR, margin: "0 7px" }} />
-          <button style={{ padding: "7px 14px", border: `1px solid ${HAIR}`, background: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Shortlist</button>
-          <button style={{ padding: "7px 15px", border: 0, background: INK, color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Request colourway</button>
+          <button onClick={() => setShowSaveModal(true)} style={{ padding: "7px 14px", border: `1px solid ${HAIR}`, background: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Shortlist</button>
+          <button onClick={() => setShowSubmissionForm(true)} style={{ padding: "7px 15px", border: 0, background: INK, color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Request colourway</button>
         </div>
       </header>
 
@@ -358,6 +397,35 @@ export default function RecolorStudio({
           />
         </aside>
       </div>
+
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {showSaveModal && (
+        <SaveModal
+          onSave={handleSaveSubmit}
+          onClose={() => setShowSaveModal(false)}
+        />
+      )}
+
+      {showSubmissionForm && (
+        <SubmissionForm
+          designId={design.id}
+          designName={design.name}
+          palette={design.palette}
+          colorMap={s.colorMap}
+          getSnapshot={getSnapshot}
+          onClose={() => setShowSubmissionForm(false)}
+        />
+      )}
+
+      {/* Saved toast */}
+      {showSavedToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg" style={{ background: INK, color: "#fff" }}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>Saved to shortlist</span>
+        </div>
+      )}
     </div>
   );
 }
