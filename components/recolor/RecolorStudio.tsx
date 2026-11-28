@@ -142,6 +142,12 @@ export default function RecolorStudio({
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
 
+  // ── Mobile layout ──────────────────────────────────────────────────────────
+  const isMobile = useIsMobile();
+  const [mobileTab, setMobileTab] = useState<"colours" | "design">("colours");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const getSnapshot = useCallback((): string | null => {
     return canvasRef.current?.getSnapshot(1200, "png") ?? null;
   }, []);
@@ -184,6 +190,211 @@ export default function RecolorStudio({
   }, [design.name]);
 
   const INK = "#2c2a24", SOFT = "#6f6a5d", FAINT = "#9a9484", HAIR = "#e7e0d2", PANEL = "#f6f2ea";
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // MOBILE LAYOUT — stage on top, controls in a bottom panel, yarn picker and
+  // menu as sheets. Reuses the same hook/state/handlers as the desktop tree.
+  // ───────────────────────────────────────────────────────────────────────────
+  if (isMobile) {
+    const aspect = design.width / design.height;
+    const openPicker = (hex: string) => { setSelectedHex(hex); setPickerOpen(true); };
+    return (
+      <div className="flex flex-col h-full w-full overflow-hidden" style={{ background: "#efe9dd", color: INK, fontFamily: "-apple-system, Inter, system-ui, sans-serif" }}>
+        {/* HEADER */}
+        <header className="shrink-0 flex items-center gap-2" style={{ height: 48, padding: "0 10px", background: PANEL, borderBottom: `1px solid ${HAIR}` }}>
+          {logoUrl
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={logoUrl} alt="" crossOrigin="anonymous" style={{ height: 22, width: 22, borderRadius: 6, objectFit: "contain" }} />
+            : <span style={{ height: 22, width: 22, borderRadius: 7, background: "#9a9566" }} />}
+          <span style={{ fontSize: 14, fontWeight: 600 }} className="truncate">{design.name}</span>
+          <div className="ml-auto flex items-center gap-0.5">
+            <IconBtn label="Undo" disabled={!s.canUndo} onClick={s.undo}><UndoI /></IconBtn>
+            <IconBtn label="Redo" disabled={!s.canRedo} onClick={s.redo}><RedoI /></IconBtn>
+            <button aria-label="Menu" onClick={() => setMenuOpen(true)} style={{ width: 34, height: 34, border: 0, background: "transparent", borderRadius: 9, color: "#6f6a5d", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+            </button>
+          </div>
+        </header>
+
+        {/* MODE + VIEW */}
+        <div className="shrink-0 flex items-center gap-2" style={{ padding: "8px 10px", borderBottom: `1px solid ${HAIR}`, background: PANEL }}>
+          <div className="flex flex-1" style={{ background: "#ece5d6", borderRadius: 10, padding: 3 }}>
+            <Seg active={mode === "manual"} onClick={() => setMode("manual")}><PencilI /> Manual</Seg>
+            <Seg active={mode === "auto"} onClick={() => { setMode("auto"); if (!autoOptions.length) runAuto(autoKind); }}><SparkI /> Auto</Seg>
+          </div>
+          {mode === "manual" && (
+            <div className="flex" style={{ background: "#ece5d6", borderRadius: 10, padding: 3 }}>
+              <ViewSeg active={view === "2d"} onClick={() => setView("2d")}><GridI /></ViewSeg>
+              <ViewSeg active={view === "3d"} onClick={() => setView("3d")}><CubeI /></ViewSeg>
+            </div>
+          )}
+        </div>
+
+        {/* STAGE */}
+        <main className="flex-1 min-h-0 relative" style={{ background: "#efe9dd" }}>
+          {mode === "manual" ? (
+            view === "2d" ? (
+              <ZoomStage aspect={aspect} canvasRef={canvasRef} busy={canvasBusy}>
+                <RecolorCanvas
+                  key={manualGen} ref={canvasRef}
+                  imageUrl={design.imageUrl} width={design.width} height={design.height}
+                  palette={design.palette} colorMap={s.colorMap} selectedHex={selectedHex}
+                  onColorPick={handleCanvasPick} textureEnabled={s.textureEnabled}
+                  designName={design.name} swatchScale={2}
+                  onRenderComplete={() => setCanvasBusy(false)} mode="global"
+                />
+              </ZoomStage>
+            ) : (
+              <div className="w-full h-full relative">
+                <Rug3DView textureUrl={tex3d} aspect={aspect} />
+                {tex3dBusy && <LoaderOverlay label="Rendering 3D…" />}
+                <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 / aspect), pointerEvents: "none" }}>
+                  <RecolorCanvas
+                    key={tex3dGen} ref={tex3dRef}
+                    imageUrl={design.imageUrl} width={design.width} height={design.height}
+                    palette={design.palette} colorMap={s.colorMap} selectedHex={null}
+                    onColorPick={() => {}} textureEnabled={s.textureEnabled}
+                    designName={design.name} swatchScale={2}
+                    onRenderComplete={onTex3dRendered} mode="global"
+                  />
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="w-full h-full flex flex-col min-h-0 relative" style={{ padding: 12 }}>
+              <div className="shrink-0" style={{ fontSize: 12, color: SOFT, textAlign: "center", marginBottom: 10 }}>Tap an option to open and edit it</div>
+              <div className="flex-1 min-h-0 grid" style={{ gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 10 }}>
+                {autoOptions.slice(0, 4).map((opt, i) => (
+                  <Contain key={`${genId}-${i}`} aspect={aspect} onClick={() => openOption(opt)} boxStyle={{ borderRadius: 8, overflow: "hidden", boxShadow: "0 4px 16px rgba(44,42,36,.14)", background: "#fff", cursor: "pointer", border: 0, padding: 0 }}>
+                    <div className="w-full h-full" style={{ pointerEvents: "none" }}>
+                      <RecolorCanvas imageUrl={design.imageUrl} width={design.width} height={design.height} palette={design.palette} colorMap={opt} selectedHex={null} onColorPick={() => {}} textureEnabled={false} designName={design.name} onRenderComplete={onTileRendered} mode="global" />
+                    </div>
+                    <span className="absolute" style={{ left: 8, bottom: 8, background: "rgba(44,42,36,.8)", color: "#fff", fontSize: 10, padding: "2px 7px", borderRadius: 6, zIndex: 2 }}>{i + 1}</span>
+                  </Contain>
+                ))}
+              </div>
+              {autoBusy && <LoaderOverlay label="Generating options…" />}
+            </div>
+          )}
+        </main>
+
+        {/* BOTTOM CONTROLS */}
+        <div className="shrink-0 flex flex-col" style={{ background: PANEL, borderTop: `1px solid ${HAIR}`, maxHeight: "42vh" }}>
+          {/* tabs */}
+          <div className="flex shrink-0" style={{ padding: "8px 10px 4px", gap: 6 }}>
+            <MTab active={mobileTab === "colours"} onClick={() => setMobileTab("colours")}>Colours used</MTab>
+            <MTab active={mobileTab === "design"} onClick={() => setMobileTab("design")}>{mode === "auto" ? "Style" : "Adjust"}</MTab>
+          </div>
+
+          {mobileTab === "colours" ? (
+            <div className="overflow-x-auto" style={{ padding: "6px 10px 12px", WebkitOverflowScrolling: "touch" }}>
+              <div className="flex gap-2" style={{ width: "max-content" }}>
+                {s.coloursUsed.map((row) => {
+                  const sel = selectedHex === row.hex;
+                  const locked = s.lockedHexes.has(row.hex);
+                  return (
+                    <button key={row.hex} onClick={() => openPicker(row.hex)} className="flex flex-col items-center" style={{ width: 62, padding: 7, borderRadius: 11, background: sel ? "#fff" : "#fff", boxShadow: sel ? `0 0 0 2px ${INK}` : `0 0 0 1px ${HAIR}`, border: 0, flex: "none" }}>
+                      <span style={{ width: 38, height: 38, borderRadius: 8, background: row.displayHex, border: isLight(row.displayHex) ? `1px solid #cfc6b2` : "none", position: "relative" }}>
+                        {locked && <span style={{ position: "absolute", top: -4, right: -4, width: 15, height: 15, borderRadius: "50%", background: INK, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><LockI open={false} /></span>}
+                      </span>
+                      <span className="truncate" style={{ fontSize: 10, fontFamily: "ui-monospace,monospace", marginTop: 4, maxWidth: 52 }}>{row.current?.code ?? row.hex}</span>
+                      <span style={{ fontSize: 9, color: FAINT }}>{row.percentage.toFixed(1)}%</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: 11, color: FAINT, marginTop: 8 }}>Tap a colour to change its yarn.</p>
+            </div>
+          ) : (
+            <div className="overflow-y-auto" style={{ padding: "6px 12px 14px" }}>
+              {mode === "manual" ? (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <StepBtn label="Previous scheme" onClick={s.scheme.prev}>‹</StepBtn>
+                    <div className="flex-1 flex items-center" style={{ height: 40, border: `1px solid ${HAIR}`, background: "#fff", borderRadius: 9, padding: "0 10px" }}>
+                      <span className="flex gap-0.5">{s.coloursUsed.slice(0, 6).map((r) => <span key={r.hex} style={{ width: 9, height: 20, borderRadius: 2, background: r.displayHex, border: isLight(r.displayHex) ? `1px solid ${HAIR}` : "none" }} />)}</span>
+                      <span className="ml-auto" style={{ fontSize: 11, color: FAINT, fontFamily: "ui-monospace,monospace" }}>{s.scheme.index < 0 ? "Orig" : `${s.scheme.index + 1}/${s.scheme.total}`}</span>
+                    </div>
+                    <StepBtn label="Next scheme" onClick={s.scheme.next}>›</StepBtn>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={s.scheme.random} style={{ ...softBtn, flex: 1, justifyContent: "center" }}><DiceI /> Random</button>
+                    <button onClick={s.shuffle} disabled={!s.hasAssignments} style={{ ...softBtn, flex: 1, justifyContent: "center" }}><ShuffleI /> Shuffle</button>
+                    <button onClick={s.randomise} disabled={!s.hasAssignments} style={{ ...softBtn, flex: 1, justifyContent: "center" }}><DiceI /> Mix</button>
+                  </div>
+                  <label className="flex items-center justify-between">
+                    <span style={{ fontSize: 13 }}>Textured</span>
+                    <Toggle on={s.textureEnabled} onClick={() => s.setTextureEnabled((v) => !v)} />
+                  </label>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: SOFT, marginBottom: 6 }}>Colours from</div>
+                    <LibraryPicker all={s.allLibraries} selected={s.libraries} onChange={s.setLibraries} />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([["full", "Full variation"], ["slight", "Slight variation"], ["family", "Tone on tone"], ["shuffle", "Shuffle"]] as const).map(([k, t]) => (
+                      <button key={k} onClick={() => runAuto(k)} className="text-left" style={{ padding: "10px 11px", border: `1px solid ${autoKind === k ? INK : HAIR}`, background: "#fff", borderRadius: 10, fontSize: 12.5, fontWeight: autoKind === k ? 600 : 500 }}>{t}</button>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: SOFT, marginBottom: 6 }}>Colours from</div>
+                    <LibraryPicker all={s.allLibraries} selected={s.libraries} onChange={s.setLibraries} />
+                  </div>
+                  <button onClick={generate} style={{ padding: 12, border: 0, background: INK, color: "#fff", borderRadius: 11, fontSize: 14, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><SparkI /> Generate four</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* YARN PICKER SHEET */}
+        {pickerOpen && (
+          <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(44,42,36,.4)" }} onClick={() => setPickerOpen(false)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full flex flex-col" style={{ height: "72vh", background: PANEL, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" }}>
+              <div className="shrink-0 flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: `1px solid ${HAIR}` }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedHex ? `Change ${s.colorMap[selectedHex]?.code ?? "colour"}` : "Pick a yarn"}</div>
+                <button onClick={() => setPickerOpen(false)} style={{ width: 30, height: 30, border: 0, background: "#ece5d6", borderRadius: 8, fontSize: 16, color: INK }}>✕</button>
+              </div>
+              <div className="flex-1 min-h-0">
+                <InlineYarnPicker
+                  yarns={yarns}
+                  targetEntry={targetEntry}
+                  currentYarn={selectedHex ? (s.colorMap[selectedHex] ?? null) : null}
+                  onPick={(yarn) => { handleYarnPick(yarn); }}
+                  tierInfo={tierInfo}
+                  yarnLibraryName={productName}
+                  initialLibrary={initialLibrary}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* OVERFLOW MENU SHEET */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(44,42,36,.4)" }} onClick={() => setMenuOpen(false)}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full flex flex-col" style={{ background: PANEL, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 10, paddingBottom: "calc(10px + env(safe-area-inset-bottom, 0px))", gap: 4 }}>
+              <MenuRow onClick={() => { setMenuOpen(false); handleDownload(); }}>Download image</MenuRow>
+              <MenuRow onClick={() => { setMenuOpen(false); setShowSaveModal(true); }}>Add to shortlist</MenuRow>
+              <MenuRow onClick={() => { setMenuOpen(false); setShowSubmissionForm(true); }}>Request colourway</MenuRow>
+              <a href={`/designs/${design.id}`} style={{ textDecoration: "none" }}><MenuRow>Classic editor</MenuRow></a>
+              <button onClick={() => setMenuOpen(false)} style={{ marginTop: 4, padding: 13, border: 0, background: "#ece5d6", borderRadius: 11, fontSize: 14, fontWeight: 500, color: INK }}>Close</button>
+            </div>
+          </div>
+        )}
+
+        {showSaveModal && <SaveModal onSave={handleSaveSubmit} onClose={() => setShowSaveModal(false)} />}
+        {showSubmissionForm && <SubmissionForm designId={design.id} designName={design.name} palette={design.palette} colorMap={s.colorMap} getSnapshot={getSnapshot} onClose={() => setShowSubmissionForm(false)} />}
+        {showSavedToast && (
+          <div className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center gap-2" style={{ bottom: 24, background: INK, color: "#fff", padding: "10px 16px", borderRadius: 11, fontSize: 13, fontWeight: 500 }}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            Saved to shortlist
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden" style={{ background: "#efe9dd", color: INK, fontFamily: "-apple-system, Inter, system-ui, sans-serif" }}>
@@ -785,6 +996,24 @@ function ViewSeg({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 function GridI() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>; }
+// Mobile helpers
+function useIsMobile(breakpoint = 768) {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [breakpoint]);
+  return mobile;
+}
+function MTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} style={{ padding: "7px 14px", borderRadius: 9, fontSize: 13, fontWeight: active ? 600 : 500, background: active ? "#fff" : "transparent", color: active ? "#2c2a24" : "#6f6a5d", boxShadow: active ? "0 1px 2px rgba(44,42,36,.1)" : "none", border: 0, cursor: "pointer" }}>{children}</button>;
+}
+function MenuRow({ onClick, children }: { onClick?: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className="w-full text-left" style={{ padding: 13, border: 0, background: "#fff", borderRadius: 11, fontSize: 14, color: "#2c2a24", display: "flex", alignItems: "center" }}>{children}</button>;
+}
 function CubeI() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></svg>; }
 function IconBtn({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return <button aria-label={label} onClick={onClick} disabled={disabled} style={{ width: 34, height: 34, border: 0, background: "transparent", borderRadius: 9, cursor: "pointer", color: disabled ? "#c3bba6" : "#6f6a5d", display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</button>;
