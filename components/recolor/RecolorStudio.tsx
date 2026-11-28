@@ -23,6 +23,7 @@ import SubmissionForm from "@/components/design/SubmissionForm";
 import { useRecolorStudio, type StudioColorMap } from "./useRecolorStudio";
 
 const RecolorCanvas = dynamic(() => import("@/components/design/RecolorCanvas"), { ssr: false });
+const Rug3DView = dynamic(() => import("./Rug3DView"), { ssr: false });
 
 type Design = {
   id: string;
@@ -95,6 +96,30 @@ export default function RecolorStudio({
     setCanvasBusy(true);
     setManualGen((g) => g + 1);
   }, [s.colorMap, s.textureEnabled]);
+
+  // ── 2D / 3D view ───────────────────────────────────────────────────────────
+  // In 3D we map the recoloured rug onto a slab. The texture is produced by an
+  // off-screen RecolorCanvas (same renderer as the 2D view): on each colour
+  // change we remount it, and its onRenderComplete snapshots the result into a
+  // data URL that Rug3DView uploads as the slab texture.
+  const [view, setView] = useState<"2d" | "3d">("2d");
+  const [tex3d, setTex3d] = useState<string | null>(null);
+  const [tex3dBusy, setTex3dBusy] = useState(false);
+  const [tex3dGen, setTex3dGen] = useState(0);
+  const tex3dRef = useRef<RecolorCanvasHandle | null>(null);
+  // Show the loader whenever we (re)enter 3D — the off-screen canvas remounts
+  // and will snapshot a fresh texture.
+  useEffect(() => { if (view === "3d") setTex3dBusy(true); }, [view]);
+  // Regenerate the 3D texture whenever the colourway changes while in 3D.
+  useEffect(() => {
+    if (view !== "3d") return;
+    setTex3dBusy(true);
+    setTex3dGen((g) => g + 1);
+  }, [s.colorMap, s.textureEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  const onTex3dRendered = useCallback(() => {
+    const url = tex3dRef.current?.getSnapshot(1800, "jpeg", 0.92) ?? null;
+    if (url) { setTex3d(url); setTex3dBusy(false); }
+  }, []);
 
   const handleCanvasPick = useCallback((hex: string) => setSelectedHex(hex), []);
   const handleYarnPick = useCallback(
@@ -304,33 +329,76 @@ export default function RecolorStudio({
         {/* STAGE */}
         <main className="flex-1 min-w-0 min-h-0 relative flex flex-col" style={{ padding: mode === "auto" ? 20 : 30, background: "#efe9dd" }}>
           {mode === "manual" ? (
-            <ZoomStage
-              aspect={design.width / design.height}
-              canvasRef={canvasRef}
-              busy={canvasBusy}
-              footerLeft={
-                <button onClick={() => s.setTextureEnabled((v) => !v)} className="flex items-center gap-2" style={{ padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
-                </button>
-              }
-            >
-              <RecolorCanvas
-                key={manualGen}
-                ref={canvasRef}
-                imageUrl={design.imageUrl}
-                width={design.width}
-                height={design.height}
-                palette={design.palette}
-                colorMap={s.colorMap}
-                selectedHex={selectedHex}
-                onColorPick={handleCanvasPick}
-                textureEnabled={s.textureEnabled}
-                designName={design.name}
-                swatchScale={2}
-                onRenderComplete={() => setCanvasBusy(false)}
-                mode="global"
-              />
-            </ZoomStage>
+            <div className="w-full h-full flex flex-col min-h-0 relative">
+              {/* 2D / 3D view switch */}
+              <div className="shrink-0 flex justify-center" style={{ marginBottom: 12 }}>
+                <div className="flex" style={{ background: "#ece5d6", borderRadius: 10, padding: 3 }}>
+                  <ViewSeg active={view === "2d"} onClick={() => setView("2d")}><GridI /> Top view</ViewSeg>
+                  <ViewSeg active={view === "3d"} onClick={() => setView("3d")}><CubeI /> 3D view</ViewSeg>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0 relative">
+                {view === "2d" ? (
+                  <ZoomStage
+                    aspect={design.width / design.height}
+                    canvasRef={canvasRef}
+                    busy={canvasBusy}
+                    footerLeft={
+                      <button onClick={() => s.setTextureEnabled((v) => !v)} className="flex items-center gap-2" style={{ padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12 }}>
+                        <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
+                      </button>
+                    }
+                  >
+                    <RecolorCanvas
+                      key={manualGen}
+                      ref={canvasRef}
+                      imageUrl={design.imageUrl}
+                      width={design.width}
+                      height={design.height}
+                      palette={design.palette}
+                      colorMap={s.colorMap}
+                      selectedHex={selectedHex}
+                      onColorPick={handleCanvasPick}
+                      textureEnabled={s.textureEnabled}
+                      designName={design.name}
+                      swatchScale={2}
+                      onRenderComplete={() => setCanvasBusy(false)}
+                      mode="global"
+                    />
+                  </ZoomStage>
+                ) : (
+                  <div className="w-full h-full relative" style={{ borderRadius: 12, overflow: "hidden" }}>
+                    <Rug3DView textureUrl={tex3d} aspect={design.width / design.height} />
+                    {/* Textured toggle (same as 2D) */}
+                    <button onClick={() => s.setTextureEnabled((v) => !v)} className="absolute flex items-center gap-2" style={{ left: 14, bottom: 14, padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12, zIndex: 3 }}>
+                      <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
+                    </button>
+                    <div className="absolute" style={{ right: 14, bottom: 14, fontSize: 11, color: SOFT, background: "rgba(255,255,255,.85)", padding: "5px 10px", borderRadius: 8, zIndex: 3 }}>Drag to orbit · scroll to zoom</div>
+                    {tex3dBusy && <LoaderOverlay label="Rendering 3D…" />}
+                    {/* Off-screen canvas that produces the 3D texture (recolour + wool). */}
+                    <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 * (design.height / design.width)), pointerEvents: "none" }}>
+                      <RecolorCanvas
+                        key={tex3dGen}
+                        ref={tex3dRef}
+                        imageUrl={design.imageUrl}
+                        width={design.width}
+                        height={design.height}
+                        palette={design.palette}
+                        colorMap={s.colorMap}
+                        selectedHex={null}
+                        onColorPick={() => {}}
+                        textureEnabled={s.textureEnabled}
+                        designName={design.name}
+                        swatchScale={2}
+                        onRenderComplete={onTex3dRendered}
+                        mode="global"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <div className="w-full h-full flex flex-col min-h-0 relative">
               <div className="shrink-0 flex items-center justify-center gap-2" style={{ marginBottom: 14, fontSize: 13, color: SOFT }}>
@@ -708,6 +776,16 @@ function Seg({ active, onClick, children }: { active: boolean; onClick: () => vo
 function StepBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
   return <button aria-label={label} onClick={onClick} style={{ width: 28, height: 42, flex: "none", border: "1px solid #e7e0d2", background: "#fff", borderRadius: 9, cursor: "pointer", color: "#6f6a5d", fontSize: 14 }}>{children}</button>;
 }
+// 2D / 3D view switch segment
+function ViewSeg({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} className="flex items-center justify-center gap-1.5" style={{ padding: "7px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: active ? 600 : 500, background: active ? "#fff" : "transparent", color: active ? "#2c2a24" : "#6f6a5d", boxShadow: active ? "0 1px 2px rgba(44,42,36,.1)" : "none", border: 0, cursor: "pointer" }}>
+      {children}
+    </button>
+  );
+}
+function GridI() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>; }
+function CubeI() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></svg>; }
 function IconBtn({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
   return <button aria-label={label} onClick={onClick} disabled={disabled} style={{ width: 34, height: 34, border: 0, background: "transparent", borderRadius: 9, cursor: "pointer", color: disabled ? "#c3bba6" : "#6f6a5d", display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</button>;
 }
