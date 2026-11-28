@@ -246,6 +246,9 @@ type Props = {
   sharpenStrength?: number;
   /** Called once the first full render (recolor + texture) is painted to the canvas. */
   onRenderComplete?: () => void;
+  /** Called on EVERY completed paint (not just the first). Used by the 3D view to
+   *  re-snapshot the texture on each colour change without remounting the canvas. */
+  onRenderPaint?: () => void;
   /** Current interaction mode. */
   mode: "global" | "region";
   /**
@@ -267,7 +270,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
     textureEnabled, designName, tileMultiplier = 0.65, textureStrength = 1.5, swatchScale = 1.0,
     yarnScaleOverrides,
     sharpenStrength = 0.6,
-    onRenderComplete, mode, fillYarn,
+    onRenderComplete, onRenderPaint, mode, fillYarn,
     onRegionFillDelta, onRegionUndoDelta, onRegionClear,
   },
   ref
@@ -824,6 +827,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
           console.log("[Canvas] onRenderComplete (flat path)");
           onRenderComplete?.();
         }
+        if (!cancelled) onRenderPaint?.();
         return;
       }
 
@@ -851,6 +855,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
           console.log("[Canvas] onRenderComplete (flat fallback — texture load timed out)");
           onRenderComplete?.();
         }
+        if (!cancelled) onRenderPaint?.();
         return;
       }
 
@@ -935,6 +940,7 @@ const RecolorCanvas = forwardRef<RecolorCanvasHandle, Props>(function RecolorCan
         console.log("[Canvas] onRenderComplete (textured path)");
         onRenderComplete?.();
       }
+      if (!cancelled) onRenderPaint?.();
     }
 
     render();

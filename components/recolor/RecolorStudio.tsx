@@ -105,19 +105,15 @@ export default function RecolorStudio({
   const [view, setView] = useState<"2d" | "3d">("2d");
   const [tex3d, setTex3d] = useState<string | null>(null);
   const [tex3dBusy, setTex3dBusy] = useState(false);
-  const [tex3dGen, setTex3dGen] = useState(0);
   const tex3dRef = useRef<RecolorCanvasHandle | null>(null);
-  // Show the loader whenever we (re)enter 3D — the off-screen canvas remounts
-  // and will snapshot a fresh texture.
+  // The off-screen 3D-texture canvas stays MOUNTED (no key remount): remounting
+  // it per colour change re-ran the full pixel pipeline next to the live WebGL
+  // context and made mobile GPUs drop the 3D context. Instead it repaints in
+  // place on colourMap/texture change, and onRenderPaint re-snapshots the result.
   useEffect(() => { if (view === "3d") setTex3dBusy(true); }, [view]);
-  // Regenerate the 3D texture whenever the colourway changes while in 3D.
-  useEffect(() => {
-    if (view !== "3d") return;
-    setTex3dBusy(true);
-    setTex3dGen((g) => g + 1);
-  }, [s.colorMap, s.textureEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (view === "3d") setTex3dBusy(true); }, [s.colorMap, s.textureEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
   const onTex3dRendered = useCallback(() => {
-    const url = tex3dRef.current?.getSnapshot(1800, "jpeg", 0.92) ?? null;
+    const url = tex3dRef.current?.getSnapshot(1600, "jpeg", 0.9) ?? null;
     if (url) { setTex3d(url); setTex3dBusy(false); }
   }, []);
 
@@ -249,12 +245,12 @@ export default function RecolorStudio({
                 {tex3dBusy && <LoaderOverlay label="Rendering 3D…" />}
                 <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 / aspect), pointerEvents: "none" }}>
                   <RecolorCanvas
-                    key={tex3dGen} ref={tex3dRef}
+                    ref={tex3dRef}
                     imageUrl={design.imageUrl} width={design.width} height={design.height}
                     palette={design.palette} colorMap={s.colorMap} selectedHex={null}
                     onColorPick={() => {}} textureEnabled={s.textureEnabled}
                     designName={design.name} swatchScale={2}
-                    onRenderComplete={onTex3dRendered} mode="global"
+                    onRenderPaint={onTex3dRendered} mode="global"
                   />
                 </div>
               </div>
@@ -351,7 +347,7 @@ export default function RecolorStudio({
         {/* YARN PICKER SHEET */}
         {pickerOpen && (
           <div className="fixed inset-0 z-50 flex items-end" style={{ background: "rgba(44,42,36,.4)" }} onClick={() => setPickerOpen(false)}>
-            <div onClick={(e) => e.stopPropagation()} className="w-full flex flex-col" style={{ height: "72vh", background: PANEL, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden" }}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full flex flex-col" style={{ height: "54vh", maxHeight: 440, background: PANEL, borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
               <div className="shrink-0 flex items-center justify-between" style={{ padding: "12px 14px", borderBottom: `1px solid ${HAIR}` }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedHex ? `Change ${s.colorMap[selectedHex]?.code ?? "colour"}` : "Pick a yarn"}</div>
                 <button onClick={() => setPickerOpen(false)} style={{ width: 30, height: 30, border: 0, background: "#ece5d6", borderRadius: 8, fontSize: 16, color: INK }}>✕</button>
@@ -590,7 +586,6 @@ export default function RecolorStudio({
                     {/* Off-screen canvas that produces the 3D texture (recolour + wool). */}
                     <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 * (design.height / design.width)), pointerEvents: "none" }}>
                       <RecolorCanvas
-                        key={tex3dGen}
                         ref={tex3dRef}
                         imageUrl={design.imageUrl}
                         width={design.width}
@@ -602,7 +597,7 @@ export default function RecolorStudio({
                         textureEnabled={s.textureEnabled}
                         designName={design.name}
                         swatchScale={2}
-                        onRenderComplete={onTex3dRendered}
+                        onRenderPaint={onTex3dRendered}
                         mode="global"
                       />
                     </div>
@@ -903,7 +898,7 @@ function ZoomStage({
   const cursor = zoom === 1 ? "crosshair" : dragging ? "grabbing" : "grab";
 
   return (
-    <div ref={zoneRef} className="flex-1 min-h-0 min-w-0 w-full relative overflow-hidden">
+    <div ref={zoneRef} className="absolute inset-0 min-h-0 min-w-0 overflow-hidden">
       {fit.fw > 0 && (
         <div
           className="absolute"
