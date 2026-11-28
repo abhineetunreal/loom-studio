@@ -113,7 +113,7 @@ export default function RecolorStudio({
   useEffect(() => { if (view === "3d") setTex3dBusy(true); }, [view]);
   useEffect(() => { if (view === "3d") setTex3dBusy(true); }, [s.colorMap, s.textureEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
   const onTex3dRendered = useCallback(() => {
-    const url = tex3dRef.current?.getSnapshot(1600, "jpeg", 0.9) ?? null;
+    const url = tex3dRef.current?.getSnapshot(1024, "jpeg", 0.88) ?? null;
     if (url) { setTex3d(url); setTex3dBusy(false); }
   }, []);
 
@@ -243,12 +243,15 @@ export default function RecolorStudio({
               <div className="w-full h-full relative">
                 <Rug3DView textureUrl={tex3d} aspect={aspect} />
                 {tex3dBusy && <LoaderOverlay label="Rendering 3D…" />}
-                <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 / aspect), pointerEvents: "none" }}>
+                {/* Off-screen texture source — FLAT (no wool texture) and small, so
+                    it stays light next to the live WebGL scene (the textured detail
+                    lives in the Top view). */}
+                <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 560, height: Math.round(560 / aspect), pointerEvents: "none" }}>
                   <RecolorCanvas
                     ref={tex3dRef}
                     imageUrl={design.imageUrl} width={design.width} height={design.height}
                     palette={design.palette} colorMap={s.colorMap} selectedHex={null}
-                    onColorPick={() => {}} textureEnabled={s.textureEnabled}
+                    onColorPick={() => {}} textureEnabled={false}
                     designName={design.name} swatchScale={2}
                     onRenderPaint={onTex3dRendered} mode="global"
                   />
@@ -577,14 +580,11 @@ export default function RecolorStudio({
                 ) : (
                   <div className="w-full h-full relative" style={{ borderRadius: 12, overflow: "hidden" }}>
                     <Rug3DView textureUrl={tex3d} aspect={design.width / design.height} />
-                    {/* Textured toggle (same as 2D) */}
-                    <button onClick={() => s.setTextureEnabled((v) => !v)} className="absolute flex items-center gap-2" style={{ left: 14, bottom: 14, padding: "7px 12px", border: `1px solid ${HAIR}`, background: "rgba(255,255,255,.94)", borderRadius: 9, fontSize: 12, zIndex: 3 }}>
-                      <span style={{ width: 12, height: 12, borderRadius: 4, background: s.textureEnabled ? INK : "transparent", border: s.textureEnabled ? "none" : `1px solid ${HAIR}` }} /> Textured
-                    </button>
                     <div className="absolute" style={{ right: 14, bottom: 14, fontSize: 11, color: SOFT, background: "rgba(255,255,255,.85)", padding: "5px 10px", borderRadius: 8, zIndex: 3 }}>Drag to orbit · scroll to zoom</div>
                     {tex3dBusy && <LoaderOverlay label="Rendering 3D…" />}
-                    {/* Off-screen canvas that produces the 3D texture (recolour + wool). */}
-                    <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 820, height: Math.round(820 * (design.height / design.width)), pointerEvents: "none" }}>
+                    {/* Off-screen texture source — FLAT + small, for a light, stable
+                        3D view (textured detail is in the Top view). */}
+                    <div aria-hidden style={{ position: "absolute", left: -99999, top: 0, width: 560, height: Math.round(560 * (design.height / design.width)), pointerEvents: "none" }}>
                       <RecolorCanvas
                         ref={tex3dRef}
                         imageUrl={design.imageUrl}
@@ -594,7 +594,7 @@ export default function RecolorStudio({
                         colorMap={s.colorMap}
                         selectedHex={null}
                         onColorPick={() => {}}
-                        textureEnabled={s.textureEnabled}
+                        textureEnabled={false}
                         designName={design.name}
                         swatchScale={2}
                         onRenderPaint={onTex3dRendered}

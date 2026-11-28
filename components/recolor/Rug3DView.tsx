@@ -49,16 +49,23 @@ export default function Rug3DView({ textureUrl, aspect }: Props) {
 
     const camera = new THREE.PerspectiveCamera(38, w / h, 0.05, 300);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Cap pixel ratio — the framebuffer memory grows with its square, and on a
+    // dpr-3 phone a full 3× buffer plus shadow map is enough to OOM the tab.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.autoUpdate = false; // render shadow once; slab doesn't move
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping; // exact texture colours
     mount.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
+
+    // Recover from a lost context instead of letting the tab die.
+    const onLost = (e: Event) => { e.preventDefault(); };
+    renderer.domElement.addEventListener("webglcontextlost", onLost, false);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0, 0);
@@ -114,6 +121,9 @@ export default function Rug3DView({ textureUrl, aspect }: Props) {
 
     const loader = new THREE.TextureLoader();
 
+    // Render the shadow map once (slab and light never move), then freeze it.
+    renderer.shadowMap.needsUpdate = true;
+
     let raf = 0;
     const animate = () => {
       raf = requestAnimationFrame(animate);
@@ -137,11 +147,13 @@ export default function Rug3DView({ textureUrl, aspect }: Props) {
     return () => {
       ro.disconnect();
       cancelAnimationFrame(raf);
+      renderer.domElement.removeEventListener("webglcontextlost", onLost);
       controls.dispose();
       geo.dispose();
       topMat.map?.dispose();
       topMat.dispose(); edgeMat.dispose(); bottomMat.dispose();
       renderer.dispose();
+      renderer.forceContextLoss(); // free the GPU context promptly on unmount
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
       stateRef.current = null;
     };
