@@ -149,6 +149,15 @@ export default function RecolorStudio({
     setTimeout(() => setShowSavedToast(false), 2500);
   }, [getSnapshot, s.coloursUsed, design.id]);
 
+  const handleDownload = useCallback(() => {
+    const dataUrl = canvasRef.current?.getSnapshot(8000, "png", 1.0) ?? null;
+    if (!dataUrl) return;
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `${design.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_colourway.png`;
+    a.click();
+  }, [design.name]);
+
   const INK = "#2c2a24", SOFT = "#6f6a5d", FAINT = "#9a9484", HAIR = "#e7e0d2", PANEL = "#f6f2ea";
 
   return (
@@ -179,6 +188,10 @@ export default function RecolorStudio({
           <IconBtn label="Undo" disabled={!s.canUndo} onClick={s.undo}><UndoI /></IconBtn>
           <IconBtn label="Redo" disabled={!s.canRedo} onClick={s.redo}><RedoI /></IconBtn>
           <div style={{ width: 1, height: 24, background: HAIR, margin: "0 7px" }} />
+          <button onClick={handleDownload} title="Download the recoloured rug as a high-res PNG" style={{ padding: "7px 14px", border: `1px solid ${HAIR}`, background: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m0 0l-6-6m6 6l6-6M5 19h14" /></svg>
+            Download
+          </button>
           <button onClick={() => setShowSaveModal(true)} style={{ padding: "7px 14px", border: `1px solid ${HAIR}`, background: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Shortlist</button>
           <button onClick={() => setShowSubmissionForm(true)} style={{ padding: "7px 15px", border: 0, background: INK, color: "#fff", borderRadius: 10, fontSize: 13, fontWeight: 500 }}>Request colourway</button>
         </div>
