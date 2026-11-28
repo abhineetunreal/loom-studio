@@ -869,12 +869,59 @@ function ZoomStage({
     return () => el.removeEventListener("wheel", onWheel);
   }, [aspect]);
 
-  // drag-to-pan / tap-to-pick
+  // Gestures: one finger pans / taps-to-pick; two fingers pinch-zoom.
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const draggingRef = useRef(false);
   const [dragging, setDragging] = useState(false);
-  const down = (e: React.PointerEvent<HTMLDivElement>) => { e.currentTarget.setPointerCapture(e.pointerId); startRef.current = { x: e.clientX, y: e.clientY }; draggingRef.current = false; setDragging(false); };
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ dist: number; zoom: number; panX: number; panY: number; midX: number; midY: number } | null>(null);
+
+  const beginPinch = () => {
+    const el = zoneRef.current;
+    if (!el || pointersRef.current.size < 2) return;
+    const [p1, p2] = [...pointersRef.current.values()];
+    const r = el.getBoundingClientRect();
+    pinchRef.current = {
+      dist: Math.hypot(p2.x - p1.x, p2.y - p1.y),
+      zoom: zoomRef.current, panX: panRef.current.x, panY: panRef.current.y,
+      midX: (p1.x + p2.x) / 2 - r.left, midY: (p1.y + p2.y) / 2 - r.top,
+    };
+    draggingRef.current = true; // a pinch is never a tap
+  };
+
+  const down = (e: React.PointerEvent<HTMLDivElement>) => {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer not capturable */ }
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 2) { beginPinch(); return; }
+    startRef.current = { x: e.clientX, y: e.clientY };
+    draggingRef.current = false; setDragging(false);
+  };
+
   const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    const pt = pointersRef.current.get(e.pointerId);
+    if (pt) { pt.x = e.clientX; pt.y = e.clientY; }
+
+    // Two-finger pinch zoom (toward the pinch midpoint) + two-finger pan.
+    if (pointersRef.current.size >= 2 && pinchRef.current) {
+      const el = zoneRef.current;
+      if (!el) return;
+      const [p1, p2] = [...pointersRef.current.values()];
+      const base = pinchRef.current;
+      const { w: zw, h: zh } = zoneR.current;
+      const r = el.getBoundingClientRect();
+      const curMidX = (p1.x + p2.x) / 2 - r.left, curMidY = (p1.y + p2.y) / 2 - r.top;
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const nz = Math.max(1, Math.min(4, base.zoom * (dist / base.dist)));
+      const ratio = nz / base.zoom;
+      const mx = base.midX - zw / 2, my = base.midY - zh / 2;
+      const nx = mx * (1 - ratio) + base.panX * ratio + (curMidX - base.midX);
+      const ny = my * (1 - ratio) + base.panY * ratio + (curMidY - base.midY);
+      const np = clampPan(nx, ny, nz, fit.fw, fit.fh, zw, zh);
+      zoomRef.current = nz; panRef.current = np; setZoom(nz); setPan(np);
+      return;
+    }
+
+    // Single-finger pan / tap.
     if (!startRef.current) return;
     const dx = e.clientX - startRef.current.x, dy = e.clientY - startRef.current.y;
     if (!draggingRef.current && Math.hypot(dx, dy) > 4) { draggingRef.current = true; setDragging(true); }
@@ -884,9 +931,23 @@ function ZoomStage({
       startRef.current = { x: e.clientX, y: e.clientY }; panRef.current = np; setPan(np);
     }
   };
+
   const up = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) canvasRef.current?.pickColorAt(e.clientX, e.clientY);
-    startRef.current = null; draggingRef.current = false; setDragging(false);
+    const hadTwo = pointersRef.current.size >= 2;
+    pointersRef.current.delete(e.pointerId);
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    if (pointersRef.current.size === 1) {
+      // One finger lifted mid-pinch — keep panning with the finger still down.
+      const [rem] = [...pointersRef.current.values()];
+      startRef.current = { x: rem.x, y: rem.y };
+      draggingRef.current = true;
+      return;
+    }
+    if (pointersRef.current.size === 0) {
+      if (!draggingRef.current && !hadTwo) canvasRef.current?.pickColorAt(e.clientX, e.clientY);
+      startRef.current = null; draggingRef.current = false; setDragging(false);
+    }
   };
 
   const setZoomTo = (z: number) => {
@@ -908,7 +969,7 @@ function ZoomStage({
         </div>
       )}
       {/* transparent overlay: pan when zoomed, tap to pick */}
-      <div className="absolute inset-0" style={{ cursor, zIndex: 1, touchAction: "none" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} />
+      <div className="absolute inset-0" style={{ cursor, zIndex: 1, touchAction: "none" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} />
       {footerLeft && <div className="absolute" style={{ left: 12, bottom: 12, zIndex: 2 }}>{footerLeft}</div>}
       {/* zoom control */}
       <div className="absolute flex items-center gap-1.5" style={{ right: 12, bottom: 12, zIndex: 2, background: "rgba(255,255,255,.94)", border: `1px solid ${HAIR}`, borderRadius: 9, padding: "5px 9px" }}>
